@@ -1106,36 +1106,41 @@ const Views = {
                     </div>
                 </div>
                 <div class="glass-card">
-                    <div class="table-container">
-                        <table class="table">
-                            <thead>
-                                <tr><th>Mã HĐ</th><th>Chuyến số</th><th>Khách hàng</th><th>Tàu</th><th>Thời gian</th><th>Doanh thu thực</th><th>Doanh thu HĐ</th><th>Tiền gửi lại</th><th>Hiệu quả</th><th>Thao tác</th></tr>
-                            </thead>
-                            <tbody>
-                                ${ships.map(s => {
-                                    const costSum = Object.values(s.costs || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-                                    const profit = s.revenueReal - costSum;
-                                    return `
-                                        <tr>
-                                            <td><strong>${s.contractNo || '---'}</strong></td>
-                                            <td><span class="badge badge-outline">${s.voyageNo || '---'}</span></td>
-                                            <td><span class="text-info">${s.customer || '---'}</span></td>
-                                            <td><span class="badge badge-success">${s.vesselId}</span></td>
-                                            <td><small>${s.dateStart} → ${s.dateEnd}</small></td>
-                                            <td>${AppData.formatCurrency(s.revenueReal)}</td>
-                                            <td>${AppData.formatCurrency(s.revenueInvoice)}</td>
-                                            <td style="color:var(--warning)">${AppData.formatCurrency(s.refundAmount)}</td>
-                                            <td class="${profit >= 0 ? 'value-positive' : 'value-negative'}"><strong>${AppData.formatCurrency(profit)}</strong></td>
-                                            <td>
-                                                <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" title="Xem Báo Cáo" onclick="app.openShipmentReport('${s.id}')"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--success)"></i></button>
-                                                <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" title="Sửa" onclick="app.editShipment('${s.id}')"><i class="fa-solid fa-pen" style="color:var(--info)"></i></button>
-                                                <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" title="Xóa" onclick="app.deleteShipment('${s.id}')"><i class="fa-solid fa-trash" style="color:var(--accent)"></i></button>
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
+                    <div class="double-scroll-wrapper" id="shipments-scroll-wrapper">
+                        <div class="top-scrollbar" style="overflow-x: auto; overflow-y: hidden; height: 8px; margin-bottom: 6px; border-radius: 4px; display: none;">
+                            <div class="top-scrollbar-dummy" style="height: 1px;"></div>
+                        </div>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr><th>Mã HĐ</th><th>Chuyến số</th><th>Khách hàng</th><th>Tàu</th><th>Số ngày</th><th>Doanh thu thực</th><th>Doanh thu HĐ</th><th>Tiền gửi lại</th><th>Hiệu quả</th><th>Thao tác</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${ships.map(s => {
+                                        const costSum = Object.values(s.costs || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                                        const profit = s.revenueReal - costSum;
+                                        return `
+                                            <tr>
+                                                <td><strong>${s.contractNo || '---'}</strong></td>
+                                                <td><span class="badge badge-outline">${s.voyageNo || '---'}</span></td>
+                                                <td><span class="text-info">${s.customer || '---'}</span></td>
+                                                <td><span class="badge badge-success">${s.vesselId}</span></td>
+                                                <td><strong>${AppData.calcDays(s.dateStart, s.dateEnd)}</strong> ngày</td>
+                                                <td>${AppData.formatCurrency(s.revenueReal)}</td>
+                                                <td>${AppData.formatCurrency(s.revenueInvoice)}</td>
+                                                <td style="color:var(--warning)">${AppData.formatCurrency(s.refundAmount)}</td>
+                                                <td class="${profit >= 0 ? 'value-positive' : 'value-negative'}"><strong>${AppData.formatCurrency(profit)}</strong></td>
+                                                <td>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" title="Xem Báo Cáo" onclick="app.openShipmentReport('${s.id}')"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--success)"></i></button>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" title="Sửa" onclick="app.editShipment('${s.id}')"><i class="fa-solid fa-pen" style="color:var(--info)"></i></button>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" title="Xóa" onclick="app.deleteShipment('${s.id}')"><i class="fa-solid fa-trash" style="color:var(--accent)"></i></button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>

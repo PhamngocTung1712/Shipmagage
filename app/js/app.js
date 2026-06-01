@@ -1400,6 +1400,64 @@ const app = {
         if (viewName === 'vessel-expenses') {
             this.loadVesselExpenses();
         }
+        if (viewName === 'shipments') {
+            this.initDoubleScroll('shipments-scroll-wrapper');
+        }
+    },
+
+    initDoubleScroll(wrapperId) {
+        setTimeout(() => {
+            const wrapper = document.getElementById(wrapperId);
+            if (!wrapper) return;
+            
+            const topScroll = wrapper.querySelector('.top-scrollbar');
+            const tableContainer = wrapper.querySelector('.table-container');
+            const dummy = wrapper.querySelector('.top-scrollbar-dummy');
+            const table = wrapper.querySelector('.table');
+            
+            if (!topScroll || !tableContainer || !dummy || !table) return;
+            
+            const updateWidth = () => {
+                const tableWidth = table.scrollWidth;
+                const containerWidth = tableContainer.clientWidth;
+                
+                if (tableWidth > containerWidth) {
+                    topScroll.style.display = 'block';
+                    dummy.style.width = tableWidth + 'px';
+                } else {
+                    topScroll.style.display = 'none';
+                }
+            };
+            
+            updateWidth();
+            
+            if (window.ResizeObserver) {
+                const observer = new ResizeObserver(() => updateWidth());
+                observer.observe(table);
+                observer.observe(tableContainer);
+                wrapper._scrollbarObserver = observer;
+            } else {
+                window.onresize = updateWidth;
+            }
+            
+            let activeScroll = null;
+            
+            topScroll.onscroll = () => {
+                if (activeScroll !== tableContainer) {
+                    activeScroll = topScroll;
+                    tableContainer.scrollLeft = topScroll.scrollLeft;
+                }
+                activeScroll = null;
+            };
+            
+            tableContainer.onscroll = () => {
+                if (activeScroll !== topScroll) {
+                    activeScroll = tableContainer;
+                    topScroll.scrollLeft = tableContainer.scrollLeft;
+                }
+                activeScroll = null;
+            };
+        }, 150);
     },
 
     changeDebtCustomer(custName) {
