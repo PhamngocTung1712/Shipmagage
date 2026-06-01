@@ -2126,25 +2126,29 @@ const Views = {
                         <div style="margin-top: 1.5rem;">
                             <!-- 1. Voyage ledger -->
                             <h3 style="font-size: 1.2rem; margin-bottom: 1rem;"><i class="fa-solid fa-ship" style="color:var(--primary-light); margin-right: 0.5rem;"></i>1. Phát sinh Doanh thu từng chuyến</h3>
-                            <div class="table-container" style="margin-bottom: 2.5rem;">
-                                ${console.log('DEBUG DATA', selectedData.transactions, selectedData.shipments) || ''}
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>STT</th>
-                                            <th>Tàu & Chuyến</th>
-                                            <th>Hợp đồng</th>
-                                            <th>Thời gian</th>
-                                            <th style="text-align: right;">Sản lượng (Tấn)</th>
-                                            <th style="text-align: right;">Đơn giá</th>
-                                            <th style="text-align: right;">Doanh thu hóa đơn</th>
-                                            <th style="text-align: right; color: var(--text-muted);">Doanh thu thực tế</th>
-                                            <th style="text-align: right; color: var(--secondary);">Số tiền đã trả</th>
-                                            <th style="text-align: right; color: var(--accent);">Công nợ còn lại</th>
-                                            <th style="text-align: right;">Tiền gửi phát sinh</th>
-                                            <th style="text-align: right; color: var(--warning);">Tiền gửi còn lại</th>
-                                        </tr>
-                                    </thead>
+                            <div class="double-scroll-wrapper" id="debts-voyages-scroll-wrapper" style="margin-bottom: 2.5rem;">
+                                <div class="top-scrollbar" style="overflow-x: auto; overflow-y: hidden; height: 8px; margin-bottom: 6px; border-radius: 4px; display: none;">
+                                    <div class="top-scrollbar-dummy" style="height: 1px;"></div>
+                                </div>
+                                <div class="table-container">
+                                    ${console.log('DEBUG DATA', selectedData.transactions, selectedData.shipments) || ''}
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>STT</th>
+                                                <th>Tàu & Chuyến</th>
+                                                <th>Hợp đồng</th>
+                                                <th>Số ngày</th>
+                                                <th style="text-align: right;">Sản lượng (Tấn)</th>
+                                                <th style="text-align: right;">Đơn giá</th>
+                                                <th style="text-align: right;">Doanh thu hóa đơn</th>
+                                                <th style="text-align: right; color: var(--text-muted);">Doanh thu thực tế</th>
+                                                <th style="text-align: right; color: var(--secondary);">Số tiền đã trả</th>
+                                                <th style="text-align: right; color: var(--accent);">Công nợ còn lại</th>
+                                                <th style="text-align: right;">Tiền gửi phát sinh</th>
+                                                <th style="text-align: right; color: var(--warning);">Tiền gửi còn lại</th>
+                                            </tr>
+                                        </thead>
                                     <tbody>
                                         ${(() => {
                                             const sortedShipments = [...selectedData.shipments].sort((a, b) => {
@@ -2228,7 +2232,7 @@ const Views = {
                                                         <td>${idx + 1}</td>
                                                         <td><strong>${vessel ? vessel.name : s.vesselId}</strong> <span class="badge badge-outline">Chuyến ${s.voyageNo}</span></td>
                                                         <td><code style="font-size: 1.1rem; font-weight: bold; padding: 4px 8px; color: var(--primary-light); background: rgba(255,255,255,0.08); border-radius: 4px;">${s.contractNo || '---'}</code></td>
-                                                        <td style="font-size: 0.8rem; color:var(--text-muted);">${s.dateStart.split('-').reverse().join('/')} - ${s.dateEnd.split('-').reverse().join('/')}</td>
+                                                        <td><strong>${AppData.calcDays(s.dateStart, s.dateEnd)}</strong> ngày</td>
                                                         <td style="text-align: right; font-weight: 500;">${s.qty ? s.qty.toLocaleString('vi-VN') : 0}</td>
                                                         <td style="text-align: right;">${s.rate ? s.rate.toLocaleString('vi-VN') : '0'}</td>
                                                         <td style="text-align: right; font-weight: 600; color: var(--info);">${AppData.formatCurrency(invoiceAmt)}</td>
@@ -2261,6 +2265,7 @@ const Views = {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
 
                             <div class="grid-2" style="margin-bottom: 2.5rem; gap: 1.5rem;">
                                 <!-- 2. Payments ledger -->

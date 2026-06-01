@@ -1403,6 +1403,9 @@ const app = {
         if (viewName === 'shipments') {
             this.initDoubleScroll('shipments-scroll-wrapper');
         }
+        if (viewName === 'debts') {
+            this.initDoubleScroll('debts-voyages-scroll-wrapper');
+        }
     },
 
     initDoubleScroll(wrapperId) {
