@@ -6,13 +6,13 @@
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAoAhYpcijQZ0Wgs8ZwtMmcyWX3-pf7jmQ",
-  authDomain: "shipmanagevgt.firebaseapp.com",
-  projectId: "shipmanagevgt",
-  storageBucket: "shipmanagevgt.firebasestorage.app",
-  messagingSenderId: "266936765184",
-  appId: "1:266936765184:web:52abed9b1caa12ffaec1e5",
-  measurementId: "G-P5N1346GZS"
+  apiKey: "AIzaSyAojeQRZeuo3TsWP8jwtIRQeEuiKi3rSKg",
+  authDomain: "shipmanagev33333.firebaseapp.com",
+  projectId: "shipmanagev33333",
+  storageBucket: "shipmanagev33333.firebasestorage.app",
+  messagingSenderId: "208092300439",
+  appId: "1:208092300439:web:e530edbb94c6fcc09fd5d2",
+  measurementId: "G-SL25NGVYQC"
 };
 
 let db = null;
@@ -292,7 +292,7 @@ window.forceSyncToCloud = function() {
     if (confirm("HÀNH ĐỘNG NÀY SẼ GHI ĐÈ TOÀN BỘ DỮ LIỆU ĐÁM MÂY BẰNG DỮ LIỆU ĐANG CÓ TRÊN MÁY TÍNH NÀY.\n\nBạn có chắc chắn muốn ép đẩy dữ liệu Local lên Cloud không?")) {
         updateServerStatus('connecting', 'Đang ép lưu (REST API)...');
         
-        const url = `https://firestore.googleapis.com/v1/projects/shipmanagevgt/databases/(default)/documents/shipmanage/state?key=${firebaseConfig.apiKey}`;
+        const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/shipmanage/state?key=${firebaseConfig.apiKey}`;
         
         const payload = {
             fields: {
