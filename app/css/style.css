@@ -81,7 +81,7 @@ body {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1.15rem;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -312,7 +312,7 @@ a:hover {
 /* View Container */
 .view-container {
     flex: 1;
-    padding: 2rem;
+    padding: 1rem 2rem;
     overflow-y: auto;
     position: relative;
     z-index: 1;
@@ -325,7 +325,7 @@ a:hover {
 
 /* Page Header */
 .page-header {
-    margin-bottom: 2rem;
+    margin-bottom: 1.15rem;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
@@ -437,6 +437,8 @@ a:hover {
 /* Tables */
 .table-container {
     overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 225px);
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
     background: rgba(0, 0, 0, 0.15);
@@ -448,9 +450,10 @@ a:hover {
 }
 
 .table th, .table td {
-    padding: 1rem 1.2rem;
+    padding: 0.65rem 0.85rem;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
+    font-size: 0.88rem;
 }
 
 .table th {
@@ -631,8 +634,8 @@ a:hover {
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
 }
 
 .kpi-card {
@@ -640,7 +643,7 @@ a:hover {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1rem 1.25rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -710,8 +713,8 @@ a:hover {
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
 }
 
 @media (max-width: 1024px) {
@@ -724,11 +727,11 @@ a:hover {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1rem 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    min-height: 380px;
+    gap: 0.75rem;
+    min-height: 320px;
 }
 
 .chart-card-header {
@@ -958,7 +961,15 @@ a:hover {
     }
     
     .view-container {
-        padding: 1.25rem;
+        padding: 1rem;
+    }
+    
+    .table-container {
+        max-height: none !important;
+    }
+    
+    .grid-2 .table-container {
+        max-height: none !important;
     }
     
     /* Adjust grid layouts */
@@ -1058,4 +1069,41 @@ a:hover {
     .login-header h2 {
         font-size: 1.3rem;
     }
+}
+
+/* ==========================================================================
+   Premium Scrollbar Styling & Compact Sizing Overrides
+   ========================================================================== */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    transition: background var(--transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.45);
+}
+
+/* For Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Nested Table Container Sizing Overrides */
+.grid-2 .table-container {
+    max-height: 280px;
+}
+
+.modal .table-container {
+    max-height: 380px;
 }
