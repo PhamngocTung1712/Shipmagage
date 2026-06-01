@@ -1,10 +1,10 @@
 /**
- * Firebase Integration & Cloud Database Sync V2.5
+ * Firebase Integration & Cloud Database Sync V3.0 (Realtime Database Version)
  * Author: Antigravity Code Assistant
- * Functions: Firebase authentication observer, Firestore sync, and REST API force sync fallback.
+ * Functions: Firebase authentication observer, Realtime Database sync.
  */
 
-// Your web app's Firebase configuration
+// Your web app's Firebase configuration with Singapore Realtime Database URL
 const firebaseConfig = {
   apiKey: "AIzaSyAojeQRZeuo3TsWP8jwtIRQeEuiKi3rSKg",
   authDomain: "shipmanagev33333.firebaseapp.com",
@@ -12,10 +12,12 @@ const firebaseConfig = {
   storageBucket: "shipmanagev33333.firebasestorage.app",
   messagingSenderId: "208092300439",
   appId: "1:208092300439:web:e530edbb94c6fcc09fd5d2",
-  measurementId: "G-SL25NGVYQC"
+  measurementId: "G-SL25NGVYQC",
+  databaseURL: "https://shipmanagev33333-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
 let db = null;
+let docRef = null;
 let isFirebaseInitialized = false;
 const DB_KEY = 'shipManageDB_v2'; // Must match data.js
 
@@ -24,9 +26,9 @@ function initFirebase() {
     try {
         if (typeof firebase !== 'undefined') {
             firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
+            db = firebase.database();
             isFirebaseInitialized = true;
-            console.log("Firebase initialized successfully!");
+            console.log("Firebase Realtime Database initialized successfully!");
             
             // Listen for authentication changes
             setupAuthObserver();
@@ -184,19 +186,19 @@ function updateServerStatus(status, text) {
     `;
 }
 
-// Two-way synchronization with Firebase Firestore
+// Two-way synchronization with Firebase Realtime Database
 function setupFirebaseSync() {
     if (!db) return;
     
-    const docRef = db.collection('shipmanage').doc('state');
+    docRef = db.ref('shipmanage/state');
     updateServerStatus('connecting', 'Đang kết nối Cloud...');
 
-    // 1. Listen for updates in Firestore
-    docRef.onSnapshot((doc) => {
-        if (doc.exists) {
-            let cloudState = doc.data();
-            console.log("Received state update from Firebase Firestore.");
-            
+    // 1. Listen for updates in Realtime Database
+    docRef.on('value', (snapshot) => {
+        let cloudState = snapshot.val();
+        console.log("Received state update from Firebase Realtime Database.");
+        
+        if (cloudState) {
             // Check if document stores state as a string in 'data' field
             if (cloudState && typeof cloudState === 'object' && cloudState.data && typeof cloudState.data === 'string') {
                 try {
@@ -218,45 +220,39 @@ function setupFirebaseSync() {
                 
                 updateServerStatus('online', 'Đồng bộ Đám mây');
             } else {
-                console.warn("Received empty or invalid state from Firestore.");
+                console.warn("Received empty or invalid state from Realtime Database.");
                 updateServerStatus('error', 'Dữ liệu trống');
             }
         } else {
-            // First time use: Firestore is empty, upload local state as initial backup
-            console.log("Firestore has no existing data. Uploading local state as backup.");
+            // First time use: RTDB is empty, upload local state as initial backup
+            console.log("Realtime Database has no existing data. Uploading local state as backup.");
             if (AppData.state) {
                 pushStateToCloud(AppData.state);
             }
         }
     }, (error) => {
-        console.error("Firestore sync subscription error:", error);
-        if (error.code === 'permission-denied') {
-            updateServerStatus('error', 'Lỗi bảo mật (Chưa phân quyền rules)');
-        } else {
-            updateServerStatus('error', 'Lỗi đồng bộ (Ngoại tuyến)');
-        }
+        console.error("Realtime Database sync subscription error:", error);
+        updateServerStatus('error', 'Lỗi đồng bộ (Ngoại tuyến)');
     });
 
-    // 2. Intercept AppData.save() to automatically push changes to Firestore
+    // 2. Intercept AppData.save() to automatically push changes to Realtime Database
     const originalSave = AppData.save;
     AppData.save = function() {
         // Save locally first for speed
         originalSave.call(AppData);
         
         // Push to Firebase in background
-        if (isFirebaseInitialized && db && firebase.auth().currentUser) {
+        if (isFirebaseInitialized && docRef && firebase.auth().currentUser) {
             pushStateToCloud(AppData.state);
         }
     };
 }
 
-// Core function to push state to Firestore (supports direct object and stringified data fields)
+// Core function to push state to Realtime Database (stores stateData as a stringified payload inside 'data')
 function pushStateToCloud(stateData) {
-    if (!db) return;
-    const docRef = db.collection('shipmanage').doc('state');
+    if (!docRef) return;
     updateServerStatus('connecting', 'Đang lưu đám mây...');
     
-    // We stringify the state inside a single field 'data' to prevent Firestore depth/field limits
     const payload = {
         data: JSON.stringify(stateData),
         updatedAt: new Date().toISOString()
@@ -267,16 +263,12 @@ function pushStateToCloud(stateData) {
             updateServerStatus('online', 'Đồng bộ Đám mây');
         })
         .catch((err) => {
-            console.error("Failed to save to Firebase Firestore:", err);
-            if (err.code === 'permission-denied') {
-                updateServerStatus('error', 'Lỗi ghi dữ liệu (Quyền rules)');
-            } else {
-                updateServerStatus('error', 'Lỗi lưu (Offline)');
-            }
+            console.error("Failed to save to Firebase Realtime Database:", err);
+            updateServerStatus('error', 'Lỗi lưu (Offline)');
         });
 }
 
-// Force local data up to Firebase Firestore using direct Google REST API (bypasses WebSocket issues on file:// protocol)
+// Force local data up to Firebase Realtime Database directly using SDK
 window.forceSyncToCloud = function() {
     if (!AppData.state) {
         alert("Lỗi: Không có dữ liệu cục bộ để đẩy!");
@@ -290,42 +282,23 @@ window.forceSyncToCloud = function() {
     }
     
     if (confirm("HÀNH ĐỘNG NÀY SẼ GHI ĐÈ TOÀN BỘ DỮ LIỆU ĐÁM MÂY BẰNG DỮ LIỆU ĐANG CÓ TRÊN MÁY TÍNH NÀY.\n\nBạn có chắc chắn muốn ép đẩy dữ liệu Local lên Cloud không?")) {
-        updateServerStatus('connecting', 'Đang ép lưu (REST API)...');
-        
-        const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/shipmanage/state?key=${firebaseConfig.apiKey}`;
+        updateServerStatus('connecting', 'Đang ép lưu...');
         
         const payload = {
-            fields: {
-                data: {
-                    stringValue: JSON.stringify(AppData.state)
-                },
-                updatedAt: {
-                    stringValue: new Date().toISOString()
-                }
-            }
+            data: JSON.stringify(AppData.state),
+            updatedAt: new Date().toISOString()
         };
 
-        fetch(url, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => { throw err; });
-            }
-            return response.json();
-        })
-        .then(() => {
-            alert("✅ ĐỒNG BỘ THÀNH CÔNG!\n\nĐã ghi đè dữ liệu cục bộ lên Đám mây. Các thiết bị khác (iPad, Điện thoại) sẽ tự động đồng bộ sau vài giây!");
-            updateServerStatus('online', 'Đồng bộ Đám mây');
-        })
-        .catch((err) => {
-            console.error("REST API force sync failed:", err);
-            updateServerStatus('error', 'Lỗi ép đồng bộ');
-            let errorMsg = err.error && err.error.message ? err.error.message : JSON.stringify(err);
-            alert("❌ THẤT BẠI: Lỗi đồng bộ đám mây!\n\nChi tiết: " + errorMsg);
-        });
+        docRef.set(payload)
+            .then(() => {
+                alert("✅ ĐỒNG BỘ THÀNH CÔNG!\n\nĐã ghi đè dữ liệu cục bộ lên Đám mây. Các thiết bị khác (iPad, Điện thoại) sẽ tự động đồng bộ sau vài giây!");
+                updateServerStatus('online', 'Đồng bộ Đám mây');
+            })
+            .catch((err) => {
+                console.error("Force sync failed:", err);
+                updateServerStatus('error', 'Lỗi ép đồng bộ');
+                alert("❌ THẤT BẠI: Lỗi đồng bộ đám mây!\n\nChi tiết: " + err.message);
+            });
     }
 };
 
