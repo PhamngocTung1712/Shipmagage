@@ -2,2403 +2,9895 @@
  * State Management & LocalStorage Mock Database - V2.0
  */
 
+const hasFontError = (str) => {
+    if (!str) return false;
+    return /[\u00c3\u00c4\u00c6\u00bb\u00ba\u00bd\u00be\u00bf]/.test(str);
+};
+
+const fixMojibake = (str) => {
+    if (!str) return str;
+    try {
+        if (hasFontError(str)) {
+            const bytes = new Uint8Array(str.split('').map(c => c.charCodeAt(0)));
+            const decoded = new TextDecoder('utf-8').decode(bytes);
+            if (decoded && !decoded.includes('\ufffd') && decoded.trim() !== '') {
+                return decoded;
+            }
+        }
+    } catch (e) {}
+    return str;
+};
+
+const correctVendors = [
+    { name: 'Petrolimex', type: 'Dầu DO/LO', contact: '0987654321', address: 'Hải Phòng' },
+    { name: 'Cảng Chân Mây', type: 'Cảng', contact: '0987654322', address: 'Huế' },
+    { name: 'Lê Phạm', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Sunshine', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Sông Hậu', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Quốc Tế Xanh', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Hoàng Đăng', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Alberta', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Công ty Đại Dương', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Petrotime', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Hoàng Khải', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Nhất Minh Sơn', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Long Bình', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Sơn HP', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Công ty Tấn My', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Pvoil Đà Nẵng', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'PV Oil miền trung', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Hồng Vân', type: 'Đối tác giao dịch', contact: '---', address: '---' },
+    { name: 'Hồng Minh', type: 'Đối tác giao dịch', contact: '---', address: '---' }
+];
+
+const correctCustomers = [
+    { name: 'Ngọc Anh', contact: '---', address: '---' },
+    { name: 'Hoàng Quyên', contact: '---', address: '---' },
+    { name: 'Bình Minh', contact: '---', address: '---' },
+    { name: 'Thái Bình Dương', contact: '---', address: '---' },
+    { name: 'Việt Anh', contact: '---', address: '---' }
+];
+
 const DEFAULT_STATE = {
-    company: {
-        name: 'CÔNG TY TNHH VẬN TẢI BIỂN',
-        taxId: '0123456789',
-        bankInfo: 'Ngân hàng ACB - 123456789',
-        address: 'Số 123, Đường Biển, Hải Phòng',
-        openingBalances: {
-            'ABbank': 0,
-            'Viettinbank': 0,
-            'Tài khoản cá nhân': 0,
-            'Tiền mặt': 0
+    "company": {
+        "name": "CÔNG TY TNHH VẬN TẢI BIỂN",
+        "taxId": "0123456789",
+        "bankInfo": "Ngân hàng ACB - 123456789",
+        "address": "Số 123, Đường Biển, Hải Phòng",
+        "openingBalances": {
+            "ABbank": 0,
+            "Viettinbank": 0,
+            "Tài khoản cá nhân": 0,
+            "Tiền mặt": 0
         }
     },
-    vessels: [
-        { id: 'VG05', name: 'Vũ Gia 05', capacity: 3000, captain: 'Nguyễn Văn A', fuelRate: 90 }, // 90 liters/hour
-        { id: 'VG09', name: 'Vũ Gia 09', capacity: 5000, captain: 'Trần Văn B', fuelRate: 110 },
-        { id: 'VG15', name: 'Vũ Gia 15', capacity: 4000, captain: 'Lê Văn C', fuelRate: 160 },
-        { id: 'VG18', name: 'Vũ Gia 18', capacity: 3500, captain: 'Phạm Văn D', fuelRate: 155 },
-        { id: 'VG36', name: 'Vũ Gia 36', capacity: 6000, captain: 'Hoàng Văn E', fuelRate: 200 }
+    "vessels": [
+        {
+            "id": "VG05",
+            "name": "Vũ Gia 05",
+            "capacity": 3000,
+            "captain": "Nguyễn Văn A",
+            "fuelRate": 90
+        },
+        {
+            "id": "VG09",
+            "name": "Vũ Gia 09",
+            "capacity": 5000,
+            "captain": "Trần Văn B",
+            "fuelRate": 110
+        },
+        {
+            "id": "VG15",
+            "name": "Vũ Gia 15",
+            "capacity": 4000,
+            "captain": "Lê Văn C",
+            "fuelRate": 160
+        },
+        {
+            "id": "VG18",
+            "name": "Vũ Gia 18",
+            "capacity": 3500,
+            "captain": "Phạm Văn D",
+            "fuelRate": 155
+        },
+        {
+            "id": "VG36",
+            "name": "Vũ Gia 36",
+            "capacity": 6000,
+            "captain": "Hoàng Văn E",
+            "fuelRate": 200
+        }
     ],
-    vendors: [
-        { id: 'v1', name: 'Petrolimex', type: 'Dầu DO/LO', contact: '0987654321', address: 'Hải Phòng' },
-        { id: 'v2', name: 'Cảng Chân Mây', type: 'Cảng', contact: '0987654322', address: 'Huế' }
+    "vendors": [
+        {
+            "id": "v1",
+            "name": "Petrolimex",
+            "type": "Dầu DO/LO",
+            "contact": "0987654321",
+            "address": "Hải Phòng"
+        },
+        {
+            "id": "v2",
+            "name": "Cảng Chân Mây",
+            "type": "Cảng",
+            "contact": "0987654322",
+            "address": "Huế"
+        }
     ],
-    customers: [
-        { id: 'c1', name: 'Ng\u1ecdc Anh', contact: '', address: '' },
-        { id: 'c2', name: 'Ho\u00e0ng Quy\u00ean', contact: '', address: '' },
-        { id: 'c3', name: 'B\u00ecnh Minh', contact: '', address: '' },
-        { id: 'c4', name: 'Th\u00e1i B\u00ecnh D\u01b0\u01a1ng', contact: '', address: '' },
-        { id: 'c5', name: 'Vi\u1ec7t Anh', contact: '', address: '' }
+    "customers": [
+        {
+            "id": "c1",
+            "name": "Ngọc Anh",
+            "contact": "",
+            "address": ""
+        },
+        {
+            "id": "c2",
+            "name": "Hoàng Quyên",
+            "contact": "",
+            "address": ""
+        },
+        {
+            "id": "c3",
+            "name": "Bình Minh",
+            "contact": "",
+            "address": ""
+        },
+        {
+            "id": "c4",
+            "name": "Thái Bình Dương",
+            "contact": "",
+            "address": ""
+        },
+        {
+            "id": "c5",
+            "name": "Việt Anh",
+            "contact": "",
+            "address": ""
+        }
     ],
-    transactions: [
-        { id: 'TXfc661950-fcad-4421-8b88-555d152031b9', date: '2026-04-01', vessel: 'VG36', category: '4.Dầu DO', partner: '', content: 'Tạm ứng Cấp dầu VG36', thu: 0, chi: 350000000, account: 'ABbank' },
-        { id: 'TXa34306f7-e1f7-4315-bf97-de32b0b9cdd2', date: '2026-04-01', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'Tài khoản cá nhân' },
-        { id: 'TX9af47d33-9396-44f3-9f20-c69832b41c4b', date: '2026-04-01', vessel: 'VG36', category: 'CVC', partner: 'Ngọc Anh', content: 'HD22 VG36 Quặng Vĩnh Xương - Hải Phòng', thu: 300000000, chi: 0, account: 'ABbank' },
-        { id: 'TX74b0e1d3-6de4-4b95-9673-26ea5d16525e', date: '2026-04-02', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX3e723ec3-90aa-4a1e-8b0e-29980603e099', date: '2026-04-02', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 10000000, account: 'ABbank' },
-        { id: 'TXc350dc85-c02a-4750-a51f-0fff7faf200a', date: '2026-04-02', vessel: 'VG36', category: 'CVC', partner: 'Ngọc Anh', content: 'HD22 VG36 Quặng Vĩnh Xương - Hải Phòng', thu: 380730050, chi: 0, account: 'ABbank' },
-        { id: 'TXd7c10c8d-fed7-4e68-b05d-714397800ed0', date: '2026-04-03', vessel: 'VG09', category: '9.Vật Tư', partner: '', content: 'Sơn HP', thu: 0, chi: 21112488, account: 'ABbank' },
-        { id: 'TX52ab79d6-7178-4ea8-86b5-ea7d7acd6123', date: '2026-04-03', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Đối ứng in hải đồ', thu: 7596000, chi: 0, account: 'Tài khoản cá nhân' },
-        { id: 'TX60b673ff-f0ca-43bf-af1c-ccdbe0798be5', date: '2026-04-03', vessel: 'VG18', category: '9.Vật Tư', partner: '', content: 'In hải đồ', thu: 0, chi: 7776000, account: 'ABbank' },
-        { id: 'TX18b4ba8c-82d5-4eb3-b6c9-4a205e3f899d', date: '2026-04-03', vessel: 'VG36', category: 'CVC', partner: '', content: 'HD9 VG36 Clinker Hòn La - Hậu Giang', thu: 200000000, chi: 0, account: 'Viettinbank' },
-        { id: 'TXe214d2cb-f150-4c8c-b573-cb4c620be98b', date: '2026-04-03', vessel: 'VG09', category: '4.Dầu DO', partner: 'PV Oil miền trung', content: 'Cấp dầu VG09', thu: 0, chi: 700000000, account: 'ABbank' },
-        { id: 'TX47592da1-fd90-4222-876e-616b251f0dfa', date: '2026-04-03', vessel: 'VG09', category: '4.Dầu DO', partner: 'PV Oil miền trung', content: 'Cấp dầu VG09', thu: 0, chi: 138962500, account: 'Viettinbank' },
-        { id: 'TX92e09b77-2a00-4e1c-ba5e-4af000a55e3b', date: '2026-04-03', vessel: 'VG15', category: 'CVC', partner: 'Ngọc Anh', content: 'HD23 VG15 Xỉ Sơn Dương - Hậu Giang', thu: 500000000, chi: 0, account: 'ABbank' },
-        { id: 'TX52b3f3d6-5c9b-47b4-aa53-7ae32e4d0ae0', date: '2026-04-03', vessel: 'VG05', category: 'CVC', partner: 'Bình Minh', content: 'HD25 VG05 Clinker Hòn La  - Cần Thơ', thu: 467913200, chi: 0, account: 'ABbank' },
-        { id: 'TX15d4c5a7-8352-499b-876d-db165ea4619f', date: '2026-04-03', vessel: 'VG09', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 40000000, account: 'ABbank' },
-        { id: 'TXec94af84-ae2a-41f4-b262-9f50c60c689d', date: '2026-04-03', vessel: 'VG18', category: 'Nhận Nợ NH', partner: '', content: 'Vay ngắn hạn ABBank', thu: 1390134000, chi: 0, account: 'ABbank' },
-        { id: 'TX42f905c8-df44-47f9-8281-487d3ca62e12', date: '2026-04-03', vessel: 'VG18', category: '4.Dầu DO', partner: '', content: 'Trả tiền dầu DO', thu: 0, chi: 1390134000, account: 'ABbank' },
-        { id: 'TX68f5f446-5503-4af6-9b97-33bed7c3d190', date: '2026-04-03', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Phí chuyển tiền', thu: 0, chi: 764574, account: 'ABbank' },
-        { id: 'TX14860f81-c617-4471-a5cb-c3fef58a9d8d', date: '2026-04-03', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: 'Lê Phạm', content: 'Đại lý C5 tại Sơn Dương', thu: 0, chi: 48961216, account: 'ABbank' },
-        { id: 'TXe0a95f4a-01d1-4fda-a195-32e1213d72c8', date: '2026-04-03', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: 'Sunshine', content: 'Đại lý C7 tại Gò Gia', thu: 0, chi: 43325000, account: 'ABbank' },
-        { id: 'TX0c30ff82-75b7-4d0d-a505-c7530e5bbb4f', date: '2026-04-03', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: 'Sunshine', content: 'Đại lý C5 tại HCM', thu: 0, chi: 42134000, account: 'ABbank' },
-        { id: 'TX7089bc20-d650-4b44-9c72-426a9d2330de', date: '2026-04-03', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: 'Sunshine', content: 'Đại lý C6 tại Đồng Nai', thu: 0, chi: 42652569, account: 'ABbank' },
-        { id: 'TXae03c4e3-84da-4681-8588-8b1122b96eee', date: '2026-04-03', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C6 tại Vĩnh Xương', thu: 0, chi: 9860490, account: 'ABbank' },
-        { id: 'TXdfc7f184-44db-4932-bfe0-1869f5fca080', date: '2026-04-03', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C6 tại Cần Thơ', thu: 0, chi: 21699456, account: 'ABbank' },
-        { id: 'TX943ff44f-4c44-4ed8-870c-65a0673311e6', date: '2026-04-03', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: '', content: 'Đại lý C7 tại Quảng Ninh', thu: 0, chi: 7331240, account: 'ABbank' },
-        { id: 'TXde2dc19b-b503-4ee9-9cde-5fbfd162b53d', date: '2026-04-03', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: '', content: 'Đại lý C7 tại Quảng Ninh phí ngoài', thu: 0, chi: 4000000, account: 'Tài khoản cá nhân' },
-        { id: 'TX94535509-aff3-46b7-95d3-130b4cfb0276', date: '2026-04-03', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Quốc Tế Xanh', content: 'Đại lý C6 tại Hải Phòng', thu: 0, chi: 8845900, account: 'ABbank' },
-        { id: 'TX8daf06c8-0e43-4dfa-8a5e-274408015385', date: '2026-04-03', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: 'Quốc Tế Xanh', content: 'Đại lý C5 tại Hải Phòng', thu: 0, chi: 28954579, account: 'ABbank' },
-        { id: 'TX895abb83-4f04-4b97-9001-28e3561a70b6', date: '2026-04-03', vessel: 'VG18', category: '4.Dầu DO', partner: '', content: 'Vận Chuyển dầu', thu: 0, chi: 7845000, account: 'ABbank' },
-        { id: 'TX4aa9e35e-8006-4a77-958a-84e4bb6957bc', date: '2026-04-04', vessel: 'VG36', category: 'CVC', partner: 'Hoàng Quyên', content: 'HD9 VG36 Clinker Hòn La - Hậu Giang', thu: 172049900, chi: 0, account: 'Viettinbank' },
-        { id: 'TX4a94700b-b93d-4746-84d5-bc84a4861284', date: '2026-04-04', vessel: 'VG05', category: 'CVC', partner: 'Hoàng Quyên', content: 'HD11 VG05 Cát Vĩnh Xương - Đà Nẵng', thu: 327950100, chi: 0, account: 'Viettinbank' },
-        { id: 'TX2921ac26-ad80-4caf-a982-8c9aaadd42d0', date: '2026-04-05', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: '', content: 'Tàu lai tại Đà Nẵng C7', thu: 0, chi: 9979200, account: 'ABbank' },
-        { id: 'TXb1d17996-169e-4bf6-9ebd-b7d9c5ebe30d', date: '2026-04-05', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: '', content: 'Cầu bến tại Đà Nẵng C7', thu: 0, chi: 5826506, account: 'ABbank' },
-        { id: 'TX3ab6bbb2-c73f-4cb1-a2ae-b55ec443a820', date: '2026-04-06', vessel: 'VG36', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX33b50919-2ab3-4693-a4ca-1fe64e67a7bb', date: '2026-04-06', vessel: 'VG09', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TXf9a24bb9-85fa-4f1d-bf94-04ad18d77752', date: '2026-04-06', vessel: 'VG05', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TXd35447fd-76f1-4e8d-8d0c-c4f2efff60b7', date: '2026-04-07', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 40000000, account: 'Viettinbank' },
-        { id: 'TXf655c250-278e-4e19-be84-ad72dcb0c7ba', date: '2026-04-08', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: '', content: 'Cầu bến lai dắt C7 tại Hòn La', thu: 0, chi: 22653032, account: 'ABbank' },
-        { id: 'TX8a0f38d8-e99d-4bda-8c74-fa43d07689c2', date: '2026-04-08', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: '', content: 'Hoa tiêu lai dắt C7 tại Hòn La', thu: 0, chi: 4320000, account: 'ABbank' },
-        { id: 'TX530e814d-152b-4bef-9b6e-7c6ef8cb7eca', date: '2026-04-08', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'Viettinbank' },
-        { id: 'TX2e510ce9-1ee1-40ab-8117-37ac95d5e27c', date: '2026-04-08', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 10000000, account: 'ABbank' },
-        { id: 'TX68b18e2b-71bd-49ab-8a3a-d3d8026933b7', date: '2026-04-08', vessel: 'VG05', category: 'CVC', partner: '', content: 'Trả tiền gửi HD25 Thái Bình Dương', thu: 0, chi: 55400000, account: 'Viettinbank' },
-        { id: 'TXec4ef882-8fae-43c5-ba62-0a7f209d5d66', date: '2026-04-08', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Luân chuyển tiền mặt', thu: 0, chi: 14600000, account: 'Viettinbank' },
-        { id: 'TX6b0047fe-e98d-462c-8b4a-da93fb664c4b', date: '2026-04-08', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Luân chuyển tiền mặt', thu: 14600000, chi: 0, account: 'Tài khoản cá nhân' },
-        { id: 'TX83c20ba4-b25e-4162-ae5f-82547956db13', date: '2026-04-08', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Thăm viếng bố đối tác', thu: 0, chi: 1000000, account: 'Tài khoản cá nhân' },
-        { id: 'TX44b9e7c7-bf2a-4b18-a284-7bd269a9cc3d', date: '2026-04-09', vessel: 'VG15', category: 'CVC', partner: 'Ngọc Anh', content: 'HD23 VG15 Xỉ Sơn Dương - Hậu Giang', thu: 425628000, chi: 0, account: 'ABbank' },
-        { id: 'TX124fd67d-7ffd-4737-9c16-110fbb5c4291', date: '2026-04-09', vessel: 'VG18', category: 'CVC', partner: 'Ngọc Anh', content: 'HD24 VG18 Cliker Hòn La - Hậu Giang', thu: 554372000, chi: 0, account: 'ABbank' },
-        { id: 'TX57c31c37-a0af-4c78-bc69-ce13fc4557f0', date: '2026-04-09', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: '', content: 'Phí ngoài Quảng Ninh', thu: 0, chi: 11000000, account: 'Tài khoản cá nhân' },
-        { id: 'TX46c65e1c-5173-4108-bf75-5760738d512a', date: '2026-04-09', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Cước điện thoại', thu: 0, chi: 776044, account: 'Tài khoản cá nhân' },
-        { id: 'TX7f49095b-cd61-47f7-9635-c136ba76f3bb', date: '2026-04-10', vessel: 'VG15', category: '4.Dầu DO', partner: '', content: 'Cấp dầu VG15 tại Đà Nẵng', thu: 0, chi: 995392000, account: 'ABbank' },
-        { id: 'TX9616b0cf-e7da-4782-99ea-d94a5d470564', date: '2026-04-10', vessel: 'VG15', category: '4.Dầu DO', partner: '', content: 'Vận chuyển dầu VG15 tại Đà Nẵng', thu: 0, chi: 18120000, account: 'ABbank' },
-        { id: 'TX9c8f8837-5076-4ece-8435-02ae4a995917', date: '2026-04-10', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: 'Hoàng Đăng', content: 'Đại lý C7 Tại Quảng Ninh', thu: 0, chi: 64699340, account: 'ABbank' },
-        { id: 'TX203ee875-9430-47e4-9a2f-463fcff07080', date: '2026-04-10', vessel: 'VG18', category: '5.Dầu LO', partner: 'Alberta', content: 'Cấp LO ngày 3/3', thu: 0, chi: 54000000, account: 'ABbank' },
-        { id: 'TX6816fc1c-aa4b-4b2c-959a-03d1327e8fe5', date: '2026-04-10', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'SMS duy tri TK', thu: 0, chi: 165000, account: 'ABbank' },
-        { id: 'TX8b3376f3-760a-4cf3-b279-c49855efb8df', date: '2026-04-10', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Hoa tiêu Sài Gòn C6 tại Đồng Nai', thu: 0, chi: 5263110, account: 'ABbank' },
-        { id: 'TXbf03e896-5d6f-4e51-86e5-67658fd1ab9c', date: '2026-04-10', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Lê Phạm', content: 'Đại lý C8 tại Sơn Dương', thu: 0, chi: 41024305, account: 'ABbank' },
-        { id: 'TX579fd193-f19f-49f6-a982-e0e4d963ac9b', date: '2026-04-10', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C7 tại Vĩnh Xương', thu: 0, chi: 56448916, account: 'ABbank' },
-        { id: 'TX819e4c1e-ecde-4e95-a72f-968a11a5f8f3', date: '2026-04-10', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: '', content: 'Tàu Lai C8 tại Đà Nẵng', thu: 0, chi: 9979200, account: 'ABbank' },
-        { id: 'TX7fe49609-6e46-4676-b1b2-978d84892cd2', date: '2026-04-10', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: '', content: 'Cầu bến C8 tại Đà Nẵng', thu: 0, chi: 6079754, account: 'ABbank' },
-        { id: 'TX3418c6ef-8f7c-4edb-be80-3c0f2346c6dc', date: '2026-04-10', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 10000000, account: 'Tài khoản cá nhân' },
-        { id: 'TXc578e45d-43ce-4d82-81cf-f90a8e3ae191', date: '2026-04-10', vessel: 'VG18', category: 'CVC', partner: 'Ngọc Anh', content: 'HD24 VG18 Cliker Hòn La - Hậu Giang', thu: 940434250, chi: 0, account: 'ABbank' },
-        { id: 'TX209f8d23-4c2f-4c05-a269-347381b00d8e', date: '2026-04-10', vessel: 'VG18', category: 'CVC', partner: 'Ngọc Anh', content: 'HD28 VG18 Xỉ Sơn Dương - HCM', thu: 543160000, chi: 0, account: 'ABbank' },
-        { id: 'TXbe9ecd27-da75-4c61-ae7a-a2396db329fd', date: '2026-04-10', vessel: 'VG05', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 12454277, account: 'ABbank' },
-        { id: 'TX1f151aaf-afef-4107-ba86-616648e57833', date: '2026-04-10', vessel: 'VG09', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 3492356, account: 'ABbank' },
-        { id: 'TX8352b13f-16a2-43a3-beaa-552270e05879', date: '2026-04-10', vessel: 'VG15', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 6726976, account: 'ABbank' },
-        { id: 'TX7e183835-1325-42d9-b5d0-d18a9a19c640', date: '2026-04-10', vessel: 'VG18', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 14983480, account: 'ABbank' },
-        { id: 'TX7b05c8e3-2e6c-459e-ab96-ab7f866b5cc2', date: '2026-04-10', vessel: 'VG36', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 6190783, account: 'ABbank' },
-        { id: 'TX54ab2ea6-5eed-47f9-816a-e7281f2e9961', date: '2026-04-11', vessel: 'VG18', category: 'CVC', partner: 'Ngọc Anh', content: 'HD28 VG18 Xỉ Sơn Dương - HCM', thu: 450000000, chi: 0, account: 'ABbank' },
-        { id: 'TXbb44a3a3-77f7-443c-a470-e288407dfc4f', date: '2026-04-11', vessel: 'VG36', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX7ee1552d-c092-4e72-83e9-8e9cdafa7769', date: '2026-04-13', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Cước phí bưu điện', thu: 0, chi: 20000, account: 'ABbank' },
-        { id: 'TX3c770dd7-8325-4a67-b52b-960fdb27758b', date: '2026-04-13', vessel: 'VG05', category: '4.Dầu DO', partner: '', content: 'Cấp dầu DO tại Đà Nẵng', thu: 0, chi: 644368000, account: 'ABbank' },
-        { id: 'TX0cc2c6ea-56f1-4f2c-baad-3dd86eac3207', date: '2026-04-13', vessel: 'VG36', category: '4.Dầu DO', partner: '', content: 'Tra đủ  đơn dầu cấp 1/4', thu: 0, chi: 367044800, account: 'ABbank' },
-        { id: 'TX79f11e1c-1baa-450c-b1a1-04e5fcb9d861', date: '2026-04-13', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Tàu lai C9 Tại Vĩnh Hưng', thu: 0, chi: 8640000, account: 'ABbank' },
-        { id: 'TX749fa82e-bd41-4829-8242-eb9bb9b70431', date: '2026-04-13', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Cầu bến C9 Tại Vĩnh Hưng', thu: 0, chi: 5749189, account: 'ABbank' },
-        { id: 'TXd184045e-b0da-4590-be91-d39e7d83c6d5', date: '2026-04-13', vessel: 'VG09', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TXc3e0fd49-8795-4d6a-af20-a54737e39de3', date: '2026-04-13', vessel: 'VG05', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TX3dec8f53-db7f-4961-b5fa-d9b11246c0ae', date: '2026-04-13', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Nhận tiền mặt bà', thu: 8900000, chi: 0, account: 'Tài khoản cá nhân' },
-        { id: 'TX5964aca0-a1db-4504-96f5-3b0a17c6da3d', date: '2026-04-13', vessel: 'VG18', category: '9.Vật Tư', partner: '', content: 'Vĩnh công tác Hòn La mua đồ', thu: 0, chi: 8900000, account: 'Tài khoản cá nhân' },
-        { id: 'TXb8192d78-1d4b-4c39-a977-96c06319a2f6', date: '2026-04-14', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Phí BDSD', thu: 0, chi: 150000, account: 'Viettinbank' },
-        { id: 'TXa06ae780-7102-4674-bff6-ec87f54dfca3', date: '2026-04-14', vessel: 'VG09', category: '9.Vật Tư', partner: '', content: 'Đồ máy 24 + vật tư 3/4', thu: 0, chi: 4841000, account: 'Tài khoản cá nhân' },
-        { id: 'TX0eb7df48-bf3a-4189-a7c5-b87a84139b04', date: '2026-04-14', vessel: 'VG18', category: 'Nhận Nợ NH', partner: '', content: 'Trả gốc ngắn hạn', thu: 0, chi: 541166308, account: 'ABbank' },
-        { id: 'TXefe234ce-b7c4-4f74-828c-923f5091d820', date: '2026-04-15', vessel: 'VG18', category: 'CVC', partner: 'Ngọc Anh', content: 'HD28 VG18 Xỉ Sơn Dương - HCM', thu: 806450750, chi: 0, account: 'ABbank' },
-        { id: 'TXed9276a9-214c-4264-be29-a447dd660424', date: '2026-04-15', vessel: 'VG09', category: 'CVC', partner: 'Ngọc Anh', content: 'HD29 VG09 Xỉ Sơn Dương - XM Tây Đô', thu: 490770750, chi: 0, account: 'ABbank' },
-        { id: 'TX98e208b7-b98a-4c07-b71d-bd1c23673ee1', date: '2026-04-15', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: '', content: 'Phí cầu bến C9 tại Đà Nẵng', thu: 0, chi: 5554508, account: 'ABbank' },
-        { id: 'TX3ff314f6-2c14-4593-b652-fb1ab1f321f8', date: '2026-04-16', vessel: 'VG18', category: '9.Vật Tư', partner: '', content: 'Thép thanh châu', thu: 0, chi: 12078807, account: 'ABbank' },
-        { id: 'TXad5d53fe-96e1-4361-b0f9-e410d55ee5a4', date: '2026-04-16', vessel: 'VG36', category: '3.Lương', partner: '', content: 'Trả tiền vé máy bay', thu: 0, chi: 6178400, account: 'ABbank' },
-        { id: 'TXb747c051-b313-476e-b645-4838b32aedaa', date: '2026-04-16', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Hoa tiêu C9 tại Vĩnh Hưng', thu: 0, chi: 4622125, account: 'ABbank' },
-        { id: 'TX31181644-7982-4ee9-93f4-d677e9742473', date: '2026-04-16', vessel: 'VG18', category: '9.Vật Tư', partner: '', content: 'Dây buộc tàu', thu: 0, chi: 32253750, account: 'ABbank' },
-        { id: 'TX4da7614c-d2ab-4330-8c5c-23e27de02402', date: '2026-04-16', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C8 tại Hậu Giang', thu: 0, chi: 10292000, account: 'ABbank' },
-        { id: 'TXb385627f-fb62-45ce-b3ed-d4acdc73ad11', date: '2026-04-16', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C9 tại Vĩnh Xương', thu: 0, chi: 7000000, account: 'ABbank' },
-        { id: 'TX7cc7ef1c-2847-4d24-b77b-f39f22ac7164', date: '2026-04-16', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C7 tại Cần Thơ', thu: 0, chi: 37347000, account: 'ABbank' },
-        { id: 'TX70e94c9f-6ff5-4fda-a9d9-0fe1d1b1514d', date: '2026-04-16', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C8 tại VĨnh Xương', thu: 0, chi: 54488023, account: 'ABbank' },
-        { id: 'TX226dcd3e-456b-4959-95fe-5f4f78b499a2', date: '2026-04-16', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: 'Quốc Tế Xanh', content: 'Đại lý C6 tại Hải Phòng', thu: 0, chi: 37297152, account: 'ABbank' },
-        { id: 'TX8b119726-7dde-4127-8af9-48ab788ecea8', date: '2026-04-16', vessel: 'VG05', category: 'CVC', partner: 'Hoàng Quyên', content: 'HD11 VG05 Cát Vĩnh Xương - Đà Nẵng', thu: 168228900, chi: 0, account: 'Viettinbank' },
-        { id: 'TX90ea26e9-42ef-42c6-8249-b4161b9303c7', date: '2026-04-16', vessel: 'VG05', category: 'CVC', partner: 'Hoàng Quyên', content: 'HD20 VG05 Cát Vĩnh Xương - Đà Nẵng', thu: 534733650, chi: 0, account: 'Viettinbank' },
-        { id: 'TX4da36856-9b2e-4670-af4e-e50cb130b798', date: '2026-04-16', vessel: 'VG09', category: 'CVC', partner: 'Hoàng Quyên', content: 'HD26 VG09 Cát Vĩnh Xương - Đà Nẵng', thu: 297037450, chi: 0, account: 'Viettinbank' },
-        { id: 'TX665393ef-c909-49a0-90d5-a0671499d5c0', date: '2026-04-16', vessel: 'VG09', category: 'CVC', partner: 'Bình Minh', content: 'HD50 VG09 Cát Vĩnh Xương - Huy Văn', thu: 50000000, chi: 0, account: 'ABbank' },
-        { id: 'TX23e5f305-c887-42f3-8f36-e5b1d8599171', date: '2026-04-17', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX6fdfc171-cb06-4ffd-8144-090b9f1c9640', date: '2026-04-17', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TX6bf44bac-7ab1-4244-9c07-9740b5a1b441', date: '2026-04-17', vessel: 'VGnew', category: '', partner: 'Công ty Đại Dương', content: 'Chuyển tiền thiết kế', thu: 0, chi: 100000000, account: 'ABbank' },
-        { id: 'TXfc04e7c3-0779-4a78-911b-e953b469ef65', date: '2026-04-18', vessel: 'VG36', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'Viettinbank' },
-        { id: 'TX30dfd2d2-5a85-47de-b895-f1d1989ba670', date: '2026-04-20', vessel: 'VG18', category: '7.Bảo Hiểm', partner: '', content: 'Bảo hiểm tàu kỳ 2', thu: 0, chi: 139122500, account: 'ABbank' },
-        { id: 'TXbbcc2ac5-8694-42da-9f3b-54630c3dc8a3', date: '2026-04-20', vessel: 'VG09', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TX62351d32-382c-40ad-883b-63e9ef50d869', date: '2026-04-20', vessel: 'VG05', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TX22acffb2-1e13-4102-a72a-81651e15d412', date: '2026-04-20', vessel: 'VG18', category: 'Nhận Nợ NH', partner: '', content: 'Trả gốc trung hạn', thu: 0, chi: 803265000, account: 'ABbank' },
-        { id: 'TX29d1f293-5c9d-4f17-936b-fb48d93f63ac', date: '2026-04-20', vessel: 'VG18', category: 'Nhận Nợ NH', partner: '', content: 'Trả lãi trung hạn', thu: 0, chi: 261987302, account: 'ABbank' },
-        { id: 'TX390a034b-7de1-4a3b-975d-9614661f4734', date: '2026-04-22', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX27ab4b69-e9b8-4641-8c13-e7dcbb37a16a', date: '2026-04-23', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TXa239f042-dbba-4dba-b6c5-eefa97c63b98', date: '2026-04-23', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: 'Lê Phạm', content: 'Đại lý C8 tại Sơn Dương', thu: 0, chi: 41383000, account: 'ABbank' },
-        { id: 'TX61714a0c-d4df-4353-a0b6-a20f7d6cb606', date: '2026-04-23', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: 'Lê Phạm', content: 'Đại lý C9 tại Sơn Dương', thu: 0, chi: 36769000, account: 'ABbank' },
-        { id: 'TX9f41d03c-da0a-42dc-943e-c2e1b39d834f', date: '2026-04-23', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: 'Lê Phạm', content: 'Đại lý C8 tại Sơn Dương', thu: 0, chi: 41117000, account: 'ABbank' },
-        { id: 'TXec318bad-357e-4cee-97d2-bcf875e2cfdf', date: '2026-04-23', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: 'Lê Phạm', content: 'Đại lý C8 tại Sơn Dương', thu: 0, chi: 44609760, account: 'ABbank' },
-        { id: 'TXdacdb440-fd8e-4747-a490-51a88032ec34', date: '2026-04-23', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Phí cầu bến tại Đà Nẵng', thu: 0, chi: 9334267, account: 'ABbank' },
-        { id: 'TX4010a241-2f13-4b12-b142-ddb7cc6d2ea9', date: '2026-04-23', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Tàu lai tại Đà Nẵng', thu: 0, chi: 9979200, account: 'ABbank' },
-        { id: 'TXec81c458-4c70-4b6f-a636-d58c7336c3a3', date: '2026-04-23', vessel: 'VG09', category: 'CVC', partner: 'Ngọc Anh', content: 'HD29 VG09 Xỉ Sơn Dương - XM Tây Đô', thu: 646829250, chi: 0, account: 'ABbank' },
-        { id: 'TX14550461-e3fb-40cb-8386-8c3476e93be1', date: '2026-04-23', vessel: 'VG36', category: 'CVC', partner: 'Ngọc Anh', content: 'HD30 VG36 Clinker Hòn La - HCM', thu: 923562900, chi: 0, account: 'ABbank' },
-        { id: 'TX398facf8-0b85-426e-aa9f-ab9d631f4be7', date: '2026-04-24', vessel: 'VG05', category: 'CVC', partner: 'Ngọc Anh', content: 'HD31 VG05 Than Quảng Ninh - Nghi Sơn', thu: 346465800, chi: 0, account: 'ABbank' },
-        { id: 'TX77da9112-381a-474e-9c1d-b3b3f681f8eb', date: '2026-04-24', vessel: 'VG36', category: 'CVC', partner: 'Ngọc Anh', content: 'HD32 VG36 Than Gò Da - Đà Nẵng', thu: 166724310, chi: 0, account: 'ABbank' },
-        { id: 'TX06bf4aa3-8038-4480-83a7-cdd827d89d73', date: '2026-04-24', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: 'Sunshine', content: 'Đại lý C8 tại HCM', thu: 0, chi: 27997070, account: 'ABbank' },
-        { id: 'TX9fbcd39f-f33d-479f-bf54-3f8f6df2a8ac', date: '2026-04-24', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý C9 tại Hậu Giang', thu: 0, chi: 33300235, account: 'ABbank' },
-        { id: 'TX351f3d52-9307-4342-987a-c5c0cdf71be9', date: '2026-04-24', vessel: 'VG09', category: '4.Dầu DO', partner: 'Petrotime', content: 'Trả tiền dầu DO', thu: 0, chi: 325611930, account: 'ABbank' },
-        { id: 'TXfe97e120-634f-425b-9bb5-70f2c531c4c5', date: '2026-04-24', vessel: 'VG18', category: '4.Dầu DO', partner: 'Hoàng Khải', content: 'Trả tiền dầu DO', thu: 0, chi: 550000000, account: 'ABbank' },
-        { id: 'TX47e35bd9-c83f-4ab1-ac07-40709e39592f', date: '2026-04-24', vessel: 'VG05', category: '7.Bảo Hiểm', partner: '', content: 'BHXH T3', thu: 0, chi: 21664000, account: 'ABbank' },
-        { id: 'TXd9d0acff-97c4-43ea-9436-2b47907864b8', date: '2026-04-24', vessel: 'VG09', category: '7.Bảo Hiểm', partner: '', content: 'BHXH T3', thu: 0, chi: 21664000, account: 'ABbank' },
-        { id: 'TXb0ba521a-5d64-4806-8c8e-bf9edb88d9d1', date: '2026-04-24', vessel: 'VG15', category: '7.Bảo Hiểm', partner: '', content: 'BHXH T3', thu: 0, chi: 21664000, account: 'ABbank' },
-        { id: 'TX2ffdfb0d-9503-4d5c-9bd2-7ec4b62f973c', date: '2026-04-24', vessel: 'VG18', category: '7.Bảo Hiểm', partner: '', content: 'BHXH T3', thu: 0, chi: 21664000, account: 'ABbank' },
-        { id: 'TXb6c514d7-b5ad-4570-82e0-f3d1a26cbdd0', date: '2026-04-24', vessel: 'VG36', category: '7.Bảo Hiểm', partner: '', content: 'BHXH T3', thu: 0, chi: 21664000, account: 'ABbank' },
-        { id: 'TX0048772f-6d52-424a-b2e4-d964ae6d1a7f', date: '2026-04-25', vessel: 'VG36', category: '4.Dầu DO', partner: 'Cảng Chân Mây', content: 'Cấp dầu DO tại Chân mây', thu: 0, chi: 562590074, account: 'ABbank' },
-        { id: 'TXbfeb5f96-2fc9-4207-abb1-f042e35d8441', date: '2026-04-26', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Cầu bến , lai dắt tại Chân mây', thu: 0, chi: 19019340, account: 'ABbank' },
-        { id: 'TX54f17380-bd4a-49ad-9cc4-07584dc4b8f2', date: '2026-04-26', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Trả lãi TK', thu: 169829, chi: 0, account: 'ABbank' },
-        { id: 'TXd1d62c3c-58b5-4e9e-841a-bbdc4d625821', date: '2026-04-28', vessel: 'VG09', category: 'CVC', partner: 'Bình Minh', content: 'HD50 VG09 Cát Vĩnh Xương - Huy Văn', thu: 300000000, chi: 0, account: 'ABbank' },
-        { id: 'TX20cf304f-1533-40d4-afba-c40ab8e9dc5f', date: '2026-04-28', vessel: 'VG09', category: '9.Vật Tư', partner: 'Công ty Tố My', content: 'Vật tư phụ', thu: 0, chi: 4306354, account: 'Viettinbank' },
-        { id: 'TXa15e884c-5a4d-44bd-8a21-4b3a6c586e1e', date: '2026-04-28', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Máy tính + máy in', thu: 0, chi: 22050000, account: 'Viettinbank' },
-        { id: 'TXe5dca330-d5d6-4781-8f63-83e8743c678a', date: '2026-04-28', vessel: 'VG09', category: '9.Vật Tư', partner: 'Sơn HP', content: 'Sơn HP', thu: 0, chi: 14220000, account: 'ABbank' },
-        { id: 'TXfbc9ff4a-abd0-4beb-9114-02d6fbce18da', date: '2026-04-28', vessel: 'VG05', category: '9.Vật Tư', partner: 'Sơn HP', content: 'Sơn HP', thu: 0, chi: 4206085, account: 'ABbank' },
-        { id: 'TXd0948e69-e6c7-467b-a4dd-6276c10d0872', date: '2026-04-28', vessel: 'VG18', category: '9.Vật Tư', partner: '', content: 'Bồi dưỡng sửa chưa tời lái', thu: 0, chi: 2000000, account: 'Tài khoản cá nhân' },
-        { id: 'TXd7ef18cb-12ce-45ea-98c0-4fe06fb0f7a6', date: '2026-04-29', vessel: 'VG36', category: 'CVC', partner: 'Ngọc Anh', content: 'HD32 VG36 Than Gò Da - Đà Nẵng', thu: 343275690, chi: 0, account: 'ABbank' },
-        { id: 'TX4b30d854-84fb-4e4d-afd9-b7f2f30a3314', date: '2026-04-29', vessel: 'VG05', category: 'CVC', partner: 'Ngọc Anh', content: 'HD33 VG05 Quặng Vĩnh Xương - Hải Phòng', thu: 603790110, chi: 0, account: 'ABbank' },
-        { id: 'TX7e3a03bb-f299-41dd-86f6-70fae14f7454', date: '2026-04-29', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TX065a2d8e-4598-4c03-bb85-06c23193a48b', date: '2026-04-29', vessel: 'VG36', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TXdc1379c5-30ef-4853-bd14-34e7904ecbe4', date: '2026-04-30', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Trả lãi TK', thu: 99261, chi: 0, account: 'Viettinbank' },
-        { id: 'TX4ea5eb35-0dc9-48e9-9259-59f5be0cd8ac', date: '2026-04-30', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Luân chuyển tiền mặt', thu: 68375000, chi: 0, account: 'Tài khoản cá nhân' },
-        { id: 'TX6c43b9ad-a8a4-4a69-9f43-cdb33c621d5e', date: '2026-04-30', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Luân chuyển tiền mặt', thu: 0, chi: 68375000, account: 'Viettinbank' },
-        { id: 'TX897967c0-a376-4ba6-8dd1-e6b56aee2c74', date: '2026-04-30', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Nhận tiền bảo hiểm', thu: 4800000, chi: 0, account: 'Tài khoản cá nhân' },
-        { id: 'TX7cc3d6bb-eaa3-470e-b63b-79c57413c4ab', date: '2026-04-30', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Lương Tùng', thu: 0, chi: 40000000, account: 'Viettinbank' },
-        { id: 'TXe2c9f113-697e-4515-b0e9-d9407eb8ba41', date: '2026-04-30', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Lương C Phương', thu: 0, chi: 20000000, account: 'Viettinbank' },
-        { id: 'TX8970dc27-09dc-4eb0-b41b-b1c4131cc3f6', date: '2026-04-30', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Lương Vĩnh', thu: 0, chi: 67650000, account: 'Viettinbank' },
-        { id: 'TX25d9e9d2-9657-48b2-abb4-508762d87db3', date: '2026-04-30', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Vé máy bay', thu: 0, chi: 28190000, account: 'Viettinbank' },
-        { id: 'TXb2d2872b-54ab-474a-9fe1-0d040d730a15', date: '2026-04-30', vessel: 'VG05', category: '3.Lương', partner: '', content: 'Lương Tháng 3', thu: 0, chi: 195829500, account: 'Viettinbank' },
-        { id: 'TXd53e19fd-c477-48b8-9577-c2605ebf5963', date: '2026-04-30', vessel: 'VG09', category: '3.Lương', partner: '', content: 'Lương Tháng 3', thu: 0, chi: 199694833, account: 'Viettinbank' },
-        { id: 'TX23e54ac6-1449-4b83-a9f9-ab4317540bd4', date: '2026-04-30', vessel: 'VG15', category: '3.Lương', partner: '', content: 'Lương Tháng 3', thu: 0, chi: 203028000, account: 'Viettinbank' },
-        { id: 'TXf7d87fee-382f-440e-a900-dcdfccd591ac', date: '2026-04-30', vessel: 'VG18', category: '3.Lương', partner: '', content: 'Lương Tháng 3', thu: 0, chi: 220093500, account: 'Viettinbank' },
-        { id: 'TX92b2b870-1e63-4d74-966c-b0919de77588', date: '2026-04-30', vessel: 'VG36', category: '3.Lương', partner: '', content: 'Lương Tháng 3', thu: 0, chi: 202606167, account: 'Viettinbank' },
-        { id: 'TXa43b4170-9687-4584-96d3-b1797b921cdb', date: '2026-04-30', vessel: 'VG05', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 43670125, account: 'Viettinbank' },
-        { id: 'TXc0370089-7b46-4577-bed2-2e9b79fc1360', date: '2026-04-30', vessel: 'VG09', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 52891792, account: 'Viettinbank' },
-        { id: 'TXa57efd14-6768-46cf-a58c-387ed9c6c115', date: '2026-04-30', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 3100000, account: 'Viettinbank' },
-        { id: 'TX5c3df28f-c08a-4791-a5f0-51a98ebf9131', date: '2026-04-30', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 9000000, account: 'Viettinbank' },
-        { id: 'TX048815d8-4b8b-4bd2-a8e6-f591631595c6', date: '2026-04-30', vessel: 'VG36', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 38215358, account: 'Viettinbank' },
-        { id: 'TX4b909501-525e-4ab3-ac5b-4619bc102b15', date: '2026-05-01', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'Tài khoản cá nhân' },
-        { id: 'TXbfb86a4b-7121-4ea3-b191-96f1221d00b2', date: '2026-05-03', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: '', content: 'Tàu lai tại Đà Nẵng', thu: 0, chi: 9979200, account: 'ABbank' },
-        { id: 'TXcabfb3e5-2702-4c8f-897e-5a9097c9b2f8', date: '2026-05-03', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: '', content: 'Phí cầu bến tại Đà Nẵng', thu: 0, chi: 7885934, account: 'ABbank' },
-        { id: 'TXc3c9bcf8-0428-4d66-acca-8d036285ee87', date: '2026-05-03', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Luân chuyển tiền mặt', thu: 0, chi: 200000000, account: 'ABbank' },
-        { id: 'TX340c504e-fd67-4426-9e7e-a51e8e4b5315', date: '2026-05-03', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Luân chuyển tiền mặt', thu: 200000000, chi: 0, account: 'Viettinbank' },
-        { id: 'TX09578697-44f3-4f05-94d0-3ae243d134ce', date: '2026-05-04', vessel: 'VG18', category: '4.Dầu DO', partner: 'Hoàng Khải', content: 'Trả đủ đơn dầu tại Sơn Dương', thu: 0, chi: 577576960, account: 'ABbank' },
-        { id: 'TX61d8d1a8-1121-4202-b7ba-87086f35d1a6', date: '2026-05-04', vessel: 'VG18', category: '6.Lãi Vay', partner: '', content: 'Trả lãi vay Yến Hậu', thu: 0, chi: 195070000, account: 'ABbank' },
-        { id: 'TXd1d6a0b6-aa94-474a-84ca-be43f1fff8a4', date: '2026-05-04', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Chuyển tk Tùng', thu: 4930000, chi: 0, account: 'Tài khoản cá nhân' },
-        { id: 'TX0b7e72a8-ae14-40ca-8e25-1b7736e047fe', date: '2026-05-04', vessel: 'Công ty', category: 'Luân chuyển', partner: '', content: 'Chuyển tk Tùng', thu: 0, chi: 4930000, account: 'ABbank' },
-        { id: 'TX9e062e8f-7702-4d8a-bcf2-51d62674595e', date: '2026-05-05', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX1ff091fd-a32a-402c-b488-40d3e947dc43', date: '2026-05-05', vessel: 'VG18', category: '9.Vật Tư', partner: 'Sơn HP', content: 'Sơn HP', thu: 0, chi: 21191220, account: 'ABbank' },
-        { id: 'TX08b38b6e-5603-4c08-ac61-68fef4d9f88c', date: '2026-05-05', vessel: 'VG15', category: 'CVC', partner: 'Ngọc Anh', content: 'Thu CVC HD34 VG15 Chân Mây - Hâụ Giang', thu: 1116447400, chi: 0, account: 'ABbank' },
-        { id: 'TX3a3113cb-b4bf-4f17-8fc1-ec12a0ffa618', date: '2026-05-05', vessel: 'VG18', category: 'CVC', partner: 'Ngọc Anh', content: 'Thu CVC HD35 VG18 Tôn Cuộn Gò Dầu - Hải Phòng', thu: 1180433520, chi: 0, account: 'ABbank' },
-        { id: 'TX9171dff0-388a-4651-9b58-48994c897fdf', date: '2026-05-05', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý Sông Hậu tại  Hậu Giang C10', thu: 0, chi: 8331000, account: 'ABbank' },
-        { id: 'TX71e9a492-fd64-429a-8639-5cb165e567cb', date: '2026-05-05', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý Sông Hậu tại VĨnh Xương C11', thu: 0, chi: 7000000, account: 'ABbank' },
-        { id: 'TX65d98aad-9ff8-4098-b86b-51a564915449', date: '2026-05-05', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý Sơng Hậu tại Hậu Giang C8', thu: 0, chi: 15969000, account: 'ABbank' },
-        { id: 'TX6ec50c71-c159-4226-a0a6-bac1f4d270c8', date: '2026-05-05', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý Sông Hậu tại VĨnh Xương C9', thu: 0, chi: 50353000, account: 'ABbank' },
-        { id: 'TX39068f1c-c2d3-4dfd-9574-9475389c292b', date: '2026-05-05', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý Sơng Hậu tại Hậu Giang C9', thu: 0, chi: 36711000, account: 'ABbank' },
-        { id: 'TX59fa5874-73f8-42e7-9561-6f389f1759a5', date: '2026-05-05', vessel: 'VG15', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý Sông Hậu tại VĨnh Xương C10', thu: 0, chi: 49919000, account: 'ABbank' },
-        { id: 'TXd24253b2-cf9c-4e76-ad37-9bcc5939a6e0', date: '2026-05-05', vessel: 'VG18', category: '2.Chi Phí Cảng', partner: 'Sông Hậu', content: 'Đại lý Sơng Hậu tại Hậu Giang C8', thu: 0, chi: 44449864, account: 'ABbank' },
-        { id: 'TXdbfe2b25-bf69-41c2-8eb2-47d4350687ea', date: '2026-05-05', vessel: 'VG09', category: '9.Vật Tư', partner: '', content: 'Lắp đặt Camera', thu: 0, chi: 17550000, account: 'ABbank' },
-        { id: 'TXab0a030a-42ff-415e-a25b-87c48130fe8e', date: '2026-05-05', vessel: 'VG18', category: '9.Vật Tư', partner: '', content: 'Sửa chữa điện', thu: 0, chi: 50021280, account: 'ABbank' },
-        { id: 'TXc76d7df3-02ca-41ed-a3c4-310c8fed953c', date: '2026-05-05', vessel: 'VG18', category: '5.Dầu LO', partner: 'Nhất Minh Sơn', content: 'Cấp LO VG18 ngày 1/4', thu: 0, chi: 100224000, account: 'ABbank' },
-        { id: 'TXc328f005-6ae0-47ab-ae7d-fcf414d681f7', date: '2026-05-05', vessel: 'VG05', category: '5.Dầu LO', partner: 'Nhất Minh Sơn', content: 'Cấp LO VG05 ngày 26/1', thu: 0, chi: 59000000, account: 'ABbank' },
-        { id: 'TX968e6f51-f4a4-4b35-8b6e-3d035438c5b4', date: '2026-05-05', vessel: 'VG15', category: '5.Dầu LO', partner: 'Nhất Minh Sơn', content: 'Cấp LO VG15 ngày 23/2', thu: 0, chi: 35700000, account: 'ABbank' },
-        { id: 'TXca9f18d9-5959-442a-ab65-8ea9456b1c99', date: '2026-05-05', vessel: 'VG09', category: '5.Dầu LO', partner: 'Nhất Minh Sơn', content: 'Cấp LO VG09 ngày 14/3', thu: 0, chi: 59500000, account: 'ABbank' },
-        { id: 'TXa71175b2-261f-4753-a2c3-e38854bef158', date: '2026-05-05', vessel: 'VG15', category: '5.Dầu LO', partner: 'Nhất Minh Sơn', content: 'Cấp LO VG15 ngày 18/3', thu: 0, chi: 59500000, account: 'ABbank' },
-        { id: 'TX999bc59a-954b-4446-94be-eb4c26edeb55', date: '2026-05-05', vessel: 'VG15', category: '4.Dầu DO', partner: 'Long Bình', content: 'Cấp dầu VG15 tại Sơn Dương', thu: 0, chi: 610369850, account: 'ABbank' },
-        { id: 'TXdb27cc55-1a12-4c59-bbc4-6e2ef5bf3633', date: '2026-05-05', vessel: 'VG15', category: 'CVC', partner: 'Hoàng Quyên', content: 'Thu CVC HD27 VG15 Cát Vĩnh Xương - Đà Nẵng', thu: 656028800, chi: 0, account: 'Viettinbank' },
-        { id: 'TXff02087a-009c-4d0a-a4e5-a751a98029ec', date: '2026-05-06', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Công đức chùa', thu: 0, chi: 200000000, account: 'Viettinbank' },
-        { id: 'TX0d73e94a-4000-4f76-bdd4-8f2be138dd69', date: '2026-05-06', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Thu phí duy trì', thu: 0, chi: 100000, account: 'Viettinbank' },
-        { id: 'TX6623effa-538c-48b0-a4de-7a8ff6cd0ae2', date: '2026-05-06', vessel: 'VG36', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TXe923e899-b00b-46c1-b464-057b042f68c9', date: '2026-05-08', vessel: 'VG36', category: '4.Dầu DO', partner: '', content: 'Cấp DầuVG36 tại Đà Nẵng', thu: 0, chi: 537429500, account: 'ABbank' },
-        { id: 'TXedb86807-9a45-4d81-9302-374e5a6b95d2', date: '2026-05-08', vessel: 'VG09', category: '9.Vật Tư', partner: '', content: 'Đồ máy 24', thu: 0, chi: 460000, account: 'Tài khoản cá nhân' },
-        { id: 'TXc12fc736-9137-4cae-a99d-95bb707d7ef6', date: '2026-05-08', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Cước Điện thoại', thu: 0, chi: 796915, account: 'Tài khoản cá nhân' },
-        { id: 'TX62d4811f-009e-4c66-ae58-62807f0b8f15', date: '2026-05-08', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: 'Hoàng Đăng', content: 'Đại lý ngoài', thu: 0, chi: 11000000, account: 'Tài khoản cá nhân' },
-        { id: 'TX55d136d7-04b8-4fce-9a6b-e0f820c785e8', date: '2026-05-08', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Hoàng Đăng', content: 'Đại lý ngoài', thu: 0, chi: 4000000, account: 'Tài khoản cá nhân' },
-        { id: 'TXef19d31c-9511-427a-a296-3eab5d9b934f', date: '2026-05-08', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Hoàng Đăng', content: 'Đại lý tại Quảng Ninh', thu: 0, chi: 4320000, account: 'ABbank' },
-        { id: 'TX709ae9bd-0083-42d8-8192-df34c902fb1e', date: '2026-05-08', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: '', content: 'Hoa tiêu C9 Cát tại Huy Văn', thu: 0, chi: 4320000, account: 'ABbank' },
-        { id: 'TX77bdfe55-4045-467f-878a-226ae8f35961', date: '2026-05-08', vessel: 'VG09', category: '9.Vật Tư', partner: '', content: 'Vật tư + Sửa chữa máy T3', thu: 0, chi: 13790304, account: 'ABbank' },
-        { id: 'TXc97ed384-f41c-4fb8-b5ff-32e89aec52e0', date: '2026-05-08', vessel: 'VG05', category: '9.Vật Tư', partner: '', content: 'Lắp đặt Camera', thu: 0, chi: 17550000, account: 'ABbank' },
-        { id: 'TX3f3af66a-b98f-4075-bec0-9978b54f52e6', date: '2026-05-09', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Cầu bến VG36 tại Đà Nẵng C11 Cát', thu: 0, chi: 5744957, account: 'Viettinbank' },
-        { id: 'TX56a84f81-8fa4-4cb7-b5c2-603d87b8951d', date: '2026-05-09', vessel: 'VG36', category: '2.Chi Phí Cảng', partner: '', content: 'Tàu Lai VG36 tại Đà Nẵng C11 Cát', thu: 0, chi: 9936000, account: 'ABbank' },
-        { id: 'TX85ba894a-af34-4325-acb7-c8f9f72e686f', date: '2026-05-09', vessel: 'VG05', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 30000000, account: 'ABbank' },
-        { id: 'TXd115a30c-a78d-45d1-8274-f0d78f09d03c', date: '2026-05-09', vessel: 'VG18', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX6d3733ac-65f5-4cc9-a356-ed877b872209', date: '2026-05-10', vessel: 'VG18', category: '4.Dầu DO', partner: 'Hoàng Khải', content: 'Cấp ứng dầu VG18 tại Sơn Dương', thu: 0, chi: 400000000, account: 'ABbank' },
-        { id: 'TXcf444fbc-40a0-4e57-9fa6-46381103b503', date: '2026-05-10', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Phí duy trì tài khoản', thu: 0, chi: 165000, account: 'ABbank' },
-        { id: 'TX4cf62146-8ea3-447e-a73c-f390930d543b', date: '2026-05-10', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Phí rút tiền', thu: 0, chi: 48500, account: 'Viettinbank' },
-        { id: 'TX04434d32-a11d-4d14-8937-4cdf0ac40c73', date: '2026-05-07', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Gia hạn Vshipel', thu: 0, chi: 1944000, account: 'Tài khoản cá nhân' },
-        { id: 'TXea31d623-73a2-41d4-be30-4756a9515274', date: '2026-05-10', vessel: 'VG15', category: '3.Lương', partner: '', content: 'Ứng lương Lưu Quang Trường', thu: 0, chi: 10000000, account: 'Tài khoản cá nhân' },
-        { id: 'TXdc355fad-b408-49ee-b839-03d934e69003', date: '2026-05-11', vessel: 'VG15', category: '1.Tàu Ứng', partner: '', content: 'Ứng tiền', thu: 0, chi: 20000000, account: 'ABbank' },
-        { id: 'TX1355bf5e-5092-491f-ab3d-04b88cb85052', date: '2026-05-11', vessel: 'VG05', category: '2.Chi Phí Cảng', partner: 'Hoàng Đăng', content: 'Phí đại lý ở Quảng Ninh Hải Phòng', thu: 0, chi: 5400000, account: 'ABbank' },
-        { id: 'TXae8ab9e3-9a15-4d31-9a9a-50307eafb1e4', date: '2026-05-11', vessel: 'VG09', category: '9.Vật Tư', partner: '', content: 'Cấp VHF', thu: 0, chi: 8640000, account: 'ABbank' },
-        { id: 'TX262b18eb-7f7a-47e8-956d-db3926b4833d', date: '2026-05-12', vessel: 'VG05', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 17067444, account: 'ABbank' },
-        { id: 'TXbf3be84f-b2cf-41bc-b0c4-63542c83d02c', date: '2026-05-12', vessel: 'VG09', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 3492356, account: 'ABbank' },
-        { id: 'TX75580d4f-06da-4a0f-a784-256ab141f037', date: '2026-05-12', vessel: 'VG15', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 9038294, account: 'ABbank' },
-        { id: 'TXd0fcb383-bb40-4688-a579-bbfd9121086a', date: '2026-05-12', vessel: 'VG18', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 24194343, account: 'ABbank' },
-        { id: 'TXf177e241-878f-4903-8cc5-3c2cbb46ce6a', date: '2026-05-12', vessel: 'VG36', category: '6.Lãi Vay', partner: '', content: 'Lãi vay ngắn hạn AB', thu: 0, chi: 7896445, account: 'ABbank' },
-        { id: 'TXc4bc9779-ead8-475e-b987-fd92e64dd64b', date: '2026-05-12', vessel: 'VG05', category: 'CVC', partner: 'Ngọc Anh', content: 'HD37 VG05 Xỉ Sơn Dương - Hậu Giang', thu: 1011241000, chi: 0, account: 'ABbank' },
-        { id: 'TX36432535-8b1c-47f0-8165-4bcd802ed107', date: '2026-05-12', vessel: 'VG36', category: 'CVC', partner: 'Ngọc Anh', content: 'HD38 VG36 Xỉ Sơn Dương - HCM', thu: 1159860870, chi: 0, account: 'ABbank' },
-        { id: 'TX70e11208-355d-417b-950e-f252b34145ec', date: '2026-05-12', vessel: 'VG09', category: 'CVC', partner: 'Ngọc Anh', content: 'HD42 VG09 Xỉ Sơn Dương - Hậu Giang', thu: 1288287000, chi: 0, account: 'ABbank' },
-        { id: 'TX22786054-e49a-4b67-a539-f78ac46bdddf', date: '2026-05-12', vessel: 'Công ty', category: 'Văn phòng', partner: '', content: 'Xăng xe', thu: 0, chi: 1400000, account: 'Tài khoản cá nhân' },
-        { id: 'TX721f0c29-2b14-43e0-bcef-f3731f0966ff', date: '2026-05-12', vessel: 'VG09', category: '3.Lương', partner: '', content: 'Ứng lương Lê Ngọc Anh', thu: 0, chi: 2000000, account: 'Tài khoản cá nhân' },
-        { id: 'TX0ec4c129-2a35-40f6-a5d4-f8899072bd8d', date: '2026-05-13', vessel: 'VG36', category: '5.Dầu LO', partner: 'Cảng Chân Mây', content: 'Tạm ứng mua dầu nhờn', thu: 0, chi: 2000000, account: 'ABbank' },
-        { id: 'TXe44fdec6-d2d4-41b7-83c0-e8f81e2dc37a', date: '2026-05-13', vessel: 'VG09', category: '2.Chi Phí Cảng', partner: '', content: 'Tàu lai', thu: 0, chi: 19000000, account: 'ABbank' },
-        { id: 'TXd8379030-73ba-4953-94fb-80dd44960c1c', date: '2026-05-13', vessel: 'VG09', category: 'CVC', partner: 'Hoàng Quyên', content: 'HD26 VG09 Cát Vĩnh Xương - Đà Nẵng', thu: 347647150, chi: 0, account: 'Viettinbank' },
-        { id: 'TX8b99d8c0-734d-4436-8358-74169e762aac', date: '2026-05-13', vessel: 'VG36', category: '3.Lương', partner: '', content: 'Ứng lương Nguyễn Văn Danh', thu: 0, chi: 5000000, account: 'Tài khoản cá nhân' },
-        { id: 'TXe29699e7-9a5c-4692-b3e6-86885d450723', date: '2026-05-13', vessel: 'VG05', category: 'CVC', partner: 'Bình Minh', content: 'HD… VG05 Than Quảng Ninh - Hòn La', thu: 180000000, chi: 0, account: 'ABbank' }
+    "transactions": [
+        {
+                "id": "TX58044ef9-ecfe-4ed0-a8ca-e7e26d98a13a",
+                "date": "2026-01-09",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C4",
+                "contractNo": "HD04",
+                "partner": "Bình Minh",
+                "content": "HD4 VG05",
+                "thu": 300000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXc5cd638a-155d-42e3-b28b-5a0d1bd612db",
+                "date": "2026-01-27",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C4",
+                "contractNo": "HD04",
+                "partner": "Bình Minh",
+                "content": "HD4 VG05",
+                "thu": 338072000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX93f9d95f-69d4-4cbf-bc0c-71ee64f77295",
+                "date": "2026-02-05",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C1",
+                "contractNo": "HD01",
+                "partner": "Ngọc Anh",
+                "content": "HD01",
+                "thu": 872727000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX28a31ba6-2b55-42fa-a33e-8b4352b4da46",
+                "date": "2026-02-05",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C3",
+                "contractNo": "HD03",
+                "partner": "Ngọc Anh",
+                "content": "HD03",
+                "thu": 597273000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXdc34acb6-1b9e-489b-a14e-926fbf25ec04",
+                "date": "2026-02-10",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C3",
+                "contractNo": "HD03",
+                "partner": "Ngọc Anh",
+                "content": "HD3",
+                "thu": 929102000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX796c1a17-de43-419f-bd9a-b1f604dff483",
+                "date": "2026-02-10",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Ngọc Anh",
+                "content": "HD7",
+                "thu": 695643200,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX33337397-8534-4f33-99ba-acff119c9656",
+                "date": "2026-02-10",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Ngọc Anh",
+                "content": "HD10",
+                "thu": 275829800,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX92327db7-f9f0-4932-b22c-65fde662fea7",
+                "date": "2026-02-10",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C16",
+                "contractNo": "HD16",
+                "partner": "Việt Anh",
+                "content": "HD16 VG18",
+                "thu": 408249000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX1a180b85-153b-4ba3-a0c7-b433dbb9dfd7",
+                "date": "2026-02-10",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C2",
+                "contractNo": "HD02",
+                "partner": "Hoàng Quyên",
+                "content": "HD2",
+                "thu": 541243000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXba1e5bab-af45-4148-897a-b061ebf6c274",
+                "date": "2026-02-11",
+                "vessel": "",
+                "category": "CVC",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Ngọc Anh",
+                "content": "Trả tiền gửi",
+                "thu": 0,
+                "chi": 500000000,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX1867d2bc-c627-4068-9a01-0469709cacb8",
+                "date": "2026-02-11",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C5",
+                "contractNo": "HD05",
+                "partner": "Hoàng Quyên",
+                "content": "HD5",
+                "thu": 596295700,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX8aad21ce-3d14-49e1-a80a-cd4abaf8a2a5",
+                "date": "2026-02-11",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C6",
+                "contractNo": "HD06",
+                "partner": "Hoàng Quyên",
+                "content": "HD6",
+                "thu": 573185000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXd1cc4e5d-0bfd-4e00-971d-4276d2bbbf73",
+                "date": "2026-02-12",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C19",
+                "contractNo": "HD19",
+                "partner": "Bình Minh",
+                "content": "HD 19 VG15 Quặng Vĩnh Xương - HP",
+                "thu": 200000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX4cb8c125-1b63-4897-b699-dc539488d59f",
+                "date": "2026-02-13",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Hoàng Quyên",
+                "content": "HD8",
+                "thu": 609756000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX3dd928ce-76b4-4f09-9ea4-a258d9ec2920",
+                "date": "2026-03-05",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Ngọc Anh",
+                "content": "HD10",
+                "thu": 19000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX4701f1c6-bc98-4a79-9e57-80f14f875111",
+                "date": "2026-03-05",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C12",
+                "contractNo": "HD12",
+                "partner": "Ngọc Anh",
+                "content": "HD12",
+                "thu": 976430000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX257f7bf7-985d-4b83-ba63-a6f01eca6e55",
+                "date": "2026-03-09",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C25",
+                "contractNo": "HD25",
+                "partner": "Thái Bình Dương",
+                "content": "HD25",
+                "thu": 400000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX6eac05e0-6173-4c04-a241-7999a2548094",
+                "date": "2026-03-11",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C13",
+                "contractNo": "HD13",
+                "partner": "Ngọc Anh",
+                "content": "HD13",
+                "thu": 499000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXc0af6488-b07a-4f9a-b5f0-796057f3ef62",
+                "date": "2026-03-13",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C13",
+                "contractNo": "HD13",
+                "partner": "Ngọc Anh",
+                "content": "HD13",
+                "thu": 1044218000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX2e72db37-4970-4fbe-a4f8-89e830277b72",
+                "date": "2026-03-13",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C19",
+                "contractNo": "HD19",
+                "partner": "Bình Minh",
+                "content": "HD18",
+                "thu": 475363000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXa91a2f81-f495-421f-80f8-27f461b97814",
+                "date": "2026-03-15",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C19",
+                "contractNo": "HD19",
+                "partner": "Bình Minh",
+                "content": "HD18",
+                "thu": 0,
+                "chi": 17500000,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXbcf01a6b-9924-4ff5-836e-9e28dffb0a10",
+                "date": "2026-03-16",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Hoàng Quyên",
+                "content": "HD8",
+                "thu": 7305000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXc443f55a-b338-4956-9ca3-61644286b1e8",
+                "date": "2026-03-16",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Hoàng Quyên",
+                "content": "HD9",
+                "thu": 500000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX8e4c7045-6be4-4f6d-bd9a-010090d426a5",
+                "date": "2026-03-16",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C14",
+                "contractNo": "HD14",
+                "partner": "Ngọc Anh",
+                "content": "HD14",
+                "thu": 925848000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TXa7382b83-588d-45e0-b752-59cd15b796a4",
+                "date": "2026-03-16",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C15",
+                "contractNo": "HD15",
+                "partner": "Ngọc Anh",
+                "content": "HD15",
+                "thu": 320000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX4233243c-3f7e-417e-bbfd-dac2d4b4de41",
+                "date": "2026-03-16",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C17",
+                "contractNo": "HD17",
+                "partner": "Ngọc Anh",
+                "content": "HD17",
+                "thu": 434767500,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX0650937a-3ddf-4b9c-88a1-cdd9839ddeef",
+                "date": "2026-03-24",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C18",
+                "contractNo": "HD18",
+                "partner": "Ngọc Anh",
+                "content": "HD18",
+                "thu": 900000000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX837f4900-7ce0-439b-a079-f33f63eb9e26",
+                "date": "2026-03-27",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C18",
+                "contractNo": "HD18",
+                "partner": "Ngọc Anh",
+                "content": "HD18",
+                "thu": 66686000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX85db5a57-a7cf-4b5b-92aa-b2a75bb255cc",
+                "date": "2026-03-27",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C21",
+                "contractNo": "HD21",
+                "partner": "Ngọc Anh",
+                "content": "HD21",
+                "thu": 963235000,
+                "chi": 0,
+                "account": "Tiền mặt"
+        },
+        {
+                "id": "TX6c5b3284-8798-4b78-8c48-200120ba3e92",
+                "date": "2026-04-01",
+                "vessel": "VG36",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Tạm ứng Cấp dầu VG36",
+                "thu": 0,
+                "chi": 350000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX20b228f8-2a49-4661-8226-42ba5bca6d61",
+                "date": "2026-04-01",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX7ab59f6c-6a6c-435c-91c8-9573f3c5aceb",
+                "date": "2026-04-01",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C22",
+                "contractNo": "HD22",
+                "partner": "Ngọc Anh",
+                "content": "HD22 VG36 Quặng Vĩnh Xương - Hải Phòng",
+                "thu": 300000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX0d6283d7-5a70-49b6-87a4-165064fc9b6a",
+                "date": "2026-04-02",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXab743fd3-29c9-41be-a356-8f4571f0d7c5",
+                "date": "2026-04-02",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8e6fadb6-a85f-42fb-914f-54674a0ba23d",
+                "date": "2026-04-02",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C22",
+                "contractNo": "HD22",
+                "partner": "Ngọc Anh",
+                "content": "HD22 VG36 Quặng Vĩnh Xương - Hải Phòng",
+                "thu": 380730050,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX832acc83-558f-4447-8fde-ea8cd8b0d674",
+                "date": "2026-04-03",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Sơn HP",
+                "thu": 0,
+                "chi": 21112488,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX390623d9-56d3-42f9-88e3-b1760ea6280f",
+                "date": "2026-04-03",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Đối ứng in hải đồ",
+                "thu": 7596000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXc895497c-e5e4-41d9-b652-d8d16d3f310f",
+                "date": "2026-04-03",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "In hải đồ",
+                "thu": 0,
+                "chi": 7776000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXd056e54c-cba9-496e-9564-442431e0600a",
+                "date": "2026-04-03",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Hoàng Quyên",
+                "content": "HD9 VG36 Clinker Hòn La - Hậu Giang",
+                "thu": 200000000,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX5880797c-8625-4747-8e17-46886ec038cb",
+                "date": "2026-04-03",
+                "vessel": "VG09",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "PV Oil miền trung",
+                "content": "Cấp dầu VG09",
+                "thu": 0,
+                "chi": 700000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX3ef3622b-a540-44d8-98c6-ac119474eba4",
+                "date": "2026-04-03",
+                "vessel": "VG09",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "PV Oil miền trung",
+                "content": "Cấp dầu VG09",
+                "thu": 0,
+                "chi": 138962500,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX48568ae9-3366-4cc5-b652-beffc8d01700",
+                "date": "2026-04-03",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C23",
+                "contractNo": "HD23",
+                "partner": "Ngọc Anh",
+                "content": "HD23 VG15 Xỉ Sơn Dương - Hậu Giang",
+                "thu": 500000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX7f9a1b49-7e2c-488f-9858-2210c0676028",
+                "date": "2026-04-03",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C25",
+                "contractNo": "HD25",
+                "partner": "Bình Minh",
+                "content": "HD25 VG05 Clinker Hòn La  - Cần Thơ",
+                "thu": 467913200,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe20b25fa-59f7-4c58-8e02-10c7b2dbbd29",
+                "date": "2026-04-03",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 40000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5f19eb55-97f4-4cfe-ab27-121c80a3cd80",
+                "date": "2026-04-03",
+                "vessel": "VG18",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Vay ngắn hạn ABBank",
+                "thu": 1390134000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX53258f44-4f95-45ec-950b-61d3e9397f41",
+                "date": "2026-04-03",
+                "vessel": "VG18",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Trả tiền dầu DO",
+                "thu": 0,
+                "chi": 1390134000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX708450dc-dbae-40a4-ab2a-606d01024a45",
+                "date": "2026-04-03",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Phí chuyển tiền",
+                "thu": 0,
+                "chi": 764574,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXdc3e6414-e841-4a42-aa56-b3e05e5b2e91",
+                "date": "2026-04-03",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C5",
+                "contractNo": "HD05",
+                "partner": "Lê Phạm",
+                "content": "Đại lý C5 tại Sơn Dương",
+                "thu": 0,
+                "chi": 48961216,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX53ab1732-e3e7-41b1-85ad-82049e706ea1",
+                "date": "2026-04-03",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Sunshine",
+                "content": "Đại lý C7 tại Gò Gia",
+                "thu": 0,
+                "chi": 43325000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc071cdb6-9a12-4fb2-ba3d-046cbd844b44",
+                "date": "2026-04-03",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C5",
+                "contractNo": "HD05",
+                "partner": "Sunshine",
+                "content": "Đại lý C5 tại HCM",
+                "thu": 0,
+                "chi": 42134000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe2d1ac4b-da57-451a-b5bd-e54be6da7da7",
+                "date": "2026-04-03",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C6",
+                "contractNo": "HD06",
+                "partner": "Sunshine",
+                "content": "Đại lý C6 tại Đồng Nai",
+                "thu": 0,
+                "chi": 42652569,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXbb939b3d-0a79-467f-88a3-ef1c90889c98",
+                "date": "2026-04-03",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C6",
+                "contractNo": "HD06",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C6 tại Vĩnh Xương",
+                "thu": 0,
+                "chi": 9860490,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX6014cf3f-0a4e-4854-9bd4-3d2baff1c61b",
+                "date": "2026-04-03",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C6",
+                "contractNo": "HD06",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C6 tại Cần Thơ",
+                "thu": 0,
+                "chi": 21699456,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX3f530404-cb72-46ce-9b7a-035d49bee15c",
+                "date": "2026-04-03",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Hoàng Đăng",
+                "content": "Đại lý C7 tại Quảng Ninh",
+                "thu": 0,
+                "chi": 7331240,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX28f06901-1a7b-4adc-b02f-8ecd6f291399",
+                "date": "2026-04-03",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Hoàng Đăng",
+                "content": "Đại lý C7 tại Quảng Ninh phí ngoài",
+                "thu": 0,
+                "chi": 4000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXdc683519-4feb-4e80-9e64-44abb622744b",
+                "date": "2026-04-03",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C6",
+                "contractNo": "HD06",
+                "partner": "Quốc Tế Xanh",
+                "content": "Đại lý C6 tại Hải Phòng",
+                "thu": 0,
+                "chi": 8845900,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb915cfa7-cb0d-4bd2-af82-9e5155718e63",
+                "date": "2026-04-03",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C5",
+                "contractNo": "HD05",
+                "partner": "Quốc Tế Xanh",
+                "content": "Đại lý C5 tại Hải Phòng",
+                "thu": 0,
+                "chi": 28954579,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf306db56-4b70-48f9-8a9a-930312479f9c",
+                "date": "2026-04-03",
+                "vessel": "VG18",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Vận Chuyển dầu",
+                "thu": 0,
+                "chi": 7845000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXba8e3e2d-9dfa-4849-866c-7d21b1bd3b14",
+                "date": "2026-04-04",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Hoàng Quyên",
+                "content": "HD9 VG36 Clinker Hòn La - Hậu Giang",
+                "thu": 172049900,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXb90fa20f-8774-4dc9-82a7-0dc2be908b1d",
+                "date": "2026-04-04",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "Hoàng Quyên",
+                "content": "HD11 VG05 Cát Vĩnh Xương - Đà Nẵng",
+                "thu": 327950100,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXdfe4502e-43e4-46e7-b6a3-2128031544e9",
+                "date": "2026-04-05",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "",
+                "content": "Tàu lai tại Đà Nẵng C7",
+                "thu": 0,
+                "chi": 9979200,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe3141a07-1fa9-4253-ba17-d71f099b2c1a",
+                "date": "2026-04-05",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "",
+                "content": "Cầu bến tại Đà Nẵng C7",
+                "thu": 0,
+                "chi": 5826506,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX6245ac08-5d2b-4b8e-8af8-63dd3e467fef",
+                "date": "2026-04-06",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXd17eb779-0bb9-4247-a4fd-c0114dcf7ac7",
+                "date": "2026-04-06",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf698fbf3-4102-4e78-aeb2-a225bd896fe5",
+                "date": "2026-04-06",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX4c7a6b62-8181-446e-8fa2-15f89bd903aa",
+                "date": "2026-04-07",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 40000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXb3a6eb00-18f5-4cfa-9ab2-a3250476b862",
+                "date": "2026-04-08",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "",
+                "content": "Cầu bến lai dắt C7 tại Hòn La",
+                "thu": 0,
+                "chi": 22653032,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe4abe3fd-4da1-46d1-bdcb-fe394c144225",
+                "date": "2026-04-08",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "",
+                "content": "Hoa tiêu lai dắt C7 tại Hòn La",
+                "thu": 0,
+                "chi": 4320000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX96763686-7ea3-4c92-905d-1cea1c8bbab3",
+                "date": "2026-04-08",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXf74ca363-27e8-48c7-9997-cab6fefca45c",
+                "date": "2026-04-08",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc2833f54-3889-44e7-b187-4b35e0a6b714",
+                "date": "2026-04-08",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C25",
+                "contractNo": "HD25",
+                "partner": "Thái Bình Dương",
+                "content": "Trả tiền gửi HD25 Thái Bình Dương",
+                "thu": 0,
+                "chi": 55400000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXab2ea383-6624-44e4-9595-dcd163e00802",
+                "date": "2026-04-08",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Luân chuyển tiền mặt",
+                "thu": 0,
+                "chi": 14600000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX9ff258d0-27c6-46e7-bec9-0587a982d443",
+                "date": "2026-04-08",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Luân chuyển tiền mặt",
+                "thu": 14600000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXf2c2c234-5a35-4c76-9c78-fef79cf46587",
+                "date": "2026-04-08",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thăm viếng bố đối tác",
+                "thu": 0,
+                "chi": 1000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX158de438-bb5f-41e5-9b10-d14f59792286",
+                "date": "2026-04-09",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C23",
+                "contractNo": "HD23",
+                "partner": "Ngọc Anh",
+                "content": "HD23 VG15 Xỉ Sơn Dương - Hậu Giang",
+                "thu": 425628000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8ac53e73-60da-42c8-8434-abf20023775e",
+                "date": "2026-04-09",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C24",
+                "contractNo": "HD24",
+                "partner": "Ngọc Anh",
+                "content": "HD24 VG18 Cliker Hòn La - Hậu Giang",
+                "thu": 554372000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX49187276-115d-4b82-8633-067d65d0d7be",
+                "date": "2026-04-09",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Hoàng Đăng",
+                "content": "Phí ngoài Quảng Ninh",
+                "thu": 0,
+                "chi": 11000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX63da9f7c-fede-4d8d-a6bd-aea4697a1e9d",
+                "date": "2026-04-09",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Cước điện thoại",
+                "thu": 0,
+                "chi": 776044,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXab4fcd41-2ffe-4ab5-bf52-8b6d276b8916",
+                "date": "2026-04-10",
+                "vessel": "VG15",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "PvOil Đà Nẵng",
+                "content": "Cấp dầu VG15 tại Đà Nẵng",
+                "thu": 0,
+                "chi": 995392000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX7a5d7098-6991-4c2a-9585-75c16fdd204d",
+                "date": "2026-04-10",
+                "vessel": "VG15",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "PvOil Đà Nẵng",
+                "content": "Vận chuyển dầu VG15 tại Đà Nẵng",
+                "thu": 0,
+                "chi": 18120000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXec3d0cd9-b186-4467-b203-bd7336e7b445",
+                "date": "2026-04-10",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Hoàng Đăng",
+                "content": "Đại lý C7 Tại Quảng Ninh",
+                "thu": 0,
+                "chi": 64699340,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5324bf65-8c4f-4b50-a943-fa76a46edd74",
+                "date": "2026-04-10",
+                "vessel": "VG18",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Alberta",
+                "content": "Cấp LO ngày 3/3",
+                "thu": 0,
+                "chi": 54000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc3e65fd7-9a9c-404b-bff4-983f071f007c",
+                "date": "2026-04-10",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "SMS duy tri TK",
+                "thu": 0,
+                "chi": 165000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX361d8ed4-fe2d-4a64-8a3e-bcfebb48dd3f",
+                "date": "2026-04-10",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C6",
+                "contractNo": "HD06",
+                "partner": "",
+                "content": "Hoa tiêu Sài Gòn C6 tại Đồng Nai",
+                "thu": 0,
+                "chi": 5263110,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXdd625513-0722-4c36-b083-61e7fe1063cc",
+                "date": "2026-04-10",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Lê Phạm",
+                "content": "Đại lý C8 tại Sơn Dương",
+                "thu": 0,
+                "chi": 41024305,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX007a6f22-8016-40de-b17c-dcaefc5bbd95",
+                "date": "2026-04-10",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C7 tại Vĩnh Xương",
+                "thu": 0,
+                "chi": 56448916,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX2bba17da-e037-4c5b-b286-9d094695d501",
+                "date": "2026-04-10",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "",
+                "content": "Tàu Lai C8 tại Đà Nẵng",
+                "thu": 0,
+                "chi": 9979200,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXfbfbf5a7-e260-4ed7-afe0-c3a9db4f3ce3",
+                "date": "2026-04-10",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "",
+                "content": "Cầu bến C8 tại Đà Nẵng",
+                "thu": 0,
+                "chi": 6079754,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX9ec0001a-868a-4e06-814c-26e1eb7d5475",
+                "date": "2026-04-10",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXbc272bd5-5edb-416d-8c0f-4bf202e415ca",
+                "date": "2026-04-10",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C24",
+                "contractNo": "HD24",
+                "partner": "Ngọc Anh",
+                "content": "HD24 VG18 Cliker Hòn La - Hậu Giang",
+                "thu": 940434250,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX021d53b6-5db0-4738-8e92-069dbe0d6ea0",
+                "date": "2026-04-10",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C28",
+                "contractNo": "HD28",
+                "partner": "Ngọc Anh",
+                "content": "HD28 VG18 Xỉ Sơn Dương - HCM",
+                "thu": 543160000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX865dc0eb-14c3-47c6-a9df-6302de129bd9",
+                "date": "2026-04-10",
+                "vessel": "VG05",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 12454276.89708284,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXcae5e66b-c063-47eb-97ff-7a8368f40a58",
+                "date": "2026-04-10",
+                "vessel": "VG09",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 3492355.6398366913,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX71f40fd1-0bb7-4987-a9b3-9fe96ed71646",
+                "date": "2026-04-10",
+                "vessel": "VG15",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 6726975.84687845,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX9b8e7894-467e-46ff-96aa-7b2ec8bdb996",
+                "date": "2026-04-10",
+                "vessel": "VG18",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 14983480.26313548,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX7b1ddb77-ec0b-4c6d-a162-c83a0d86af92",
+                "date": "2026-04-10",
+                "vessel": "VG36",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 6190783.3530665375,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX89eb9a2a-f628-4530-a7c3-5020051ab743",
+                "date": "2026-04-11",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C28",
+                "contractNo": "HD28",
+                "partner": "Ngọc Anh",
+                "content": "HD28 VG18 Xỉ Sơn Dương - HCM",
+                "thu": 450000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX3ee6e6d5-d751-4110-8bed-7f75dc93c8cd",
+                "date": "2026-04-11",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf8e74547-6b8b-47f9-9b82-73d19c64b931",
+                "date": "2026-04-13",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Cước phí bưu điện",
+                "thu": 0,
+                "chi": 20000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX7f07be5a-7304-4726-bdee-77a109339179",
+                "date": "2026-04-13",
+                "vessel": "VG05",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "PvOil Đà Nẵng",
+                "content": "Cấp dầu DO tại Đà Nẵng",
+                "thu": 0,
+                "chi": 644368000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX67072d48-4a81-4d9f-9168-1ce5059e21cb",
+                "date": "2026-04-13",
+                "vessel": "VG36",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Tra đủ  đơn dầu cấp 1/4",
+                "thu": 0,
+                "chi": 367044800,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX253a79bd-a9b2-4af9-a886-229ce7f38af6",
+                "date": "2026-04-13",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "",
+                "content": "Tàu lai C9 Tại Vĩnh Hưng",
+                "thu": 0,
+                "chi": 8640000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe173e08e-a21c-48ec-a1b3-34fab1b8c341",
+                "date": "2026-04-13",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "",
+                "content": "Cầu bến C9 Tại Vĩnh Hưng",
+                "thu": 0,
+                "chi": 5749189,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXaa88c7a2-7746-45d1-85ca-1eb2b1dc59de",
+                "date": "2026-04-13",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX69c386bb-f326-43c5-83e8-13b85e2631e6",
+                "date": "2026-04-13",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXd143a1a2-cd56-4d16-8778-8e611ca1c1e0",
+                "date": "2026-04-13",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Nhận tiền mặt bà",
+                "thu": 8900000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX9d1422ef-d68a-49df-82dd-09b3514d96a8",
+                "date": "2026-04-13",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Vĩnh công tác Hòn La mua đồ",
+                "thu": 0,
+                "chi": 8900000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX55969271-47b1-4acd-bee7-6258b13b9049",
+                "date": "2026-04-14",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Phí BDSD",
+                "thu": 0,
+                "chi": 150000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX47d3a0ad-8da4-4565-9ac6-ef7089eda35b",
+                "date": "2026-04-14",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Đồ máy 24 + vật tư 3/4",
+                "thu": 0,
+                "chi": 4841000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX1a5e2a83-ad31-4285-8cfb-bb912f58045d",
+                "date": "2026-04-14",
+                "vessel": "VG18",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc ngắn hạn",
+                "thu": 0,
+                "chi": 541166308,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXdd8a30c9-e021-45f8-b18a-a81b1678a2c3",
+                "date": "2026-04-15",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C28",
+                "contractNo": "HD28",
+                "partner": "Ngọc Anh",
+                "content": "HD28 VG18 Xỉ Sơn Dương - HCM",
+                "thu": 806450750,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe0e17606-b380-417d-a89e-8c16cdd234c7",
+                "date": "2026-04-15",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C29",
+                "contractNo": "HD29",
+                "partner": "Ngọc Anh",
+                "content": "HD29 VG09 Xỉ Sơn Dương - XM Tây Đô",
+                "thu": 490770750,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb63e555b-060c-4027-a1bd-25c418420e84",
+                "date": "2026-04-15",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "",
+                "content": "Phí cầu bến C9 tại Đà Nẵng",
+                "thu": 0,
+                "chi": 5554508,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX94264839-3711-4174-9777-e59e18f28f19",
+                "date": "2026-04-16",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thép thanh châu",
+                "thu": 0,
+                "chi": 12078807,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX26fc519d-b1a2-413b-a782-51c66ca3e50c",
+                "date": "2026-04-16",
+                "vessel": "VG36",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả tiền vé máy bay",
+                "thu": 0,
+                "chi": 6178400,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX35848f20-4b7b-445c-907e-80f1d7c3df06",
+                "date": "2026-04-16",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "",
+                "content": "Hoa tiêu C9 tại Vĩnh Hưng",
+                "thu": 0,
+                "chi": 4622125,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX76312968-f112-4c97-9fc1-9c2f9f0f9f98",
+                "date": "2026-04-16",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Dây buộc tàu",
+                "thu": 0,
+                "chi": 32253750,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX897626fb-e8ef-4e03-b7b4-74dd4680ca7d",
+                "date": "2026-04-16",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C8 tại Hậu Giang",
+                "thu": 0,
+                "chi": 10292000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf6339b99-e1ea-49b4-8a01-71b4795ae470",
+                "date": "2026-04-16",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C9 tại Vĩnh Xương",
+                "thu": 0,
+                "chi": 7000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX71135f8f-1fa0-4148-990f-f675eb58fcab",
+                "date": "2026-04-16",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C7",
+                "contractNo": "HD07",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C7 tại Cần Thơ",
+                "thu": 0,
+                "chi": 37347000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX2bb9f2b0-240f-4f71-a820-dca1b3474350",
+                "date": "2026-04-16",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C8 tại VĨnh Xương",
+                "thu": 0,
+                "chi": 54488023,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXec71e2c9-3276-4cf1-bb37-09d4eb83e8b6",
+                "date": "2026-04-16",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C6",
+                "contractNo": "HD06",
+                "partner": "Quốc Tế Xanh",
+                "content": "Đại lý C6 tại Hải Phòng",
+                "thu": 0,
+                "chi": 37297152,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc5d40835-fe84-4a1d-80dd-6273ec0a5c9d",
+                "date": "2026-04-16",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "Hoàng Quyên",
+                "content": "HD11 VG05 Cát Vĩnh Xương - Đà Nẵng",
+                "thu": 168228900,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXd7504d1c-5436-4884-84bf-627c8e2ef6c3",
+                "date": "2026-04-16",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C20",
+                "contractNo": "HD20",
+                "partner": "Hoàng Quyên",
+                "content": "HD20 VG05 Cát Vĩnh Xương - Đà Nẵng",
+                "thu": 534733650,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX2f9a7589-d857-42fb-a9a0-dee037408d79",
+                "date": "2026-04-16",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C20",
+                "contractNo": "HD20",
+                "partner": "Hoàng Quyên",
+                "content": "HD26 VG09 Cát Vĩnh Xương - Đà Nẵng",
+                "thu": 297037450,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX75e9acd9-3ac5-4296-9aca-d41cdca81d8d",
+                "date": "2026-04-16",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C50",
+                "contractNo": "HD50",
+                "partner": "Bình Minh",
+                "content": "HD50 VG09 Cát Vĩnh Xương - Huy Văn",
+                "thu": 50000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8aa8cd0e-1b37-4e7f-b949-1812e149a569",
+                "date": "2026-04-17",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe5638564-357b-4498-b910-564558fa1349",
+                "date": "2026-04-17",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX18f576db-c60b-462d-8935-163bf6d6db5b",
+                "date": "2026-04-17",
+                "vessel": "VGnew",
+                "category": "",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Công ty Đại Dương",
+                "content": "Chuyển tiền thiết kế",
+                "thu": 0,
+                "chi": 100000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX87a4b903-bfff-4a03-ac59-5bcc2b671711",
+                "date": "2026-04-18",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX2cb638c6-d1f1-4658-8d83-bdab3ef089d0",
+                "date": "2026-04-20",
+                "vessel": "VG18",
+                "category": "7.Bảo Hiểm",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Bảo hiểm tàu kỳ 2",
+                "thu": 0,
+                "chi": 139122500,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8dbf78f4-c0bf-4b20-95c5-a70d91b9788d",
+                "date": "2026-04-20",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX92afe94d-d0fc-41d4-9b0a-e25397da5f0a",
+                "date": "2026-04-20",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX1559485a-a4d9-4491-8ea8-85fa83167834",
+                "date": "2026-04-20",
+                "vessel": "VG18",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc trung hạn",
+                "thu": 0,
+                "chi": 803265000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX067953b6-132e-4021-94e2-f945e6e862d8",
+                "date": "2026-04-20",
+                "vessel": "VG18",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả lãi trung hạn",
+                "thu": 0,
+                "chi": 261987302,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX9f3411ad-0ef5-4b76-b08f-297793bba338",
+                "date": "2026-04-22",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXde38ffa4-35e6-444d-b8ff-92c3480b87c3",
+                "date": "2026-04-23",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXbf96059a-a2f8-4b0a-abb6-9b108eaf227b",
+                "date": "2026-04-23",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Lê Phạm",
+                "content": "Đại lý C8 tại Sơn Dương",
+                "thu": 0,
+                "chi": 41383000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX85336d16-799c-4718-a6e5-a6246dc74983",
+                "date": "2026-04-23",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Lê Phạm",
+                "content": "Đại lý C9 tại Sơn Dương",
+                "thu": 0,
+                "chi": 36769000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa740ab91-b921-42fa-a8b3-981055457b54",
+                "date": "2026-04-23",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Lê Phạm",
+                "content": "Đại lý C8 tại Sơn Dương",
+                "thu": 0,
+                "chi": 41117000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8bd95909-71d2-4509-83fb-62decb6ff6df",
+                "date": "2026-04-23",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Lê Phạm",
+                "content": "Đại lý C8 tại Sơn Dương",
+                "thu": 0,
+                "chi": 44609760,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb4f873d5-32ff-448c-ae59-f3e81e776bf6",
+                "date": "2026-04-23",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "",
+                "content": "Phí cầu bến tại Đà Nẵng",
+                "thu": 0,
+                "chi": 9334267,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXd10ade46-1560-48c9-bf52-739d4fb4cd38",
+                "date": "2026-04-23",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "",
+                "content": "Tàu lai tại Đà Nẵng",
+                "thu": 0,
+                "chi": 9979200,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8bee5dcc-9f23-4b18-a489-86a493ea83ab",
+                "date": "2026-04-23",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C29",
+                "contractNo": "HD29",
+                "partner": "Ngọc Anh",
+                "content": "HD29 VG09 Xỉ Sơn Dương - XM Tây Đô",
+                "thu": 646829250,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXec1f4077-958b-44df-96ef-82778c6277a2",
+                "date": "2026-04-23",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C30",
+                "contractNo": "HD30",
+                "partner": "Ngọc Anh",
+                "content": "HD30 VG36 Clinker Hòn La - HCM",
+                "thu": 923562900,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe378554d-b4cb-48ba-b367-a5cd17658d4d",
+                "date": "2026-04-24",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C31",
+                "contractNo": "HD31",
+                "partner": "Ngọc Anh",
+                "content": "HD31 VG05 Than Quảng Ninh - Nghi Sơn",
+                "thu": 346465800,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX21b8f869-e68d-4159-bb09-f13a3de5a902",
+                "date": "2026-04-24",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C32",
+                "contractNo": "HD32",
+                "partner": "Ngọc Anh",
+                "content": "HD32 VG36 Than Gò Da - Đà Nẵng",
+                "thu": 166724310,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX92224751-9c1f-40bb-a999-4558d3e6a657",
+                "date": "2026-04-24",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Sunshine",
+                "content": "Đại lý C8 tại HCM",
+                "thu": 0,
+                "chi": 27997070,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX38c5671b-1b61-41d2-aa42-7fec52d16c36",
+                "date": "2026-04-24",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Sông Hậu",
+                "content": "Đại lý C9 tại Hậu Giang",
+                "thu": 0,
+                "chi": 33300235,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX90c71a08-9218-42de-95c4-156c51a78448",
+                "date": "2026-04-24",
+                "vessel": "VG09",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Petrotime",
+                "content": "Trả tiền dầu DO",
+                "thu": 0,
+                "chi": 325611930,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX9f136958-1d9a-458b-a22c-42ca6a9b3bbe",
+                "date": "2026-04-24",
+                "vessel": "VG18",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Trả tiền dầu DO",
+                "thu": 0,
+                "chi": 550000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf1e01640-537e-4b09-b1c6-3741c1c07ebe",
+                "date": "2026-04-24",
+                "vessel": "VG05",
+                "category": "7.Bảo Hiểm",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "BHXH T3",
+                "thu": 0,
+                "chi": 21664000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5473f538-5b3f-41bc-863e-71168687fea2",
+                "date": "2026-04-24",
+                "vessel": "VG09",
+                "category": "7.Bảo Hiểm",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "BHXH T3",
+                "thu": 0,
+                "chi": 21664000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8a578f9d-d5df-4a1a-a9f0-826bd8184cba",
+                "date": "2026-04-24",
+                "vessel": "VG15",
+                "category": "7.Bảo Hiểm",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "BHXH T3",
+                "thu": 0,
+                "chi": 21664000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX4f96a007-ae8f-46b4-a291-8bf1294e7d3f",
+                "date": "2026-04-24",
+                "vessel": "VG18",
+                "category": "7.Bảo Hiểm",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "BHXH T3",
+                "thu": 0,
+                "chi": 21664000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa0d6800a-747e-49b8-8464-de2ee237aca7",
+                "date": "2026-04-24",
+                "vessel": "VG36",
+                "category": "7.Bảo Hiểm",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "BHXH T3",
+                "thu": 0,
+                "chi": 21664000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe129c443-59ba-4ec9-87a9-56b78f756b33",
+                "date": "2026-04-25",
+                "vessel": "VG36",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Cảng Chân Mây",
+                "content": "Cấp dầu DO tại Chân mây",
+                "thu": 0,
+                "chi": 562590074,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa0dc449f-1bfa-4c7b-af46-67fb2ff1ebae",
+                "date": "2026-04-26",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "",
+                "content": "Cầu bến , lai dắt tại Chân mây",
+                "thu": 0,
+                "chi": 19019340,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc18c9dc2-cb12-4966-9a4e-56a2a3397023",
+                "date": "2026-04-26",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả lãi TK",
+                "thu": 169829,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa279966f-8a18-49f7-97ee-fc4131f649b8",
+                "date": "2026-04-28",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C50",
+                "contractNo": "HD50",
+                "partner": "Bình Minh",
+                "content": "HD50 VG09 Cát Vĩnh Xương - Huy Văn",
+                "thu": 300000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc6395673-de00-4bda-9683-e00dc1510318",
+                "date": "2026-04-28",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Công ty Tố My",
+                "content": "Vật tư phụ",
+                "thu": 0,
+                "chi": 4306354,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX8a32ed85-385b-4831-81c7-175afe573a62",
+                "date": "2026-04-28",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Máy tính + máy in",
+                "thu": 0,
+                "chi": 22050000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX6f0c827b-8c63-444f-82f1-4913244c7590",
+                "date": "2026-04-28",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Sơn HP",
+                "content": "Sơn HP",
+                "thu": 0,
+                "chi": 14220000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX81d47b07-3916-4abc-8a45-585ab0ffbcca",
+                "date": "2026-04-28",
+                "vessel": "VG05",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Sơn HP",
+                "content": "Sơn HP",
+                "thu": 0,
+                "chi": 4206085,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX65e195af-a0f0-49af-bdce-bb8a45596e72",
+                "date": "2026-04-28",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Tấn Cường",
+                "content": "Bồi dưỡng sửa chưa tời lái",
+                "thu": 0,
+                "chi": 2000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXb16d748e-48d3-486a-997f-2f516e993b2d",
+                "date": "2026-04-29",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C32",
+                "contractNo": "HD32",
+                "partner": "Ngọc Anh",
+                "content": "HD32 VG36 Than Gò Da - Đà Nẵng",
+                "thu": 343275690,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX3611f66a-7cea-4b2f-8270-bd7a246a8254",
+                "date": "2026-04-29",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C33",
+                "contractNo": "HD33",
+                "partner": "Ngọc Anh",
+                "content": "HD33 VG05 Quặng Vĩnh Xương - Hải Phòng",
+                "thu": 603790110,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXad22dae7-24ae-4341-b00f-3ec9aa34a386",
+                "date": "2026-04-29",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX68ab4122-2120-4353-837b-59add9d5a72f",
+                "date": "2026-04-29",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXddb0a1d4-0380-4cf5-895a-210c137a8df6",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả lãi TK",
+                "thu": 99261,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXa37d87d1-069a-4097-a1a1-4738369db573",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Luân chuyển tiền mặt",
+                "thu": 68375000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX12ca6e33-bf37-49fc-b8f8-a4ffd51bbf31",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Luân chuyển tiền mặt",
+                "thu": 0,
+                "chi": 68375000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXbf50b5f6-6eb8-44a3-99d7-6e0aa7e9671c",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Nhận tiền bảo hiểm",
+                "thu": 4800000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXa51bfa83-1413-43b0-a25a-cddbe3383310",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Tùng",
+                "thu": 0,
+                "chi": 40000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX37524756-b0a3-48e1-a68a-707d004c0e23",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương C Phương",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX85f07d99-6812-4c08-8ed7-6dc81ddc075b",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Vĩnh",
+                "thu": 0,
+                "chi": 67650000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXe72ddc4b-042f-4124-be8a-65024332a641",
+                "date": "2026-04-30",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Vé máy bay",
+                "thu": 0,
+                "chi": 28190000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXca87e089-a4c7-4881-a013-f1ef06d1900b",
+                "date": "2026-04-30",
+                "vessel": "VG05",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Tháng",
+                "thu": 0,
+                "chi": 195829500,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX6cea8ea3-3d17-41fe-92af-7f2985a555d5",
+                "date": "2026-04-30",
+                "vessel": "VG09",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Tháng",
+                "thu": 0,
+                "chi": 199694833.33333334,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX695c2101-3fa8-403f-ae8e-d2e524a544e1",
+                "date": "2026-04-30",
+                "vessel": "VG15",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Tháng",
+                "thu": 0,
+                "chi": 203028000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX7634825e-d1d3-40ce-bcba-1b072998d9ed",
+                "date": "2026-04-30",
+                "vessel": "VG18",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Tháng",
+                "thu": 0,
+                "chi": 220093500,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX27181d7f-6d3a-4b10-b812-1371e55a8c96",
+                "date": "2026-04-30",
+                "vessel": "VG36",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Tháng",
+                "thu": 0,
+                "chi": 202606166.66666666,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX7e66801c-dace-496a-95b2-24459b48eece",
+                "date": "2026-04-30",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 43670125,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX724bf7f5-31eb-4cf6-b033-735d3519c22f",
+                "date": "2026-04-30",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 52891791.666666664,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXc290c182-ac18-4b4a-a9a9-ddade17eb87f",
+                "date": "2026-04-30",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 3100000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX016fd961-a6eb-4a7d-9258-e277cbb68d05",
+                "date": "2026-04-30",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 9000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXbc73b346-d1c0-470a-b0c9-d075cf71988b",
+                "date": "2026-04-30",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 38215358.333333336,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX70089ee0-34d4-49d8-91cc-768de523013a",
+                "date": "2026-05-01",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX4f700022-3b36-4e07-b4a9-954ac5c3fe2a",
+                "date": "2026-05-03",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "",
+                "content": "Tàu lai tại Đà Nẵng",
+                "thu": 0,
+                "chi": 9979200,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXd2f848cc-4c75-4516-92f5-d138a0ecb613",
+                "date": "2026-05-03",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "",
+                "content": "Phí cầu bến tại Đà Nẵng",
+                "thu": 0,
+                "chi": 7885934,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX6e2a7e70-a438-4fc4-b567-ed2990d8bee1",
+                "date": "2026-05-03",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Luân chuyển tiền mặt",
+                "thu": 0,
+                "chi": 200000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb037b52e-e906-4406-9f85-48e170fe7d9e",
+                "date": "2026-05-03",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Luân chuyển tiền mặt",
+                "thu": 200000000,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXe9ae9d69-1b19-4ba7-9de2-58e4873a842f",
+                "date": "2026-05-04",
+                "vessel": "VG18",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Trả đủ đơn dầu tại Sơn Dương",
+                "thu": 0,
+                "chi": 577576960,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa9661f80-0912-4f55-a804-76bb606f7a95",
+                "date": "2026-05-04",
+                "vessel": "VG18",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả lãi vay Yến Hậu",
+                "thu": 0,
+                "chi": 195070000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX2d0bc15b-7787-4c01-b154-a21d043d2ec5",
+                "date": "2026-05-04",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Chuyển tk Tùng",
+                "thu": 4930000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX3e86171b-cbfe-4db0-a5e7-ab9ad5c0c450",
+                "date": "2026-05-04",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Chuyển tk Tùng",
+                "thu": 0,
+                "chi": 4930000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf8bb7d3f-acb0-4a02-bc11-a74752035bf8",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5985e155-400d-46df-97cd-09f8a36727a1",
+                "date": "2026-05-05",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Sơn HP",
+                "content": "Sơn HP",
+                "thu": 0,
+                "chi": 21191220,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXd7f3cf27-a137-425b-8af2-f27979fec42f",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C34",
+                "contractNo": "HD34",
+                "partner": "Ngọc Anh",
+                "content": "Thu CVC HD34 VG15 Chân Mây - Hâụ Giang",
+                "thu": 1116447400,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXcdda3940-56dd-4609-a90b-70dbe5bac9c0",
+                "date": "2026-05-05",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C35",
+                "contractNo": "HD35",
+                "partner": "Ngọc Anh",
+                "content": "Thu CVC HD35 VG18 Tôn Cuộn Gò Dầu - Hải Phòng",
+                "thu": 1180433520,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb0a95d8e-971f-48a8-910f-b935a11c92da",
+                "date": "2026-05-05",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Sông Hậu",
+                "content": "Đại lý Sông Hậu tại  Hậu Giang C10",
+                "thu": 0,
+                "chi": 8331000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX506a38bd-27fd-4b5e-9528-8215e7cd1158",
+                "date": "2026-05-05",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "Sông Hậu",
+                "content": "Đại lý Sông Hậu tại VĨnh Xương C11",
+                "thu": 0,
+                "chi": 7000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX195c104f-0dc0-4170-b958-f091ee7c736d",
+                "date": "2026-05-05",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Sông Hậu",
+                "content": "Đại lý Sơng Hậu tại Hậu Giang C8",
+                "thu": 0,
+                "chi": 15969000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX2b858cc9-0d67-4045-bb2e-cc8f354e971d",
+                "date": "2026-05-05",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Sông Hậu",
+                "content": "Đại lý Sông Hậu tại VĨnh Xương C9",
+                "thu": 0,
+                "chi": 50353000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX18d32799-3f65-4b0d-8280-a8c0db618c1b",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Sông Hậu",
+                "content": "Đại lý Sơng Hậu tại Hậu Giang C9",
+                "thu": 0,
+                "chi": 36711000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5dae662f-9c22-4dac-b57c-0036eda1ace3",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Sông Hậu",
+                "content": "Đại lý Sông Hậu tại VĨnh Xương C10",
+                "thu": 0,
+                "chi": 49919000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX45b20710-b3f3-483b-97c3-6a8f11be0ae6",
+                "date": "2026-05-05",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C8",
+                "contractNo": "HD08",
+                "partner": "Sông Hậu",
+                "content": "Đại lý Sơng Hậu tại Hậu Giang C8",
+                "thu": 0,
+                "chi": 44449864,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXdec41b5b-1408-4922-b0dc-6e34354c96ff",
+                "date": "2026-05-05",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lắp đặt Camera",
+                "thu": 0,
+                "chi": 17550000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXccea8c51-6c46-49ac-aa79-0a134ec36109",
+                "date": "2026-05-05",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Sửa chữa điện",
+                "thu": 0,
+                "chi": 50021280,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8db97fe9-f82d-4d84-a479-41d7d76b751b",
+                "date": "2026-05-05",
+                "vessel": "VG18",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Nhất Minh Sơn",
+                "content": "Cấp LO VG18 ngày 1/4",
+                "thu": 0,
+                "chi": 100224000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX03321ceb-a80f-47b7-affe-3c813b2bad86",
+                "date": "2026-05-05",
+                "vessel": "VG05",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Nhất Minh Sơn",
+                "content": "Cấp LO VG05 ngày 26/1",
+                "thu": 0,
+                "chi": 59000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8d0f6984-8d91-4d09-a2de-5ea23f3485d1",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Nhất Minh Sơn",
+                "content": "Cấp LO VG15 ngày 23/2",
+                "thu": 0,
+                "chi": 35700000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc969d640-ce91-41b7-92ac-946e36ef59f1",
+                "date": "2026-05-05",
+                "vessel": "VG09",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Nhất Minh Sơn",
+                "content": "Cấp LO VG09 ngày 14/3",
+                "thu": 0,
+                "chi": 59500000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX86ceee58-4306-448e-92f0-a9d3d2e6bebf",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Nhất Minh Sơn",
+                "content": "Cấp LO VG15 ngày 18/3",
+                "thu": 0,
+                "chi": 59500000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf5f54845-1517-49df-9dab-0fbaab5c4d2f",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Long Bình",
+                "content": "Cấp dầu VG15 tại Sơn Dương",
+                "thu": 0,
+                "chi": 610369850,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX0c8f1b8f-79cc-479d-bbd9-501135b5d69b",
+                "date": "2026-05-05",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C27",
+                "contractNo": "HD27",
+                "partner": "Hoàng Quyên",
+                "content": "Thu CVC HD27 VG15 Cát Vĩnh Xương - Đà Nẵng",
+                "thu": 656028800,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXb09cb774-4b36-4784-8162-441f3eb5c145",
+                "date": "2026-05-06",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Công đức chùa",
+                "thu": 0,
+                "chi": 200000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX78c44cf5-dc0f-40ad-8d8a-929a6b60b377",
+                "date": "2026-05-06",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thu phí duy trì",
+                "thu": 0,
+                "chi": 100000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXac3b88d1-7a4d-4940-ae1e-2ee07587c540",
+                "date": "2026-05-06",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX3dc39e0e-94ba-479f-be81-f0d895bae51d",
+                "date": "2026-05-08",
+                "vessel": "VG36",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "PvOil Đà Nẵng",
+                "content": "Cấp DầuVG36 tại Đà Nẵng",
+                "thu": 0,
+                "chi": 537429500,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX7bfba750-adb2-4a8d-8e82-def3070c740b",
+                "date": "2026-05-08",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Đồ máy 24",
+                "thu": 0,
+                "chi": 460000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXe62ea7b6-1b2d-4801-901f-8aa58b6d4107",
+                "date": "2026-05-08",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Cước Điện thoại",
+                "thu": 0,
+                "chi": 796915,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX6cd148a3-dab6-4a53-8b32-9a08a7cad5d7",
+                "date": "2026-05-08",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Hoàng Đăng",
+                "content": "Đại lý ngoài",
+                "thu": 0,
+                "chi": 11000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXf1f2e7d6-b69b-4c11-88bc-840aca0a70de",
+                "date": "2026-05-08",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C13",
+                "contractNo": "HD13",
+                "partner": "Hoàng Đăng",
+                "content": "Đại lý ngoài",
+                "thu": 0,
+                "chi": 4000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXe643a311-7f51-4437-82e6-54fc72b0d5a8",
+                "date": "2026-05-08",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Hoàng Đăng",
+                "content": "Đại lý tại Quảng Ninh",
+                "thu": 0,
+                "chi": 4320000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX41913982-9e51-4835-b08c-741036779c85",
+                "date": "2026-05-08",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "",
+                "content": "Hoa tiêu C9 Cát tại Huy Văn",
+                "thu": 0,
+                "chi": 4320000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX142d9d3b-bd05-4440-b4de-861debf97ec3",
+                "date": "2026-05-08",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Vật tư + Sửa chữa máy T3",
+                "thu": 0,
+                "chi": 13790304,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX52d17e70-739a-440e-a78a-e7863c674698",
+                "date": "2026-05-08",
+                "vessel": "VG05",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lắp đặt Camera",
+                "thu": 0,
+                "chi": 17550000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX04cd5917-ee34-4648-8ad0-4bbefbe2a4e8",
+                "date": "2026-05-09",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "",
+                "content": "Cầu bến VG36 tại Đà Nẵng C11 Cát",
+                "thu": 0,
+                "chi": 5744957,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXcc954018-e7a8-42d6-b46d-25564bde0f2d",
+                "date": "2026-05-09",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "",
+                "content": "Tàu Lai VG36 tại Đà Nẵng C11 Cát",
+                "thu": 0,
+                "chi": 9936000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX16ab40fd-47da-4770-bca9-64566b3bbe8e",
+                "date": "2026-05-09",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc493bb65-957d-495d-85d8-f21fb26e5c01",
+                "date": "2026-05-09",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5452ec48-bdae-4107-9ab0-474bb4c9e0c5",
+                "date": "2026-05-10",
+                "vessel": "VG18",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Cấp ứng dầu VG18 tại Sơn Dương",
+                "thu": 0,
+                "chi": 400000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXed8b7901-dc8d-4efa-aecd-c8b023b79a5a",
+                "date": "2026-05-10",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Phí duy trì tài khoản",
+                "thu": 0,
+                "chi": 165000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5b057276-03e8-4497-adbe-37ca405cfdc7",
+                "date": "2026-05-10",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Phí rút tiền",
+                "thu": 0,
+                "chi": 102000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXb0d8b034-7024-49fc-9a5f-4df3ccd523e8",
+                "date": "2026-05-07",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Gia hạn Vshipel",
+                "thu": 0,
+                "chi": 1944000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX025aca1b-b7eb-4681-bcca-6da39c0b915a",
+                "date": "2026-05-10",
+                "vessel": "VG15",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng lương Lưu Quang Trường",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX4abd6d8a-eda0-46ac-87b2-909cb832f444",
+                "date": "2026-05-11",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXcce24303-e879-4135-875d-569db36616f6",
+                "date": "2026-05-11",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C13",
+                "contractNo": "HD13",
+                "partner": "Hoàng Đăng",
+                "content": "Phí đại lý ở Quảng Ninh Hải Phòng",
+                "thu": 0,
+                "chi": 5400000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa85de7c7-8559-4da8-bbd3-5ea056141ab3",
+                "date": "2026-05-11",
+                "vessel": "VG09",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Cấp VHF",
+                "thu": 0,
+                "chi": 8640000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXeccf2be8-0b64-4a56-8567-cf723b7b542a",
+                "date": "2026-05-12",
+                "vessel": "VG05",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 17067444.266987763,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX61c41624-f7eb-4920-bd44-5d73d854ffaf",
+                "date": "2026-05-12",
+                "vessel": "VG09",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 3492355.6398366913,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX4157e7a8-2a25-41bf-b37a-8162198d1bb2",
+                "date": "2026-05-12",
+                "vessel": "VG15",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 9038294.476973524,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf22c0ad9-7f0e-4c89-82b1-82e62d1ec442",
+                "date": "2026-05-12",
+                "vessel": "VG18",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 24194342.65285629,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXe5a4c52f-6777-4119-8ae4-0c65772edea1",
+                "date": "2026-05-12",
+                "vessel": "VG36",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi vay ngắn hạn AB",
+                "thu": 0,
+                "chi": 7896444.963345725,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa8b58fda-2d3b-4692-a9c1-88e237d2a5e2",
+                "date": "2026-05-12",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C37",
+                "contractNo": "HD37",
+                "partner": "Ngọc Anh",
+                "content": "HD37 VG05 Xỉ Sơn Dương - Hậu Giang",
+                "thu": 1011241000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX40be957f-ffc7-4c5d-8b74-624b94ad58f1",
+                "date": "2026-05-12",
+                "vessel": "VG36",
+                "category": "CVC",
+                "voyageNo": "C38",
+                "contractNo": "HD38",
+                "partner": "Ngọc Anh",
+                "content": "HD38 VG36 Xỉ Sơn Dương - HCM",
+                "thu": 1159860870,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX520f4250-4565-45ee-836d-7d4bff33318e",
+                "date": "2026-05-12",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C42",
+                "contractNo": "HD42",
+                "partner": "Ngọc Anh",
+                "content": "HD42 VG09 Xỉ Sơn Dương - Hậu Giang",
+                "thu": 1288287000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXab143fff-c160-4d73-920e-d56782c33574",
+                "date": "2026-05-12",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Xăng xe",
+                "thu": 0,
+                "chi": 1400000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX05e5ac9b-bca6-499b-8255-eb8e6b5b85aa",
+                "date": "2026-05-12",
+                "vessel": "VG09",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng lương Lê Ngọc Anh",
+                "thu": 0,
+                "chi": 2000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX4a42c799-b41b-4362-ae16-175ff83032eb",
+                "date": "2026-05-13",
+                "vessel": "VG36",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Cảng Chân Mây",
+                "content": "Tạm ứng mua dầu nhờn",
+                "thu": 0,
+                "chi": 2000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa94739a6-6d6d-487b-abdf-95b7585b5b05",
+                "date": "2026-05-13",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "",
+                "content": "Tàu lai",
+                "thu": 0,
+                "chi": 19000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa781add6-ffe4-45f9-9bf4-794edd91061d",
+                "date": "2026-05-13",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C26",
+                "contractNo": "HD26",
+                "partner": "Hoàng Quyên",
+                "content": "HD26 VG09 Cát Vĩnh Xương - Đà Nẵng",
+                "thu": 347647150,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX4cb52530-6952-433f-9f4a-356fa93bfd67",
+                "date": "2026-05-13",
+                "vessel": "VG36",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng lương Nguyễn Văn Danh",
+                "thu": 0,
+                "chi": 5000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXb3ddf65d-5304-4387-8019-ce1a22c32325",
+                "date": "2026-05-13",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C55",
+                "contractNo": "HD55",
+                "partner": "Bình Minh",
+                "content": "HD… VG05 Than Quảng Ninh - Hòn La",
+                "thu": 180000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX89c4d2f1-fe1e-4437-968c-624c9dfad44a",
+                "date": "2026-05-14",
+                "vessel": "VG18",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc ngắn hạn",
+                "thu": 0,
+                "chi": 965804729,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX99a23e8b-4407-4c2e-b5a3-ff1fb55844cf",
+                "date": "2026-05-14",
+                "vessel": "VG36",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc ngắn hạn",
+                "thu": 0,
+                "chi": 735064640,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa3ae5265-8811-49ec-a37c-58ba8defc79a",
+                "date": "2026-05-14",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C54",
+                "contractNo": "HD54",
+                "partner": "Thái Bình Dương",
+                "content": "HD... VG09 Than Quảng Ninh - Nghi Sơn",
+                "thu": 230000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXda1a2bfa-0b8a-49ad-8ece-6fbb09bf8a53",
+                "date": "2026-05-15",
+                "vessel": "VG36",
+                "category": "5.Dầu LO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Cảng Chân Mây",
+                "content": "Trả tiền dầu Lo tại Huế",
+                "thu": 0,
+                "chi": 52298075,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5d8c8f18-ca6b-475e-b184-2aa3a20f0bb0",
+                "date": "2026-05-15",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX9bbb908d-64b3-4520-bdcc-bae63737872a",
+                "date": "2026-05-15",
+                "vessel": "VG05",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Trả tiền dầu DO đơn 5/5",
+                "thu": 0,
+                "chi": 596035830,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXfa554146-0662-4289-99e7-7a2294bbe93b",
+                "date": "2026-05-15",
+                "vessel": "VG09",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Petrotime",
+                "content": "Trả tiền dầu DO đơn 4/5",
+                "thu": 0,
+                "chi": 788697000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa591e3c5-6ff6-4612-95c3-aad8b59d709b",
+                "date": "2026-05-15",
+                "vessel": "VG09",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Lê Phạm",
+                "content": "Đại lý tại Sơn Dương",
+                "thu": 0,
+                "chi": 2160000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXa75a85b8-636a-401d-8520-a783c75470b8",
+                "date": "2026-05-15",
+                "vessel": "VG05",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C9",
+                "contractNo": "HD09",
+                "partner": "Lê Phạm",
+                "content": "Đại lý tại Sơn Dương",
+                "thu": 0,
+                "chi": 39501000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX1e056f0e-ac08-4d50-b424-50ad45458f71",
+                "date": "2026-05-15",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Lê Phạm",
+                "content": "Đại lý tại Sơn Dương",
+                "thu": 0,
+                "chi": 42829682,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX90a8dbf2-85e2-4421-a32a-aaf96bbe4bc6",
+                "date": "2026-05-15",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "Sông Hậu",
+                "content": "Đại lý tại Hậu Giang",
+                "thu": 0,
+                "chi": 36215000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX37c31bb6-3a44-4a90-9cf4-ea3fbd04281d",
+                "date": "2026-05-15",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C12",
+                "contractNo": "HD12",
+                "partner": "Sông Hậu",
+                "content": "Đại lý tại Vĩnh Xương",
+                "thu": 0,
+                "chi": 52468000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8789e655-654c-494a-a19d-4615a888312e",
+                "date": "2026-05-15",
+                "vessel": "VG18",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "Sông Hậu",
+                "content": "Đại lý tại Hậu Giang",
+                "thu": 0,
+                "chi": 42646753,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX68440bcb-1877-47c8-a948-33aabc8081cb",
+                "date": "2026-05-15",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C43",
+                "contractNo": "HD43",
+                "partner": "Ngọc Anh",
+                "content": "HD43 VG18 lần 1",
+                "thu": 499000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX36f6b2c3-7579-4a83-ba33-c629b4508077",
+                "date": "2026-05-15",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Phí SMS",
+                "thu": 0,
+                "chi": 150000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX53b5c46e-2d92-45b6-a379-9b98fd9f0842",
+                "date": "2026-05-15",
+                "vessel": "VGnew",
+                "category": "",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thẩm định 5 tầu",
+                "thu": 0,
+                "chi": 5500000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX68ffafaa-46fa-4b2a-b89c-04a9967430b9",
+                "date": "2026-05-16",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX639da9a9-2116-422a-bbed-8892047109c0",
+                "date": "2026-05-16",
+                "vessel": "VG36",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "",
+                "content": "Cầu bến, tàu lai tại Chân Mây",
+                "thu": 0,
+                "chi": 19271866,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX3fc11029-3305-46ae-a0c7-ad3fa00af9f1",
+                "date": "2026-05-16",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb199a195-6e40-4e43-ad17-de1bf66254d6",
+                "date": "2026-05-16",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX57774161-d176-4d6e-bd05-2ca5bd3c261e",
+                "date": "2026-05-16",
+                "vessel": "",
+                "category": "CVC",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Ngọc Anh",
+                "content": "Trả tiền gửi Ngọc Anh",
+                "thu": 0,
+                "chi": 300000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX38e62f42-58b5-4344-9b54-f1e3ca97cfe5",
+                "date": "2026-05-16",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Chuyển tk Tùng",
+                "thu": 0,
+                "chi": 62341000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb78d2c71-c4ec-49b4-80db-8a25d974170a",
+                "date": "2026-05-16",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Chuyển tk Tùng",
+                "thu": 67518500,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXb444eff1-00a1-4c49-8e6c-ad9b2214fd70",
+                "date": "2026-05-16",
+                "vessel": "VG18",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Hoàng Khải",
+                "content": "Trả tiền dầu",
+                "thu": 0,
+                "chi": 419365190,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX073ad373-32ce-4753-b8ce-62f11eb1b0af",
+                "date": "2026-05-19",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thuế",
+                "thu": 0,
+                "chi": 1248225,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX540db6cc-a936-4b93-8215-0ae02d86e8fa",
+                "date": "2026-05-20",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C43",
+                "contractNo": "HD43",
+                "partner": "Ngọc Anh",
+                "content": "HD43 VG18",
+                "thu": 1511852000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXb743c23e-814b-4988-a426-d54a019435cd",
+                "date": "2026-05-20",
+                "vessel": "VG15",
+                "category": "CVC",
+                "voyageNo": "C44",
+                "contractNo": "HD44",
+                "partner": "Ngọc Anh",
+                "content": "HD44 VG15",
+                "thu": 410400000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX28744946-1e68-42fc-8af7-f8132fa84852",
+                "date": "2026-05-20",
+                "vessel": "VG18",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc trung hạn",
+                "thu": 0,
+                "chi": 803265000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX45e233e2-7aa3-49d6-b09e-ab4f96dfc702",
+                "date": "2026-05-20",
+                "vessel": "VG18",
+                "category": "6.Lãi Vay",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả lãi trung hạn",
+                "thu": 0,
+                "chi": 249003183,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXf80cf0fb-5eda-4877-bfbb-bf87329de006",
+                "date": "2026-05-21",
+                "vessel": "VG36",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Quấn Motor",
+                "thu": 0,
+                "chi": 8679000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX36e85b2d-5a56-4ce5-9da1-44c7b74f61b5",
+                "date": "2026-05-22",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Mua 2 điện thoại",
+                "thu": 0,
+                "chi": 73980000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX148ba271-478a-42da-b565-3224b3181145",
+                "date": "2026-05-21",
+                "vessel": "VG15",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Đồ máy 24",
+                "thu": 0,
+                "chi": 320000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX38a2e826-daea-4db3-aa1e-0d03edf5b160",
+                "date": "2026-05-21",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX94a68e25-d1fb-49ec-bcd0-c10a015da38a",
+                "date": "2026-05-21",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX284ce963-6c69-479b-b3ac-3452c14925cd",
+                "date": "2026-05-22",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C45",
+                "contractNo": "HD45",
+                "partner": "Ngọc Anh",
+                "content": "HD45 VG05 Clinker - Chân Mây Hậu Giang",
+                "thu": 841736700,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXfe93a2cf-f4c0-4e73-a869-04ff9567de54",
+                "date": "2026-05-22",
+                "vessel": "VG05",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc ngắn hạn",
+                "thu": 0,
+                "chi": 413861707,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXacfe2ff5-0fb6-4401-a4cc-6c0573a601c3",
+                "date": "2026-05-22",
+                "vessel": "VG09",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc ngắn hạn",
+                "thu": 0,
+                "chi": 407125450,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8c2ab743-6678-4808-bfec-2b2422dc247a",
+                "date": "2026-05-22",
+                "vessel": "VG15",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc ngắn hạn",
+                "thu": 0,
+                "chi": 39962500,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5bb75a0e-58f0-4865-9980-3102db3a63c3",
+                "date": "2026-05-22",
+                "vessel": "VG36",
+                "category": "Nhận Nợ NH",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Trả gốc ngắn hạn",
+                "thu": 0,
+                "chi": 39962500,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX8042c13b-1e0a-4fc9-9c0d-2021a5b98974",
+                "date": "2026-05-22",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C50",
+                "contractNo": "HD50",
+                "partner": "Bình Minh",
+                "content": "HD50 VG09 Cát Vĩnh Xương - Huy Văn",
+                "thu": 468640000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX028f8b85-5856-4b77-bd19-acb67bffc317",
+                "date": "2026-05-22",
+                "vessel": "VG09",
+                "category": "CVC",
+                "voyageNo": "C36",
+                "contractNo": "HD36",
+                "partner": "Hoàng Quyên",
+                "content": "HD36 VG09 Cát Vĩnh Xương - Đà Nẵng",
+                "thu": 780162299.9999999,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX2c73e7a9-d73e-4036-845b-d7c60e16b538",
+                "date": "2026-05-22",
+                "vessel": "VG18",
+                "category": "CVC",
+                "voyageNo": "C39",
+                "contractNo": "HD39",
+                "partner": "Hoàng Quyên",
+                "content": "HD39 VG18 Than Quảng Ninh - Hòn La",
+                "thu": 219837700,
+                "chi": 0,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX0a797585-5582-4dd0-98e2-67fe0391f248",
+                "date": "2026-05-23",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX605b7dbd-a645-41cf-a03e-01f55414d4cd",
+                "date": "2026-05-23",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX872a3428-da0c-42e5-b42a-80ee75cdd219",
+                "date": "2026-05-24",
+                "vessel": "VG15",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "PvOil Đà Nẵng",
+                "content": "Trả tiền dầu DO tại Đà Nẵng",
+                "thu": 0,
+                "chi": 782272000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX1c5911ef-4373-4a97-8ebc-ed3c1299acfc",
+                "date": "2026-05-24",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX5bea5dda-b289-4e08-93d5-9f0297147678",
+                "date": "2026-05-24",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX814d0e30-5421-48b1-ad78-a8d777c9edd7",
+                "date": "2026-05-25",
+                "vessel": "VG36",
+                "category": "4.Dầu DO",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Long Bình",
+                "content": "Trả tiền dầu DO tại Sơn Dương",
+                "thu": 0,
+                "chi": 863977500,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXea360413-00ac-4898-ae85-8f744d0133c1",
+                "date": "2026-05-25",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lãi ngân hàng",
+                "thu": 261080,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX43151dd7-9a60-4ecd-93ff-5e0fd076c5bb",
+                "date": "2026-05-26",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "",
+                "content": "Phí lai dắt tại Đà Nẵng",
+                "thu": 0,
+                "chi": 9979200,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX847db63d-d2e5-42b0-8d22-92b5b5a1e6d2",
+                "date": "2026-05-26",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C10",
+                "contractNo": "HD10",
+                "partner": "",
+                "content": "Cầu bến tại Đà Nẵng",
+                "thu": 0,
+                "chi": 6246940,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXfa917fc3-bd6b-4331-bbf5-4d3e084b60ee",
+                "date": "2026-05-26",
+                "vessel": "VG15",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Máy bơm nước",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX1c7c33f5-3b13-41c0-9320-e414937ee73d",
+                "date": "2026-05-25",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Tiền cẩu xe về Gara",
+                "thu": 0,
+                "chi": 2200000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX7f83c279-f8ac-428d-808b-b679d6aecb62",
+                "date": "2026-05-25",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "",
+                "content": "Lobbi vào cầu sớm tại chân mây",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX9af4967b-d1af-4879-8f06-2a4f5b1d1030",
+                "date": "2026-05-26",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX77eb8c7e-e5ce-49de-b277-56556fc8a646",
+                "date": "2026-05-26",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX667c748a-8138-4393-bf04-39156177da57",
+                "date": "2026-05-26",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 30000000,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX25f43f98-a4b5-4a04-9c17-8dedffd4921c",
+                "date": "2026-05-26",
+                "vessel": "VG05",
+                "category": "CVC",
+                "voyageNo": "C44",
+                "contractNo": "HD44",
+                "partner": "Ngọc Anh",
+                "content": "HD44 VG15 Xỉ Sơn Dương - Hậu Giang",
+                "thu": 499000000,
+                "chi": 0,
+                "account": "ABbank"
+        },
+        {
+                "id": "TXc35f6b2f-59f2-41d6-98b6-d1967202e17b",
+                "date": "2026-05-26",
+                "vessel": "VG18",
+                "category": "9.Vật Tư",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "Sơn HP",
+                "content": "Sơn HP",
+                "thu": 0,
+                "chi": 6717600,
+                "account": "ABbank"
+        },
+        {
+                "id": "TX58c4eb39-2564-486c-9a47-009c309867bd",
+                "date": "2026-05-27",
+                "vessel": "VP",
+                "category": "Văn phòng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Rút tiền đưa Ông",
+                "thu": 0,
+                "chi": 400000000,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TX873b76a0-209d-4526-be2a-eb8005a9d995",
+                "date": "2026-05-27",
+                "vessel": "VG15",
+                "category": "2.Chi Phí Cảng",
+                "voyageNo": "C11",
+                "contractNo": "HD11",
+                "partner": "",
+                "content": "Cầu bến tại Huế",
+                "thu": 0,
+                "chi": 18571540,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXddbe447f-0b40-4ebf-ba64-d674e751855a",
+                "date": "2026-05-27",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Chuyển tk Tùng",
+                "thu": 0,
+                "chi": 1399956900,
+                "account": "Viettinbank"
+        },
+        {
+                "id": "TXd3ed74ab-38ba-427c-b3cf-a1ac30e42756",
+                "date": "2026-05-27",
+                "vessel": "VP",
+                "category": "Luân chuyển",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Chuyển tk Tùng",
+                "thu": 1399956900,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX40ad550b-5de3-4ae9-8634-40ed897bc37e",
+                "date": "2026-05-27",
+                "vessel": "VP",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương C Phương Tháng 4",
+                "thu": 0,
+                "chi": 20000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXe19ef850-1856-460f-b02f-1bc793858b6b",
+                "date": "2026-05-27",
+                "vessel": "VP",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Tùng Tháng 4",
+                "thu": 0,
+                "chi": 40000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXfb14d8b6-47ed-419b-8a2a-eead320cfba2",
+                "date": "2026-05-27",
+                "vessel": "VP",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương Vĩnh Tháng 4",
+                "thu": 0,
+                "chi": 67450000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX83eba0bc-de44-4c78-b557-4709d11fa0dc",
+                "date": "2026-05-27",
+                "vessel": "VG05",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương thuyền Viên Tháng 4",
+                "thu": 0,
+                "chi": 199869500,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX64ad37f7-6f95-4f08-adfd-8fc653a3e659",
+                "date": "2026-05-27",
+                "vessel": "VG09",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương thuyền Viên Tháng 4",
+                "thu": 0,
+                "chi": 204731500,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXd375a1f2-6a06-418d-9aeb-c622ea45cfe6",
+                "date": "2026-05-27",
+                "vessel": "VG15",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương thuyền Viên Tháng 4",
+                "thu": 0,
+                "chi": 202571500,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX27381bf4-f54f-4c09-b3b3-36872cee7d39",
+                "date": "2026-05-27",
+                "vessel": "VG18",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương thuyền Viên Tháng 4",
+                "thu": 0,
+                "chi": 223093500,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX4896d151-e58e-4fe1-899e-e72efc13d4c0",
+                "date": "2026-05-27",
+                "vessel": "VG36",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Lương thuyền Viên Tháng 4",
+                "thu": 0,
+                "chi": 198776166.66666666,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXc4b57959-a183-4e82-9f53-1a186001eeaa",
+                "date": "2026-05-27",
+                "vessel": "VG15",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thu tiền ứng trước Lưu Quang Trường (ất)",
+                "thu": 4000000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXe02446df-1863-4323-9314-54807afb3fe4",
+                "date": "2026-05-27",
+                "vessel": "VG09",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thu tiền ứng trước Lê Ngọc Anh",
+                "thu": 2000000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXd83913af-55d1-4385-9b7c-e79ee146f979",
+                "date": "2026-05-27",
+                "vessel": "VG36",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Thu tiền ứng trước Danh",
+                "thu": 5000000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX66ec8647-e5f9-4e9d-9167-3e9d83956bde",
+                "date": "2026-05-27",
+                "vessel": "VG15",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng lương Lê Ngọc Hoa",
+                "thu": 0,
+                "chi": 5000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX04e53d25-6250-417d-ae16-c16b1aed7680",
+                "date": "2026-05-27",
+                "vessel": "VG18",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng lương Lê Văn Hùng",
+                "thu": 0,
+                "chi": 10000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXf478439e-f58c-431f-9643-353b352a0cfa",
+                "date": "2026-05-27",
+                "vessel": "VG15",
+                "category": "3.Lương",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng lương Châu",
+                "thu": 0,
+                "chi": 5000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX44e0ab91-c687-49d6-a7f9-28de10e12ceb",
+                "date": "2026-05-27",
+                "vessel": "VG05",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 42630125,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXb33a299e-89e2-4569-897d-e3d0547937f8",
+                "date": "2026-05-27",
+                "vessel": "VG09",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 6300000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX24824891-76a0-4d19-b641-afba311e3cfd",
+                "date": "2026-05-27",
+                "vessel": "VG15",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 39002775,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXd7dc03d3-a2f6-4972-803b-05097178ae37",
+                "date": "2026-05-27",
+                "vessel": "VG18",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 38000000,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TXe1c975af-d14f-43cd-a0e4-dfa275616eb7",
+                "date": "2026-05-27",
+                "vessel": "VG36",
+                "category": "1.Tàu Ứng",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Ứng tiền",
+                "thu": 0,
+                "chi": 11966833.33333333,
+                "account": "Tài khoản cá nhân"
+        },
+        {
+                "id": "TX397081ab-6e7f-4ac8-8293-774b99f20b2c",
+                "date": "2026-05-27",
+                "vessel": "VP",
+                "category": "7.Bảo Hiểm",
+                "voyageNo": "",
+                "contractNo": "",
+                "partner": "",
+                "content": "Nhận tiền bảo hiểm",
+                "thu": 1600000,
+                "chi": 0,
+                "account": "Tài khoản cá nhân"
+        }
+],
+    "employees": [
+        {
+            "id": "EMP-f1fdw32q1",
+            "name": "Lê Ngọc Ngọ",
+            "role": "Giám đốc",
+            "department": "VP",
+            "basicSalary": 9000000,
+            "allowances": 5940000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-3xr09nv65",
+            "name": "Vũ Đức Ngọ",
+            "role": "P.GĐ",
+            "department": "VP",
+            "basicSalary": 8500000,
+            "allowances": 5940000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-extowi1n4",
+            "name": "Bùi Thị Phương",
+            "role": "KTT",
+            "department": "VP",
+            "basicSalary": 7000000,
+            "allowances": 5440000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-gza5v431t",
+            "name": "Nguyễn Thị Nhị",
+            "role": "Kế toán",
+            "department": "VP",
+            "basicSalary": 5000000,
+            "allowances": 4940000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-q2gqn0h3s",
+            "name": "Hoàng Thị Diệp Linh",
+            "role": "Kế toán",
+            "department": "VP",
+            "basicSalary": 5000000,
+            "allowances": 4940000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-14ycsn1t5",
+            "name": "Lương Thị Bích Hằng",
+            "role": "Thủ quỹ",
+            "department": "VP",
+            "basicSalary": 5000000,
+            "allowances": 4940000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-5lu1n80qq",
+            "name": "Vũ Ngọc Vĩnh",
+            "role": "Nhân viên KD",
+            "department": "VP",
+            "basicSalary": 7000000,
+            "allowances": 4940000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-atqr8lafp",
+            "name": "Phạm Ngọc Tùng",
+            "role": "Nhân viên KD",
+            "department": "VP",
+            "basicSalary": 7000000,
+            "allowances": 4940000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-9nkl8bkp3",
+            "name": "Lê Ngọc Huế",
+            "role": "Thuyền trưởng",
+            "department": "VG15",
+            "basicSalary": 10500000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-i63xltcr2",
+            "name": "Lê Duy Anh",
+            "role": "T. phó 1",
+            "department": "VG15",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-yf7k8e9yc",
+            "name": "Lưu Quang Trường",
+            "role": "Máy trưởng",
+            "department": "VG15",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-hzv7t49ma",
+            "name": "Vũ Đức Trọng",
+            "role": "T. phó 2",
+            "department": "VG15",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-7y57bvyt3",
+            "name": "Nguyễn Xuân Toàn",
+            "role": "SQM 1",
+            "department": "VG15",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-t7ubxcyim",
+            "name": "Nguyễn Văn Tú",
+            "role": "SQM 2",
+            "department": "VG15",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-ypvmflb14",
+            "name": "Lê Đức Mừng",
+            "role": "Thủy thủ",
+            "department": "VG15",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-v5s5o4km2",
+            "name": "Nguyễn Trọng Dương",
+            "role": "Thủy thủ",
+            "department": "VG15",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-58byxpyc5",
+            "name": "Vũ Đức An",
+            "role": "Thủy thủ",
+            "department": "VG15",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-oljwpq3xi",
+            "name": "Nguyễn Trọng Vũ",
+            "role": "Thủy thủ",
+            "department": "VG15",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-0ylnxc20v",
+            "name": "Nguyễn Đức Giang",
+            "role": "Thợ máy/sq",
+            "department": "VG15",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-2wc5dgj01",
+            "name": "Nguyễn Hữu Quyết",
+            "role": "Bếp",
+            "department": "VG15",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-bll95olft",
+            "name": "Tạ Quang Hợp",
+            "role": "Thuyền trưởng",
+            "department": "VG36",
+            "basicSalary": 10500000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-88cg0ez21",
+            "name": "Lê Ngọc Hoàng",
+            "role": "T. phó 1",
+            "department": "VG36",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-8wtkf5zbq",
+            "name": "Nguyễn Trọng Vinh",
+            "role": "T. phó 2/tt",
+            "department": "VG36",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-s0f5l0ttv",
+            "name": "Bùi Đình Thịnh",
+            "role": "MT",
+            "department": "VG36",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-kar3rpjus",
+            "name": "Tạ Duy Trưởng",
+            "role": "SQM 1",
+            "department": "VG36",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-enhtzd49b",
+            "name": "Nguyễn Văn Danh",
+            "role": "SQM 2",
+            "department": "VG36",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-t0id6otav",
+            "name": "Lê Duy Tới",
+            "role": "Thủy thủ",
+            "department": "VG36",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-bghs56unj",
+            "name": "Nguyễn Đức Huy",
+            "role": "Thủy thủ",
+            "department": "VG36",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-uatrtyq6a",
+            "name": "Lê Ngọc Hà",
+            "role": "Thủy thủ",
+            "department": "VG36",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-t2itnv2b7",
+            "name": "Đinh Ngọc Hà",
+            "role": "Thợ máy",
+            "department": "VG36",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-7mxbps69v",
+            "name": "Nguyễn Đức Dũng",
+            "role": "Thủy thủ",
+            "department": "VG36",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-xoheu9qa3",
+            "name": "Nguyễn Dương Thân",
+            "role": "Thủy thủ",
+            "department": "VG36",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-94igwyxow",
+            "name": "Lê Bá Thạo",
+            "role": "Bếp",
+            "department": "VG36",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-7piadbcu2",
+            "name": "Tạ Quang Đức",
+            "role": "Thuyền trưởng",
+            "department": "VG18",
+            "basicSalary": 10500000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 3,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-bb3ub44te",
+            "name": "Nguyễn Trường Giang",
+            "role": "Máy trưởng",
+            "department": "VG18",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-s1sa66a12",
+            "name": "Nguyễn Trọng Hồng",
+            "role": "T. phó 1",
+            "department": "VG18",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-3fnotwn2z",
+            "name": "Vũ Đình Đại",
+            "role": "T. phó 2",
+            "department": "VG18",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-wd8lqfhsv",
+            "name": "Lê Văn Cường",
+            "role": "SQM 1",
+            "department": "VG18",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-em9jr2zqw",
+            "name": "Lê Mạnh Hùng",
+            "role": "SQM 2",
+            "department": "VG18",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-2qcqnjgj0",
+            "name": "Vũ Đức Thắng",
+            "role": "Thủy thủ",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-0ukgse45s",
+            "name": "Lê Ngọc Cung",
+            "role": "Thủy thủ",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-s250s32ry",
+            "name": "Lê Văn Cường(QB)",
+            "role": "Thủy thủ",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-bvqwqhl7v",
+            "name": "Lê Ngọc Hoa",
+            "role": "Thuỷ thủ",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-50rbvs1bs",
+            "name": "Nguyễn Trọng Tuấn Anh",
+            "role": "Thợ máy",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-b5l6b9hc4",
+            "name": "Lương Anh Tuấn",
+            "role": "Thợ máy",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-rk4wcovfo",
+            "name": "Lê Văn Thắng",
+            "role": "Thợ máy",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-fw4h3kvaw",
+            "name": "Trần Văn Phiến",
+            "role": "Bếp",
+            "department": "VG18",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-og1ol932g",
+            "name": "Lại Xuân Kiều",
+            "role": "Thuyền trưởng",
+            "department": "VG09",
+            "basicSalary": 10500000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-n6ae677vm",
+            "name": "Nguyễn Xuân Soái",
+            "role": "Máy trưởng",
+            "department": "VG09",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-19vg8vz9h",
+            "name": "Phạm Văn Long",
+            "role": "Thuyền phó 1",
+            "department": "VG09",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-xgf3fcbg0",
+            "name": "Nguyễn Trọng Hiếu",
+            "role": "Thuyền phó 2",
+            "department": "VG09",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-1h3xg9hfx",
+            "name": "Bùi Thế Tuấn Anh",
+            "role": "SQM 1",
+            "department": "VG09",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-azlj1myku",
+            "name": "Vũ Hội",
+            "role": "SQM 2",
+            "department": "VG09",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-587to249h",
+            "name": "Trần Bá Trọng",
+            "role": "SQM",
+            "department": "VG09",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-pq1klj3ax",
+            "name": "Bùi Thế Tiến",
+            "role": "Thủy thủ",
+            "department": "VG09",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-pjkpxw6w3",
+            "name": "Lê Ngọc Anh",
+            "role": "Thủy thủ",
+            "department": "VG09",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-2vrjgi7rj",
+            "name": "Lại Xuân Hà",
+            "role": "Thủy thủ",
+            "department": "VG09",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-bemk7svb6",
+            "name": "Phạm Văn Khiêm",
+            "role": "Thủy thủ",
+            "department": "VG09",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-4czquuu8n",
+            "name": "Lê Xuân Hồng",
+            "role": "Bếp",
+            "department": "VG09",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-tocyhvhi0",
+            "name": "Lê Thân Thắng",
+            "role": "Thuyền trưởng",
+            "department": "VG05",
+            "basicSalary": 10500000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-ucdtea5q3",
+            "name": "Đỗ Hữu Xuần",
+            "role": "Máy trưởng",
+            "department": "VG05",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-f14mfuvks",
+            "name": "Nguyễn Đức Hiền",
+            "role": "Thuyền phó",
+            "department": "VG05",
+            "basicSalary": 7600000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 2,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-2nivbvxnn",
+            "name": "Nguyễn Thái Bình",
+            "role": "SQM 1",
+            "department": "VG05",
+            "basicSalary": 6000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-1uh0orhxe",
+            "name": "Bùi Đình Kha",
+            "role": "SQB2",
+            "department": "VG05",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-99n8sh5c7",
+            "name": "Nguyễn Văn Bắc",
+            "role": "Thủy thủ",
+            "department": "VG05",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-5zfoncza9",
+            "name": "Phạm Văn Tứ",
+            "role": "Thủy thủ",
+            "department": "VG05",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-h5c9h1dpy",
+            "name": "Nguyễn Trọng Hậu",
+            "role": "Thủy thủ/ql",
+            "department": "VG05",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 1,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-0j02przr8",
+            "name": "Đỗ Hữu Xoa",
+            "role": "Thợ máy",
+            "department": "VG05",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-g59nh2e5d",
+            "name": "Nguyễn Văn Luân",
+            "role": "Thủy thủ",
+            "department": "VG05",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        },
+        {
+            "id": "EMP-sn5ne7ahg",
+            "name": "Vũ Văn Cường",
+            "role": "Bếp",
+            "department": "VG05",
+            "basicSalary": 5000000,
+            "allowances": 5400000,
+            "personalDeduction": 15500000,
+            "dependents": 0,
+            "joinDate": "",
+            "leaveDate": "",
+            "phone": "",
+            "notes": ""
+        }
     ],
-    fuelVoyages: [
-        { id: 'FV-VG05-C1', vesselId: 'VG05', voyageNo: 'C1', cargoType: 'Cát', addedFuel: 0, initialFuel: 24295, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG05-C2', vesselId: 'VG05', voyageNo: 'C2', cargoType: 'Clinker', addedFuel: 17900, initialFuel: 14320, fuelDate: '1/8/2026', fuelVendor: 'Cảng Chân Mây', fuelLocation: 'Cảng Chân Mây', fuelUnitPrice: 17350 },
-        { id: 'FV-VG05-C3', vesselId: 'VG05', voyageNo: 'C3', cargoType: 'Cát', addedFuel: 0, initialFuel: 23978, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG05-C4', vesselId: 'VG05', voyageNo: 'C4', cargoType: 'Xỉ', addedFuel: 21065, initialFuel: 12593, fuelDate: '1/28/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Cảng Sơn Dương', fuelUnitPrice: 18700 },
-        { id: 'FV-VG05-C5', vesselId: 'VG05', voyageNo: 'C5', cargoType: 'Cát', addedFuel: 0, initialFuel: 22460, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG05-C6', vesselId: 'VG05', voyageNo: 'C6', cargoType: 'Cliker', addedFuel: 21850, initialFuel: 35730, fuelDate: '3/2/2026', fuelVendor: 'Hồng Vân', fuelLocation: 'Cảng Hòn La', fuelUnitPrice: 20144 },
-        { id: 'FV-VG05-C7', vesselId: 'VG05', voyageNo: 'C7', cargoType: 'Quặng', addedFuel: 0, initialFuel: 25534, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG05-C8', vesselId: 'VG05', voyageNo: 'C8', cargoType: 'Than', addedFuel: 32030, initialFuel: 41588, fuelDate: '3/23/2026', fuelVendor: 'Hồng Minh', fuelLocation: 'Cảng Vật Cách', fuelUnitPrice: 33920 },
-        { id: 'FV-VG05-C9', vesselId: 'VG05', voyageNo: 'C9', cargoType: 'Xỉ', addedFuel: 0, initialFuel: 38900, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG05-C10', vesselId: 'VG05', voyageNo: 'C10', cargoType: 'Cát', addedFuel: 0, initialFuel: 27105, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG05-C11', vesselId: 'VG05', voyageNo: 'C11', cargoType: 'Clinker', addedFuel: 19550, initialFuel: 36680, fuelDate: '4/15/2026', fuelVendor: 'Pvoil Đà Nẵng', fuelLocation: 'Đà Nẵng', fuelUnitPrice: 32890 },
-        { id: 'FV-VG05-C12', vesselId: 'VG05', voyageNo: 'C12', cargoType: 'Quặng', addedFuel: 0, initialFuel: 28843, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG09-C1', vesselId: 'VG09', voyageNo: 'C1', cargoType: 'Cát', addedFuel: 20000, initialFuel: 31800, fuelDate: '1/5/2026', fuelVendor: 'PetrolTime', fuelLocation: 'Cái Cui', fuelUnitPrice: 18140 },
-        { id: 'FV-VG09-C2', vesselId: 'VG09', voyageNo: 'C2', cargoType: 'Xỉ', addedFuel: 21065, initialFuel: 18098, fuelDate: '1/19/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Sơn Dương', fuelUnitPrice: 17820 },
-        { id: 'FV-VG09-C3', vesselId: 'VG09', voyageNo: 'C3', cargoType: 'Tro ẩm', addedFuel: 0, initialFuel: 26396, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG09-C4', vesselId: 'VG09', voyageNo: 'C4', cargoType: 'Xỉ', addedFuel: 19570, initialFuel: 31233, fuelDate: '2/11/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Sơn Dương', fuelUnitPrice: 18150 },
-        { id: 'FV-VG09-C5', vesselId: 'VG09', voyageNo: 'C5', cargoType: 'Cát', addedFuel: 0, initialFuel: 16108, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG09-C6', vesselId: 'VG09', voyageNo: 'C6', cargoType: 'Xỉ', addedFuel: 30000, initialFuel: 30695, fuelDate: '3/13/2026', fuelVendor: 'PV Đà Nẵng', fuelLocation: 'Cảng Tiên Sa', fuelUnitPrice: 28020 },
-        { id: 'FV-VG09-C7', vesselId: 'VG09', voyageNo: 'C7', cargoType: 'Cát', addedFuel: 0, initialFuel: 16700, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG09-C8', vesselId: 'VG09', voyageNo: 'C8', cargoType: 'Xỉ', addedFuel: 20500, initialFuel: 25925, fuelDate: '4/3/2026', fuelVendor: 'PvOil Miền Trung', fuelLocation: 'Cảng Tiên Sa', fuelUnitPrice: 40925 },
-        { id: 'FV-VG09-C9', vesselId: 'VG09', voyageNo: 'C9', cargoType: 'Cát', addedFuel: 10507, initialFuel: 20324, fuelDate: '4/16/2026', fuelVendor: 'PetrolTime', fuelLocation: 'Cái Cui', fuelUnitPrice: 30960 },
-        { id: 'FV-VG15-C1', vesselId: 'VG15', voyageNo: 'C1', cargoType: 'Xỉ ', addedFuel: 0, initialFuel: 33850, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG15-C2', vesselId: 'VG15', voyageNo: 'C2', cargoType: 'Cát', addedFuel: 0, initialFuel: 23722, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG15-C3', vesselId: 'VG15', voyageNo: 'C3', cargoType: 'Xỉ', addedFuel: 21065, initialFuel: 12382, fuelDate: '1/22/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Sơn Dương', fuelUnitPrice: 17920 },
-        { id: 'FV-VG15-C4', vesselId: 'VG15', voyageNo: 'C4', cargoType: 'Quặng', addedFuel: 30935, initialFuel: 20899, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG15-C5', vesselId: 'VG15', voyageNo: 'C5', cargoType: 'Xỉ', addedFuel: 0, initialFuel: 34087, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG15-C6', vesselId: 'VG15', voyageNo: 'C6', cargoType: 'Cát', addedFuel: 0, initialFuel: 20682, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG15-C7', vesselId: 'VG15', voyageNo: 'C7', cargoType: 'Clkiner', addedFuel: 16900, initialFuel: 6489, fuelDate: '3/26/2026', fuelVendor: 'Cảng Chân Mây', fuelLocation: 'Chân Mây', fuelUnitPrice: 37990 },
-        { id: 'FV-VG15-C8', vesselId: 'VG15', voyageNo: 'C8', cargoType: 'Cát', addedFuel: 0, initialFuel: 14499, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG15-C9', vesselId: 'VG15', voyageNo: 'C9', cargoType: 'Xỉ', addedFuel: 30200, initialFuel: 34124, fuelDate: '4/10/2026', fuelVendor: 'PvOil Đà Nẵng', fuelLocation: 'Đà Nẵng', fuelUnitPrice: 33490 },
-        { id: 'FV-VG15-C10', vesselId: 'VG15', voyageNo: 'C10', cargoType: 'Cát', addedFuel: 0, initialFuel: 20374, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG18-C1', vesselId: 'VG18', voyageNo: 'C1', cargoType: 'Tro ẩm', addedFuel: 0, initialFuel: 33728, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG18-C2', vesselId: 'VG18', voyageNo: 'C2', cargoType: 'Clinker', addedFuel: 30618, initialFuel: 41244, fuelDate: '1/19/2026', fuelVendor: 'Petrotime', fuelLocation: 'Nghi Sơn', fuelUnitPrice: 17730 },
-        { id: 'FV-VG18-C3', vesselId: 'VG18', voyageNo: 'C3', cargoType: 'Đường', addedFuel: 23700, initialFuel: 22306, fuelDate: '2/7/2026', fuelVendor: 'Petrotime', fuelLocation: 'Nam Vân Phong', fuelUnitPrice: 18360 },
-        { id: 'FV-VG18-C4', vesselId: 'VG18', voyageNo: 'C4', cargoType: 'Clinker', addedFuel: 19500, initialFuel: 37541, fuelDate: '3/2/2026', fuelVendor: 'Hồng Minh', fuelLocation: 'Nhà Bè', fuelUnitPrice: 19670 },
-        { id: 'FV-VG18-C5', vesselId: 'VG18', voyageNo: 'C5', cargoType: 'Xỉ', addedFuel: 40973, initialFuel: 27913, fuelDate: '3/13/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Sơn Dương', fuelUnitPrice: 28210 },
-        { id: 'FV-VG18-C6', vesselId: 'VG18', voyageNo: 'C6', cargoType: 'Tôn Cuộn', addedFuel: 0, initialFuel: 33832, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG18-C7', vesselId: 'VG18', voyageNo: 'C7', cargoType: 'Than', addedFuel: 39225, initialFuel: 50719, fuelDate: '3/30/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Cảng Cá', fuelUnitPrice: 35640 },
-        { id: 'FV-VG18-C8', vesselId: 'VG18', voyageNo: 'C8', cargoType: 'Xỉ', addedFuel: 0, initialFuel: 43919, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG18-C9', vesselId: 'VG18', voyageNo: 'C9', cargoType: 'Xỉ', addedFuel: 40973, initialFuel: 23111, fuelDate: '4/24/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Sơn Dương', fuelUnitPrice: 27520 },
-        { id: 'FV-VG36-C1', vesselId: 'VG36', voyageNo: 'C1', cargoType: 'Xỉ', addedFuel: 0, initialFuel: 33728, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG36-C2', vesselId: 'VG36', voyageNo: 'C2', cargoType: 'Cát', addedFuel: 0, initialFuel: 18811, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG36-C3', vesselId: 'VG36', voyageNo: 'C3', cargoType: 'Clinker', addedFuel: 28380, initialFuel: 5851, fuelDate: '1/18/2026', fuelVendor: 'Hồng Vân', fuelLocation: 'Hòn La', fuelUnitPrice: 17820 },
-        { id: 'FV-VG36-C4', vesselId: 'VG36', voyageNo: 'C4', cargoType: 'Gỗ', addedFuel: 0, initialFuel: 21078, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG36-C5', vesselId: 'VG36', voyageNo: 'C5', cargoType: 'Xỉ', addedFuel: 19540, initialFuel: 24700, fuelDate: '2/6/2026', fuelVendor: 'Hồng Minh', fuelLocation: 'Cửa Lò', fuelUnitPrice: 18530 },
-        { id: 'FV-VG36-C6', vesselId: 'VG36', voyageNo: 'C6', cargoType: 'Quặng ', addedFuel: 10507, initialFuel: 11741, fuelDate: '2/25/2026', fuelVendor: 'Petrotime', fuelLocation: 'Trà Nóc', fuelUnitPrice: 19070 },
-        { id: 'FV-VG36-C7', vesselId: 'VG36', voyageNo: 'C7', cargoType: 'Clinker', addedFuel: 37657, initialFuel: 42450, fuelDate: '3/3/2026', fuelVendor: 'Petrotime', fuelLocation: 'Vật Cách', fuelUnitPrice: 19520 },
-        { id: 'FV-VG36-C8', vesselId: 'VG36', voyageNo: 'C8', cargoType: 'Than', addedFuel: 0, initialFuel: 29313, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG36-C9', vesselId: 'VG36', voyageNo: 'C9', cargoType: 'Xỉ', addedFuel: 19570, initialFuel: 20088, fuelDate: '4/1/2026', fuelVendor: 'Hoàng Khải', fuelLocation: 'Sơn Dương', fuelUnitPrice: 36640 },
-        { id: 'FV-VG36-C10', vesselId: 'VG36', voyageNo: 'C10', cargoType: 'Gỗ', addedFuel: 0, initialFuel: 22885, fuelDate: '', fuelVendor: '', fuelLocation: '', fuelUnitPrice: 0 },
-        { id: 'FV-VG36-C11', vesselId: 'VG36', voyageNo: 'C11', cargoType: 'Clinker', addedFuel: 21000, initialFuel: 13451, fuelDate: '4/25/2026', fuelVendor: 'Cảng Chân Mây', fuelLocation: 'Chân Mây', fuelUnitPrice: 26790 },
+    "payroll": [],
+    "fuelVoyages": [
+        {
+                "id": "FV-VG05-C1",
+                "vesselId": "VG05",
+                "voyageNo": "C1",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 24295,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C2",
+                "vesselId": "VG05",
+                "voyageNo": "C2",
+                "cargoType": "Clinker",
+                "addedFuel": 17900,
+                "initialFuel": 14320,
+                "fuelDate": "1/8/2026",
+                "fuelVendor": "Cảng Chân Mây",
+                "fuelLocation": "Cảng Chân Mây",
+                "fuelUnitPrice": 17350
+        },
+        {
+                "id": "FV-VG05-C3",
+                "vesselId": "VG05",
+                "voyageNo": "C3",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 23978,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C4",
+                "vesselId": "VG05",
+                "voyageNo": "C4",
+                "cargoType": "Xỉ",
+                "addedFuel": 21065,
+                "initialFuel": 12593,
+                "fuelDate": "1/28/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Cảng Sơn Dương",
+                "fuelUnitPrice": 18700
+        },
+        {
+                "id": "FV-VG05-C5",
+                "vesselId": "VG05",
+                "voyageNo": "C5",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 22460,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C6",
+                "vesselId": "VG05",
+                "voyageNo": "C6",
+                "cargoType": "Cliker",
+                "addedFuel": 21850,
+                "initialFuel": 35730,
+                "fuelDate": "3/2/2026",
+                "fuelVendor": "Hồng Vân",
+                "fuelLocation": "Cảng Hòn La",
+                "fuelUnitPrice": 20144
+        },
+        {
+                "id": "FV-VG05-C7",
+                "vesselId": "VG05",
+                "voyageNo": "C7",
+                "cargoType": "Quặng",
+                "addedFuel": 0,
+                "initialFuel": 25534,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C8",
+                "vesselId": "VG05",
+                "voyageNo": "C8",
+                "cargoType": "Than",
+                "addedFuel": 32030,
+                "initialFuel": 41588,
+                "fuelDate": "3/23/2026",
+                "fuelVendor": "Hồng Minh",
+                "fuelLocation": "Cảng Vật Cách",
+                "fuelUnitPrice": 33920
+        },
+        {
+                "id": "FV-VG05-C9",
+                "vesselId": "VG05",
+                "voyageNo": "C9",
+                "cargoType": "Xỉ",
+                "addedFuel": 0,
+                "initialFuel": 38900,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C10",
+                "vesselId": "VG05",
+                "voyageNo": "C10",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 27105,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C11",
+                "vesselId": "VG05",
+                "voyageNo": "C11",
+                "cargoType": "Clinker",
+                "addedFuel": 19550,
+                "initialFuel": 36680,
+                "fuelDate": "4/15/2026",
+                "fuelVendor": "Pvoil Đà Nẵng",
+                "fuelLocation": "Đà Nẵng",
+                "fuelUnitPrice": 32890
+        },
+        {
+                "id": "FV-VG05-C12",
+                "vesselId": "VG05",
+                "voyageNo": "C12",
+                "cargoType": "Quặng",
+                "addedFuel": 0,
+                "initialFuel": 28843,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG09-C1",
+                "vesselId": "VG09",
+                "voyageNo": "C1",
+                "cargoType": "Cát",
+                "addedFuel": 20000,
+                "initialFuel": 31800,
+                "fuelDate": "1/5/2026",
+                "fuelVendor": "Petrotime",
+                "fuelLocation": "Cái Cui",
+                "fuelUnitPrice": 18140
+        },
+        {
+                "id": "FV-VG09-C2",
+                "vesselId": "VG09",
+                "voyageNo": "C2",
+                "cargoType": "Xỉ",
+                "addedFuel": 21065,
+                "initialFuel": 18098,
+                "fuelDate": "1/19/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Sơn Dương",
+                "fuelUnitPrice": 17820
+        },
+        {
+                "id": "FV-VG09-C3",
+                "vesselId": "VG09",
+                "voyageNo": "C3",
+                "cargoType": "Tro ẩm",
+                "addedFuel": 0,
+                "initialFuel": 26396,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG09-C4",
+                "vesselId": "VG09",
+                "voyageNo": "C4",
+                "cargoType": "Xỉ",
+                "addedFuel": 19570,
+                "initialFuel": 31233,
+                "fuelDate": "2/11/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Sơn Dương",
+                "fuelUnitPrice": 18150
+        },
+        {
+                "id": "FV-VG09-C5",
+                "vesselId": "VG09",
+                "voyageNo": "C5",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 16108,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG09-C6",
+                "vesselId": "VG09",
+                "voyageNo": "C6",
+                "cargoType": "Xỉ",
+                "addedFuel": 30000,
+                "initialFuel": 30695,
+                "fuelDate": "3/13/2026",
+                "fuelVendor": "Pvoil Đà Nẵng",
+                "fuelLocation": "Cảng Tiên Sa",
+                "fuelUnitPrice": 28020
+        },
+        {
+                "id": "FV-VG09-C7",
+                "vesselId": "VG09",
+                "voyageNo": "C7",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 16700,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG09-C8",
+                "vesselId": "VG09",
+                "voyageNo": "C8",
+                "cargoType": "Xỉ",
+                "addedFuel": 20500,
+                "initialFuel": 25925,
+                "fuelDate": "4/3/2026",
+                "fuelVendor": "PvOil Miền Trung",
+                "fuelLocation": "Cảng Tiên Sa",
+                "fuelUnitPrice": 40925
+        },
+        {
+                "id": "FV-VG09-C9",
+                "vesselId": "VG09",
+                "voyageNo": "C9",
+                "cargoType": "Cát",
+                "addedFuel": 10507,
+                "initialFuel": 20324,
+                "fuelDate": "4/16/2026",
+                "fuelVendor": "Petrotime",
+                "fuelLocation": "Cái Cui",
+                "fuelUnitPrice": 30960
+        },
+        {
+                "id": "FV-VG15-C1",
+                "vesselId": "VG15",
+                "voyageNo": "C1",
+                "cargoType": "Xỉ ",
+                "addedFuel": 0,
+                "initialFuel": 33850,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C2",
+                "vesselId": "VG15",
+                "voyageNo": "C2",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 23722,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C3",
+                "vesselId": "VG15",
+                "voyageNo": "C3",
+                "cargoType": "Xỉ",
+                "addedFuel": 21065,
+                "initialFuel": 12382,
+                "fuelDate": "1/22/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Sơn Dương",
+                "fuelUnitPrice": 17920
+        },
+        {
+                "id": "FV-VG15-C4",
+                "vesselId": "VG15",
+                "voyageNo": "C4",
+                "cargoType": "Quặng",
+                "addedFuel": 30935,
+                "initialFuel": 20899,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C5",
+                "vesselId": "VG15",
+                "voyageNo": "C5",
+                "cargoType": "Xỉ",
+                "addedFuel": 0,
+                "initialFuel": 34087,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C6",
+                "vesselId": "VG15",
+                "voyageNo": "C6",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 20682,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C7",
+                "vesselId": "VG15",
+                "voyageNo": "C7",
+                "cargoType": "Clkiner",
+                "addedFuel": 16900,
+                "initialFuel": 6489,
+                "fuelDate": "3/26/2026",
+                "fuelVendor": "Cảng Chân Mây",
+                "fuelLocation": "Chân Mây",
+                "fuelUnitPrice": 37990
+        },
+        {
+                "id": "FV-VG15-C8",
+                "vesselId": "VG15",
+                "voyageNo": "C8",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 14499,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C9",
+                "vesselId": "VG15",
+                "voyageNo": "C9",
+                "cargoType": "Xỉ",
+                "addedFuel": 30200,
+                "initialFuel": 34124,
+                "fuelDate": "4/10/2026",
+                "fuelVendor": "Pvoil Đà Nẵng",
+                "fuelLocation": "Đà Nẵng",
+                "fuelUnitPrice": 33490
+        },
+        {
+                "id": "FV-VG15-C10",
+                "vesselId": "VG15",
+                "voyageNo": "C10",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 20374,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG18-C1",
+                "vesselId": "VG18",
+                "voyageNo": "C1",
+                "cargoType": "Tro ẩm",
+                "addedFuel": 0,
+                "initialFuel": 33728,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG18-C2",
+                "vesselId": "VG18",
+                "voyageNo": "C2",
+                "cargoType": "Clinker",
+                "addedFuel": 30618,
+                "initialFuel": 41244,
+                "fuelDate": "1/19/2026",
+                "fuelVendor": "Petrotime",
+                "fuelLocation": "Nghi Sơn",
+                "fuelUnitPrice": 17730
+        },
+        {
+                "id": "FV-VG18-C3",
+                "vesselId": "VG18",
+                "voyageNo": "C3",
+                "cargoType": "Đường",
+                "addedFuel": 23700,
+                "initialFuel": 22306,
+                "fuelDate": "2/7/2026",
+                "fuelVendor": "Petrotime",
+                "fuelLocation": "Nam Vân Phong",
+                "fuelUnitPrice": 18360
+        },
+        {
+                "id": "FV-VG18-C4",
+                "vesselId": "VG18",
+                "voyageNo": "C4",
+                "cargoType": "Clinker",
+                "addedFuel": 19500,
+                "initialFuel": 37541,
+                "fuelDate": "3/2/2026",
+                "fuelVendor": "Hồng Minh",
+                "fuelLocation": "Nhà Bè",
+                "fuelUnitPrice": 19670
+        },
+        {
+                "id": "FV-VG18-C5",
+                "vesselId": "VG18",
+                "voyageNo": "C5",
+                "cargoType": "Xỉ",
+                "addedFuel": 40973,
+                "initialFuel": 27913,
+                "fuelDate": "3/13/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Sơn Dương",
+                "fuelUnitPrice": 28210
+        },
+        {
+                "id": "FV-VG18-C6",
+                "vesselId": "VG18",
+                "voyageNo": "C6",
+                "cargoType": "Tôn Cuộn",
+                "addedFuel": 0,
+                "initialFuel": 33832,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG18-C7",
+                "vesselId": "VG18",
+                "voyageNo": "C7",
+                "cargoType": "Than",
+                "addedFuel": 39225,
+                "initialFuel": 50719,
+                "fuelDate": "3/30/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Cảng Cá",
+                "fuelUnitPrice": 35640
+        },
+        {
+                "id": "FV-VG18-C8",
+                "vesselId": "VG18",
+                "voyageNo": "C8",
+                "cargoType": "Xỉ",
+                "addedFuel": 0,
+                "initialFuel": 43919,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG18-C9",
+                "vesselId": "VG18",
+                "voyageNo": "C9",
+                "cargoType": "Xỉ",
+                "addedFuel": 40973,
+                "initialFuel": 23111,
+                "fuelDate": "4/24/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Sơn Dương",
+                "fuelUnitPrice": 27520
+        },
+        {
+                "id": "FV-VG36-C1",
+                "vesselId": "VG36",
+                "voyageNo": "C1",
+                "cargoType": "Xỉ",
+                "addedFuel": 0,
+                "initialFuel": 33728,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG36-C2",
+                "vesselId": "VG36",
+                "voyageNo": "C2",
+                "cargoType": "Cát",
+                "addedFuel": 0,
+                "initialFuel": 18811,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG36-C3",
+                "vesselId": "VG36",
+                "voyageNo": "C3",
+                "cargoType": "Clinker",
+                "addedFuel": 28380,
+                "initialFuel": 5851,
+                "fuelDate": "1/18/2026",
+                "fuelVendor": "Hồng Vân",
+                "fuelLocation": "Hòn La",
+                "fuelUnitPrice": 17820
+        },
+        {
+                "id": "FV-VG36-C4",
+                "vesselId": "VG36",
+                "voyageNo": "C4",
+                "cargoType": "Gỗ",
+                "addedFuel": 0,
+                "initialFuel": 21078,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG36-C5",
+                "vesselId": "VG36",
+                "voyageNo": "C5",
+                "cargoType": "Xỉ",
+                "addedFuel": 19540,
+                "initialFuel": 24700,
+                "fuelDate": "2/6/2026",
+                "fuelVendor": "Hồng Minh",
+                "fuelLocation": "Cửa Lò",
+                "fuelUnitPrice": 18530
+        },
+        {
+                "id": "FV-VG36-C6",
+                "vesselId": "VG36",
+                "voyageNo": "C6",
+                "cargoType": "Quặng ",
+                "addedFuel": 10507,
+                "initialFuel": 11741,
+                "fuelDate": "2/25/2026",
+                "fuelVendor": "Petrotime",
+                "fuelLocation": "Trà Nóc",
+                "fuelUnitPrice": 19070
+        },
+        {
+                "id": "FV-VG36-C7",
+                "vesselId": "VG36",
+                "voyageNo": "C7",
+                "cargoType": "Clinker",
+                "addedFuel": 37657,
+                "initialFuel": 42450,
+                "fuelDate": "3/3/2026",
+                "fuelVendor": "Petrotime",
+                "fuelLocation": "Vật Cách",
+                "fuelUnitPrice": 19520
+        },
+        {
+                "id": "FV-VG36-C8",
+                "vesselId": "VG36",
+                "voyageNo": "C8",
+                "cargoType": "Than",
+                "addedFuel": 0,
+                "initialFuel": 29313,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG36-C9",
+                "vesselId": "VG36",
+                "voyageNo": "C9",
+                "cargoType": "Xỉ",
+                "addedFuel": 19570,
+                "initialFuel": 20088,
+                "fuelDate": "4/1/2026",
+                "fuelVendor": "Hoàng Khải",
+                "fuelLocation": "Sơn Dương",
+                "fuelUnitPrice": 36640
+        },
+        {
+                "id": "FV-VG36-C10",
+                "vesselId": "VG36",
+                "voyageNo": "C10",
+                "cargoType": "Gỗ",
+                "addedFuel": 0,
+                "initialFuel": 22885,
+                "fuelDate": "",
+                "fuelVendor": "",
+                "fuelLocation": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG36-C11",
+                "vesselId": "VG36",
+                "voyageNo": "C11",
+                "cargoType": "Clinker",
+                "addedFuel": 21000,
+                "initialFuel": 13451,
+                "fuelDate": "4/25/2026",
+                "fuelVendor": "Cảng Chân Mây",
+                "fuelLocation": "Chân Mây",
+                "fuelUnitPrice": 26790
+        },
+        {
+                "id": "FV-VG05-C13",
+                "vesselId": "VG05",
+                "voyageNo": "C13",
+                "cargoType": "Than",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C14",
+                "vesselId": "VG05",
+                "voyageNo": "C14",
+                "cargoType": "Đá",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG05-C15",
+                "vesselId": "VG05",
+                "voyageNo": "C15",
+                "cargoType": "Cát",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG09-C10",
+                "vesselId": "VG09",
+                "voyageNo": "C10",
+                "cargoType": "Than",
+                "initialFuel": 0,
+                "addedFuel": 28350,
+                "fuelDate": "5/4/2026",
+                "fuelLocation": "Huy Văn",
+                "fuelVendor": "Petrotime",
+                "fuelUnitPrice": 27820
+        },
+        {
+                "id": "FV-VG09-C11",
+                "vesselId": "VG09",
+                "voyageNo": "C11",
+                "cargoType": "Xỉ",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG09-C12",
+                "vesselId": "VG09",
+                "voyageNo": "C12",
+                "cargoType": "Cát",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C11",
+                "vesselId": "VG15",
+                "voyageNo": "C11",
+                "cargoType": "Xỉ",
+                "initialFuel": 0,
+                "addedFuel": 21545,
+                "fuelDate": "5/5/2026",
+                "fuelLocation": "Sơn Dương",
+                "fuelVendor": "Long Bình",
+                "fuelUnitPrice": 28330
+        },
+        {
+                "id": "FV-VG15-C12",
+                "vesselId": "VG15",
+                "voyageNo": "C12",
+                "cargoType": "Cát",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG15-C13",
+                "vesselId": "VG15",
+                "voyageNo": "C13",
+                "cargoType": "Cliker",
+                "initialFuel": 0,
+                "addedFuel": 27200,
+                "fuelDate": "5/25/2026",
+                "fuelLocation": "Sơn Trà",
+                "fuelVendor": "Pvoil Đà Nẵng",
+                "fuelUnitPrice": 28760
+        },
+        {
+                "id": "FV-VG18-C10",
+                "vesselId": "VG18",
+                "voyageNo": "C10",
+                "cargoType": "Xỉ",
+                "initialFuel": 0,
+                "addedFuel": 30471,
+                "fuelDate": "5/10/2026",
+                "fuelLocation": "Sơn Dương",
+                "fuelVendor": "Hoàng Khải",
+                "fuelUnitPrice": 26890
+        },
+        {
+                "id": "FV-VG18-C11",
+                "vesselId": "VG18",
+                "voyageNo": "C11",
+                "cargoType": "Than",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG36-C12",
+                "vesselId": "VG36",
+                "voyageNo": "C12",
+                "cargoType": "Gỗ",
+                "initialFuel": 0,
+                "addedFuel": 0,
+                "fuelDate": "",
+                "fuelLocation": "",
+                "fuelVendor": "",
+                "fuelUnitPrice": 0
+        },
+        {
+                "id": "FV-VG36-C13",
+                "vesselId": "VG36",
+                "voyageNo": "C13",
+                "cargoType": "Clinker",
+                "initialFuel": 0,
+                "addedFuel": 19550,
+                "fuelDate": "5/8/2026",
+                "fuelLocation": "Tiên Sa",
+                "fuelVendor": "Pvoil Đà Nẵng",
+                "fuelUnitPrice": 27490
+        }
+],
+    "fuelLogs": [
+        {
+                "id": "FL-685b57f8",
+                "fuelVoyageId": "FV-VG05-C1",
+                "startTime": "12/28/2025 6:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "12/28/2025 15:00",
+                "endPos": "Khu neo Hậu Giang",
+                "hours": 9,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-60477170",
+                "fuelVoyageId": "FV-VG05-C1",
+                "startTime": "12/29/2025 13:00",
+                "startPos": "Khu neo Hậu Giang",
+                "endTime": "1/2/2026 13:00",
+                "endPos": "Đà Nẵng",
+                "hours": 96,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-9ca28666",
+                "fuelVoyageId": "FV-VG05-C2",
+                "startTime": "1/4/2026 16:00",
+                "startPos": "Đà Nẵng",
+                "endTime": "1/4/2026 20:30",
+                "endPos": "Neo Cảng Chân Mây",
+                "hours": 4.5,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-03a113d0",
+                "fuelVoyageId": "FV-VG05-C2",
+                "startTime": "1/9/2026 13:30",
+                "startPos": "Cảng Chân Mây",
+                "endTime": "1/12/2026 22:30",
+                "endPos": "Neo Cái Sắn",
+                "hours": 81,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-933391d1",
+                "fuelVoyageId": "FV-VG05-C2",
+                "startTime": "1/13/2026 6:00",
+                "startPos": "Neo cái sắn",
+                "endTime": "1/13/2026 7:30",
+                "endPos": "An Giang",
+                "hours": 1.5,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-6e6b0487",
+                "fuelVoyageId": "FV-VG05-C3",
+                "startTime": "1/16/2026 6:30",
+                "startPos": "An Giang",
+                "endTime": "1/16/2026 13:00",
+                "endPos": "Neo Vĩnh Xương",
+                "hours": 6.5,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-16e6d1c4",
+                "fuelVoyageId": "FV-VG05-C3",
+                "startTime": "1/19/2026 6:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "1/24/2026 6:00",
+                "endPos": "Đà Nẵng",
+                "hours": 120,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-f661b183",
+                "fuelVoyageId": "FV-VG05-C4",
+                "startTime": "1/26/2026 22:00",
+                "startPos": "Đà Nẵng",
+                "endTime": "1/27/2026 5:20",
+                "endPos": "Sơn Dương",
+                "hours": 31.333333,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-4d436ecb",
+                "fuelVoyageId": "FV-VG05-C4",
+                "startTime": "1/28/2026 15:30",
+                "startPos": "Sơn Dương",
+                "endTime": "2/1/2026 9:35",
+                "endPos": "P0 Định An",
+                "hours": 90.083333,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-5c74384e",
+                "fuelVoyageId": "FV-VG05-C4",
+                "startTime": "2/1/2026 17:30",
+                "startPos": "P0 Định An",
+                "endTime": "2/1/2026 20:30",
+                "endPos": "Tây Đô",
+                "hours": 3,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-b0784a3d",
+                "fuelVoyageId": "FV-VG05-C5",
+                "startTime": "2/6/2026 6:30",
+                "startPos": "Cần Thơ",
+                "endTime": "2/6/2026 14:40",
+                "endPos": "Vĩnh Xương",
+                "hours": 8.1666667,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-c7616c18",
+                "fuelVoyageId": "FV-VG05-C5",
+                "startTime": "2/10/2026 5:30",
+                "startPos": "Vĩnh Xương",
+                "endTime": "2/13/2026 20:40",
+                "endPos": "Đà Nẵng",
+                "hours": 87.166667,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-bb97f307",
+                "fuelVoyageId": "FV-VG05-C6",
+                "startTime": "2/25/2026 15:20",
+                "startPos": "Đà Nẵng",
+                "endTime": "2/26/2026 7:20",
+                "endPos": "Hòn La",
+                "hours": 16,
+                "fuelRate": 90
+        },
+        {
+                "id": "FL-3af1d0c5",
+                "fuelVoyageId": "FV-VG05-C6",
+                "startTime": "3/3/2026 1:10",
+                "startPos": "Hòn La",
+                "endTime": "3/6/2026 21:20",
+                "endPos": "XM Tây Đô",
+                "hours": 92.166667,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-d51d0f5b",
+                "fuelVoyageId": "FV-VG05-C7",
+                "startTime": "3/9/2026 6:00",
+                "startPos": "XM Tây Đô",
+                "endTime": "3/9/2026 13:40",
+                "endPos": "Vĩnh Xương",
+                "hours": 7.6666667,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-9a5243ff",
+                "fuelVoyageId": "FV-VG05-C7",
+                "startTime": "3/15/2026 6:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "3/21/2026 17:00",
+                "endPos": "Hòn Dấu",
+                "hours": 155,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-53dd02cd",
+                "fuelVoyageId": "FV-VG05-C7",
+                "startTime": "3/22/2026 11:00",
+                "startPos": "Hòn Dấu",
+                "endTime": "3/22/2026 16:30",
+                "endPos": "Vật Cách",
+                "hours": 5.5,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-e64cd10f",
+                "fuelVoyageId": "FV-VG05-C8",
+                "startTime": "3/23/2026 13:00",
+                "startPos": "Vật Cách",
+                "endTime": "3/23/2026 18:40",
+                "endPos": "Cửa Ông",
+                "hours": 5.6666667,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-5ce44f77",
+                "fuelVoyageId": "FV-VG05-C8",
+                "startTime": "3/27/2026 9:00",
+                "startPos": "Cửa ông",
+                "endTime": "3/28/2026 6:30",
+                "endPos": "Nghi Sơn",
+                "hours": 21.5,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-d89269c8",
+                "fuelVoyageId": "FV-VG05-C9",
+                "startTime": "3/29/2026 12:20",
+                "startPos": "Nghi Sơn",
+                "endTime": "3/29/2026 23:40",
+                "endPos": "Sơn Dương",
+                "hours": 11.333333,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-bf0f57e6",
+                "fuelVoyageId": "FV-VG05-C9",
+                "startTime": "3/30/2026 17:00",
+                "startPos": "Sơn Dương",
+                "endTime": "4/3/2026 22:00",
+                "endPos": "Hậu Giang",
+                "hours": 101,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-07f0db82",
+                "fuelVoyageId": "FV-VG05-C10",
+                "startTime": "4/6/2026 8:40",
+                "startPos": "Hậu Giang",
+                "endTime": "4/6/2026 19:00",
+                "endPos": "Vĩnh Xương",
+                "hours": 10.333333,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-1ed1cf4f",
+                "fuelVoyageId": "FV-VG05-C10",
+                "startTime": "4/9/2026 6:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "4/13/2026 4:40",
+                "endPos": "Đà Nẵng",
+                "hours": 94.666667,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-395c4eee",
+                "fuelVoyageId": "FV-VG15-C1",
+                "startTime": "12/31/2025 14:45",
+                "startPos": "Sơn Dương",
+                "endTime": "1/2/2026 15:25",
+                "endPos": "Neo Vũng Rô",
+                "hours": 48.666667,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-8a74386a",
+                "fuelVoyageId": "FV-VG15-C1",
+                "startTime": "1/4/2026 4:30",
+                "startPos": "Neo Vũng Rô",
+                "endTime": "1/5/2026 22:00",
+                "endPos": "Định An",
+                "hours": 41.5,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-73d94aa9",
+                "fuelVoyageId": "FV-VG15-C1",
+                "startTime": "1/6/2026 3:00",
+                "startPos": "Định An",
+                "endTime": "1/6/2026 9:20",
+                "endPos": "Buộc phao",
+                "hours": 6.3333333,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-6ed3c839",
+                "fuelVoyageId": "FV-VG15-C2",
+                "startTime": "1/11/2026 5:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "1/15/2026 17:00",
+                "endPos": "Đà Nẵng",
+                "hours": 108,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-f80dc0ae",
+                "fuelVoyageId": "FV-VG15-C3",
+                "startTime": "1/20/2026 6:00",
+                "startPos": "Đà Nẵng",
+                "endTime": "1/21/2026 3:00",
+                "endPos": "Sơn Dương",
+                "hours": 21,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-9220fbdd",
+                "fuelVoyageId": "FV-VG15-C3",
+                "startTime": "1/23/2026 9:00",
+                "startPos": "Sơn Dương",
+                "endTime": "1/27/2026 11:30",
+                "endPos": "Phao Hậu Giang",
+                "hours": 98.5,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-57a67f9b",
+                "fuelVoyageId": "FV-VG15-C4",
+                "startTime": "2/4/2026 5:15",
+                "startPos": "Hậu Giang",
+                "endTime": "2/4/2026 15:00",
+                "endPos": "Vĩnh Xương",
+                "hours": 9.75,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-ddc6399a",
+                "fuelVoyageId": "FV-VG15-C4",
+                "startTime": "2/11/2026 7:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "2/17/2026 8:00",
+                "endPos": "Hải Phòng",
+                "hours": 145,
+                "fuelRate": 115
+        },
+        {
+                "id": "FL-e77e2023",
+                "fuelVoyageId": "FV-VG15-C5",
+                "startTime": "2/23/2026 13:00",
+                "startPos": "Vật Cách",
+                "endTime": "2/24/2026 17:00",
+                "endPos": "Hòn La",
+                "hours": 28,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-5e312348",
+                "fuelVoyageId": "FV-VG15-C5",
+                "startTime": "2/28/2026 18:30",
+                "startPos": "Hòn La",
+                "endTime": "2/28/2026 21:30",
+                "endPos": "Sơn Dương",
+                "hours": 3,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-8bb15183",
+                "fuelVoyageId": "FV-VG15-C5",
+                "startTime": "3/1/2026 18:00",
+                "startPos": "Sơn Dương",
+                "endTime": "3/5/2026 18:40",
+                "endPos": "Phao Hậu Giang",
+                "hours": 96.666667,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-ec5febec",
+                "fuelVoyageId": "FV-VG15-C6",
+                "startTime": "3/7/2026 5:30",
+                "startPos": "Phao Hậu Giang",
+                "endTime": "3/7/2026 13:10",
+                "endPos": "Vĩnh Xương",
+                "hours": 7.6666667,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-d84c7812",
+                "fuelVoyageId": "FV-VG15-C6",
+                "startTime": "3/9/2026 9:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "3/9/2026 19:30",
+                "endPos": "Cái Cui",
+                "hours": 10.5,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-9216a10b",
+                "fuelVoyageId": "FV-VG15-C6",
+                "startTime": "3/10/2026 6:00",
+                "startPos": "Cái Cui",
+                "endTime": "3/13/2026 14:00",
+                "endPos": "Cù Lao Xanh",
+                "hours": 80,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-7b26ce7b",
+                "fuelVoyageId": "FV-VG15-C6",
+                "startTime": "3/15/2026 5:00",
+                "startPos": "Cù Lao Xanh",
+                "endTime": "3/16/2026 18:00",
+                "endPos": "Sơn Trà",
+                "hours": 37,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-d88140c9",
+                "fuelVoyageId": "FV-VG15-C7",
+                "startTime": "3/20/2026 8:00",
+                "startPos": "Sơn Trà",
+                "endTime": "3/20/2026 10:30",
+                "endPos": "Chân Mây",
+                "hours": 2.5,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-cbdacbae",
+                "fuelVoyageId": "FV-VG15-C7",
+                "startTime": "3/26/2026 20:00",
+                "startPos": "Chân Mây",
+                "endTime": "3/30/2026 6:10",
+                "endPos": "Phao Hậu Giang",
+                "hours": 82.166667,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-ec37d09a",
+                "fuelVoyageId": "FV-VG15-C8",
+                "startTime": "4/2/2026 5:30",
+                "startPos": "Phao Hậu Giang",
+                "endTime": "4/2/2026 13:50",
+                "endPos": "Vĩnh Xương",
+                "hours": 8.3333333,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-9431eb0d",
+                "fuelVoyageId": "FV-VG15-C8",
+                "startTime": "4/5/2026 6:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "4/9/2026 7:25",
+                "endPos": "Đà Nẵng",
+                "hours": 97.416667,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-7900aff3",
+                "fuelVoyageId": "FV-VG15-C9",
+                "startTime": "4/11/2026 6:00",
+                "startPos": "Đà Nẵng",
+                "endTime": "4/12/2026 3:00",
+                "endPos": "Sơn Dương",
+                "hours": 21,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-6d9f74d9",
+                "fuelVoyageId": "FV-VG15-C9",
+                "startTime": "4/12/2026 21:30",
+                "startPos": "Sơn Dương",
+                "endTime": "4/17/2026 5:30",
+                "endPos": "Cái Cui",
+                "hours": 104,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-3e068033",
+                "fuelVoyageId": "FV-VG15-C10",
+                "startTime": "4/22/2026 8:00",
+                "startPos": "Cái Cui",
+                "endTime": "4/22/2026 16:25",
+                "endPos": "Vĩnh Xương",
+                "hours": 8.4166667,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-a5e780c7",
+                "fuelVoyageId": "FV-VG15-C10",
+                "startTime": "4/25/2026 6:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "4/29/2026 16:00",
+                "endPos": "Đà Nẵng",
+                "hours": 106,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-d12855af",
+                "fuelVoyageId": "FV-VG18-C1",
+                "startTime": "12/30/2025 22:00",
+                "startPos": "HCM",
+                "endTime": "12/31/2025 18:00",
+                "endPos": "Vĩnh Tân",
+                "hours": 20,
+                "fuelRate": 150
+        },
+        {
+                "id": "FL-d6eccdaf",
+                "fuelVoyageId": "FV-VG18-C1",
+                "startTime": "1/10/2026 15:20",
+                "startPos": "Vĩnh Tân",
+                "endTime": "1/14/2026 7:30",
+                "endPos": "Nghi Sơn",
+                "hours": 88.166667,
+                "fuelRate": 228
+        },
+        {
+                "id": "FL-25998d26",
+                "fuelVoyageId": "FV-VG18-C2",
+                "startTime": "1/23/2026 13:00",
+                "startPos": "Nghi Sơn",
+                "endTime": "1/26/2026 23:45",
+                "endPos": "Neo kỳ vân",
+                "hours": 82.75,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-7bcef4e2",
+                "fuelVoyageId": "FV-VG18-C2",
+                "startTime": "1/28/2026 13:15",
+                "startPos": "Neo kỳ vân",
+                "endTime": "1/28/2026 22:00",
+                "endPos": "Phao TT8 Hiệp Phước",
+                "hours": 8.75,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-265ffd56",
+                "fuelVoyageId": "FV-VG18-C2",
+                "startTime": "1/31/2026 21:50",
+                "startPos": "Phao TT8 Hiệp Phước",
+                "endTime": "1/31/2026 23:10",
+                "endPos": "PM2",
+                "hours": 1.3333333,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-4fc2eedd",
+                "fuelVoyageId": "FV-VG18-C3",
+                "startTime": "2/3/2026 5:20",
+                "startPos": "PM2",
+                "endTime": "2/3/2026 9:00",
+                "endPos": "G1",
+                "hours": 3.6666667,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-3bfacaee",
+                "fuelVoyageId": "FV-VG18-C3",
+                "startTime": "2/4/2026 0:10",
+                "startPos": "G1",
+                "endTime": "2/4/2026 2:50",
+                "endPos": "SP-PSA",
+                "hours": 2.6666667,
+                "fuelRate": 221
+        },
+        {
+                "id": "FL-96490856",
+                "fuelVoyageId": "FV-VG18-C3",
+                "startTime": "2/4/2026 17:00",
+                "startPos": "SP-PSA",
+                "endTime": "2/5/2026 22:45",
+                "endPos": "HÒn TRà Là",
+                "hours": 29.75,
+                "fuelRate": 221
+        },
+        {
+                "id": "FL-3a69c899",
+                "fuelVoyageId": "FV-VG18-C3",
+                "startTime": "2/6/2026 13:20",
+                "startPos": "HÒn TRà Là",
+                "endTime": "2/6/2026 15:50",
+                "endPos": "Nam Phong Vân",
+                "hours": 2.5,
+                "fuelRate": 221
+        },
+        {
+                "id": "FL-4ac4e574",
+                "fuelVoyageId": "FV-VG18-C4",
+                "startTime": "2/10/2026 0:50",
+                "startPos": "Nam Phong Vân",
+                "endTime": "2/10/2026 1:40",
+                "endPos": "Neo",
+                "hours": 0.8333333,
+                "fuelRate": 210
+        },
+        {
+                "id": "FL-925d2b51",
+                "fuelVoyageId": "FV-VG18-C4",
+                "startTime": "2/11/2026 11:20",
+                "startPos": "Neo",
+                "endTime": "2/13/2026 6:20",
+                "endPos": "Hòn La",
+                "hours": 43,
+                "fuelRate": 210
+        },
+        {
+                "id": "FL-efa47383",
+                "fuelVoyageId": "FV-VG18-C4",
+                "startTime": "2/27/2026 0:15",
+                "startPos": "Hòn La",
+                "endTime": "3/2/2026 14:30",
+                "endPos": "BP10",
+                "hours": 86.25,
+                "fuelRate": 231
+        },
+        {
+                "id": "FL-84db80ca",
+                "fuelVoyageId": "FV-VG18-C5",
+                "startTime": "3/7/2026 12:30",
+                "startPos": "Sài Gòn",
+                "endTime": "3/9/2026 8:30",
+                "endPos": "Xuân Đài",
+                "hours": 44,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-e86e56f3",
+                "fuelVoyageId": "FV-VG18-C5",
+                "startTime": "3/11/2026 12:15",
+                "startPos": "Xuân Đài",
+                "endTime": "3/13/2026 8:10",
+                "endPos": "Sơn Dương",
+                "hours": 43.916667,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-7b44070b",
+                "fuelVoyageId": "FV-VG18-C5",
+                "startTime": "3/15/2026 3:30",
+                "startPos": "Sơn Dương",
+                "endTime": "3/18/2026 15:25",
+                "endPos": "SR6",
+                "hours": 83.916667,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-5b5c240d",
+                "fuelVoyageId": "FV-VG18-C6",
+                "startTime": "3/21/2026 18:00",
+                "startPos": "SR6",
+                "endTime": "3/21/2026 21:00",
+                "endPos": "H20",
+                "hours": 3,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-cc8ed911",
+                "fuelVoyageId": "FV-VG18-C6",
+                "startTime": "3/22/2026 12:00",
+                "startPos": "H20",
+                "endTime": "3/22/2026 16:00",
+                "endPos": "Gò Dầu",
+                "hours": 4,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-d8488562",
+                "fuelVoyageId": "FV-VG18-C6",
+                "startTime": "3/25/2026 16:30",
+                "startPos": "Gò Dầu",
+                "endTime": "3/29/2026 23:00",
+                "endPos": "Hải Phòng",
+                "hours": 102.5,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-c287bb25",
+                "fuelVoyageId": "FV-VG18-C7",
+                "startTime": "4/3/2026 5:45",
+                "startPos": "Hải Phòng",
+                "endTime": "4/3/2026 13:15",
+                "endPos": "HP4",
+                "hours": 7.5,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-09e19a17",
+                "fuelVoyageId": "FV-VG18-C7",
+                "startTime": "4/5/2026 11:45",
+                "startPos": "HP4",
+                "endTime": "4/6/2026 13:35",
+                "endPos": "Hòn La",
+                "hours": 25.833333,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-e7f57c88",
+                "fuelVoyageId": "FV-VG18-C8",
+                "startTime": "4/9/2026 17:10",
+                "startPos": "Hòn La",
+                "endTime": "4/9/2026 21:00",
+                "endPos": "Sơn Dương",
+                "hours": 3.8333333,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-96b2d8a3",
+                "fuelVoyageId": "FV-VG18-C8",
+                "startTime": "4/11/2026 22:30",
+                "startPos": "Sơn Dương",
+                "endTime": "4/15/2026 15:45",
+                "endPos": "Trà Vinh",
+                "hours": 89.25,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-b173bad4",
+                "fuelVoyageId": "FV-VG18-C8",
+                "startTime": "4/16/2026 12:30",
+                "startPos": "Trà Vinh",
+                "endTime": "4/16/2026 21:25",
+                "endPos": "Cái cui",
+                "hours": 8.9166667,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-efd3c183",
+                "fuelVoyageId": "FV-VG18-C9",
+                "startTime": "4/20/2026 12:00",
+                "startPos": "Cái cui",
+                "endTime": "4/23/2026 12:15",
+                "endPos": "Sơn Dương",
+                "hours": 72.25,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-1082dc6f",
+                "fuelVoyageId": "FV-VG18-C9",
+                "startTime": "4/25/2026 6:00",
+                "startPos": "Sơn Dương",
+                "endTime": "4/28/2026 13:20",
+                "endPos": "Phao 0",
+                "hours": 79.333333,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-7ce30f60",
+                "fuelVoyageId": "FV-VG18-C9",
+                "startTime": "4/29/2026 11:00",
+                "startPos": "Phao 0",
+                "endTime": "4/29/2026 18:45",
+                "endPos": "Cái Cui",
+                "hours": 7.75,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-65d89c9a",
+                "fuelVoyageId": "FV-VG36-C1",
+                "startTime": "12/27/2025 13:00",
+                "startPos": "Sơn Dương",
+                "endTime": "12/30/2025 14:00",
+                "endPos": "Neo Kỳ Vân",
+                "hours": 73,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-e65f070b",
+                "fuelVoyageId": "FV-VG36-C1",
+                "startTime": "1/1/2026 2:00",
+                "startPos": "Neo Kỳ Vân",
+                "endTime": "1/1/2026 10:00",
+                "endPos": "Phao nhà bè",
+                "hours": 8,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-fbfccf90",
+                "fuelVoyageId": "FV-VG36-C1",
+                "startTime": "1/3/2026 10:30",
+                "startPos": "Phao nhà bè",
+                "endTime": "1/4/2026 16:30",
+                "endPos": "Neo Trà Nóc",
+                "hours": 30,
+                "fuelRate": 117
+        },
+        {
+                "id": "FL-8247560d",
+                "fuelVoyageId": "FV-VG36-C1",
+                "startTime": "1/5/2026 6:00",
+                "startPos": "Neo Trà Nóc",
+                "endTime": "1/5/2026 13:30",
+                "endPos": "Neo Vĩnh Xương",
+                "hours": 7.5,
+                "fuelRate": 117
+        },
+        {
+                "id": "FL-ccbebb3b",
+                "fuelVoyageId": "FV-VG36-C2",
+                "startTime": "1/8/2026 20:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "1/13/2026 8:00",
+                "endPos": "Đà Nẵng",
+                "hours": 108,
+                "fuelRate": 120
+        },
+        {
+                "id": "FL-0228de85",
+                "fuelVoyageId": "FV-VG36-C3",
+                "startTime": "1/15/2026 7:00",
+                "startPos": "Đà Nẵng",
+                "endTime": "1/15/2026 10:40",
+                "endPos": "Neo Chân Mấy",
+                "hours": 3.6666667,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-322086c2",
+                "fuelVoyageId": "FV-VG36-C3",
+                "startTime": "1/15/2026 16:30",
+                "startPos": "Neo Chân Mấy",
+                "endTime": "1/16/2026 7:30",
+                "endPos": "Hòn La",
+                "hours": 15,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-25230561",
+                "fuelVoyageId": "FV-VG36-C3",
+                "startTime": "1/19/2026 19:00",
+                "startPos": "Hòn La",
+                "endTime": "1/23/2026 8:30",
+                "endPos": "CầnThơ",
+                "hours": 85.5,
+                "fuelRate": 132
+        },
+        {
+                "id": "FL-c340f5b9",
+                "fuelVoyageId": "FV-VG36-C4",
+                "startTime": "1/25/2026 6:00",
+                "startPos": "Cần Thơ",
+                "endTime": "1/25/2026 11:00",
+                "endPos": "Phao Mỹ Thới",
+                "hours": 5,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-7b1c1c3f",
+                "fuelVoyageId": "FV-VG36-C4",
+                "startTime": "1/31/2026 6:00",
+                "startPos": "Phao Mỹ Thới",
+                "endTime": "2/4/2026 23:50",
+                "endPos": "Cửa Lò",
+                "hours": 113.83333,
+                "fuelRate": 135
+        },
+        {
+                "id": "FL-25fa8c97",
+                "fuelVoyageId": "FV-VG36-C5",
+                "startTime": "2/6/2026 20:00",
+                "startPos": "Cửa Lò",
+                "endTime": "2/7/2026 14:00",
+                "endPos": "Sơn Dường",
+                "hours": 18,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-1b1c901e",
+                "fuelVoyageId": "FV-VG36-C5",
+                "startTime": "2/9/2026 16:40",
+                "startPos": "Sơn Dương",
+                "endTime": "2/13/2026 8:30",
+                "endPos": "Phao 0 Định An",
+                "hours": 87.833333,
+                "fuelRate": 125
+        },
+        {
+                "id": "FL-a9745795",
+                "fuelVoyageId": "FV-VG36-C6",
+                "startTime": "2/22/2026 6:00",
+                "startPos": "Phao 0 Định An",
+                "endTime": "2/22/2026 14:00",
+                "endPos": "Vĩnh Xương",
+                "hours": 8,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-343b4927",
+                "fuelVoyageId": "FV-VG36-C6",
+                "startTime": "2/25/2026 8:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "2/25/2026 16:30",
+                "endPos": "Trà Nóc",
+                "hours": 8.5,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-08d8ca39",
+                "fuelVoyageId": "FV-VG36-C6",
+                "startTime": "2/26/2026 6:00",
+                "startPos": "Trà Nóc",
+                "endTime": "3/3/2026 5:00",
+                "endPos": "Vật Cách",
+                "hours": 119,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-4bb16a2c",
+                "fuelVoyageId": "FV-VG36-C7",
+                "startTime": "3/5/2026 5:00",
+                "startPos": "Vật Cách",
+                "endTime": "3/6/2026 6:30",
+                "endPos": "Hòn La",
+                "hours": 25.5,
+                "fuelRate": 115
+        },
+        {
+                "id": "FL-35e6d557",
+                "fuelVoyageId": "FV-VG36-C7",
+                "startTime": "3/11/2026 9:00",
+                "startPos": "Hòn La",
+                "endTime": "3/14/2026 13:00",
+                "endPos": "Nhà bè",
+                "hours": 76,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-2a9a3b57",
+                "fuelVoyageId": "FV-VG36-C7",
+                "startTime": "3/19/2026 5:30",
+                "startPos": "Nhà bè",
+                "endTime": "3/19/2026 8:00",
+                "endPos": "XM Thành Công",
+                "hours": 2.5,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-4a10b2ad",
+                "fuelVoyageId": "FV-VG36-C8",
+                "startTime": "3/24/2026 9:00",
+                "startPos": "XM Thành Công",
+                "endTime": "3/24/2026 18:00",
+                "endPos": "Bông tông",
+                "hours": 9,
+                "fuelRate": 115
+        },
+        {
+                "id": "FL-ee0bb919",
+                "fuelVoyageId": "FV-VG36-C8",
+                "startTime": "Bông tông",
+                "startPos": "Bông tông",
+                "endTime": "3/28/2026 8:00",
+                "endPos": "Đà Nẵng",
+                "hours": 63,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-fafc4c0c",
+                "fuelVoyageId": "FV-VG36-C9",
+                "startTime": "3/30/2026 10:35",
+                "startPos": "Đà Nẵng",
+                "endTime": "3/31/2026 18:00",
+                "endPos": "Sơn Dường",
+                "hours": 31.416667,
+                "fuelRate": 115
+        },
+        {
+                "id": "FL-a79b0d67",
+                "fuelVoyageId": "FV-VG36-C9",
+                "startTime": "4/1/2026 18:00",
+                "startPos": "Sơn Dương",
+                "endTime": "4/5/2026 11:00",
+                "endPos": "Vũng Tàu",
+                "hours": 89,
+                "fuelRate": 140
+        },
+        {
+                "id": "FL-5b306e7c",
+                "fuelVoyageId": "FV-VG36-C9",
+                "startTime": "4/6/2026 10:00",
+                "startPos": "Vũng Tàu",
+                "endTime": "4/6/2026 15:00",
+                "endPos": "Cảng Hạ Long",
+                "hours": 5,
+                "fuelRate": 140
+        },
+        {
+                "id": "FL-58338d08",
+                "fuelVoyageId": "FV-VG36-C10",
+                "startTime": "4/8/2026 9:00",
+                "startPos": "Cảng Hạ Long",
+                "endTime": "4/8/2026 20:00",
+                "endPos": "Phao 0 Định An",
+                "hours": 11,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-0915ff29",
+                "fuelVoyageId": "FV-VG36-C10",
+                "startTime": "4/9/2026 2:00",
+                "startPos": "Phao 0 Định An",
+                "endTime": "4/9/2026 8:00",
+                "endPos": "Hậu giang",
+                "hours": 6,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-5c6604bc",
+                "fuelVoyageId": "FV-VG36-C10",
+                "startTime": "4/11/2026 6:40",
+                "startPos": "Hậu giang",
+                "endTime": "4/12/2026 5:00",
+                "endPos": "Cảng Vĩnh Hưng",
+                "hours": 22.333333,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-1bda6e8e",
+                "fuelVoyageId": "FV-VG36-C10",
+                "startTime": "4/14/2026 0:30",
+                "startPos": "Cảng Vĩnh Hưng",
+                "endTime": "4/16/2026 7:30",
+                "endPos": "Đà Nẵng",
+                "hours": 55,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-f5d7ac26",
+                "fuelVoyageId": "FV-VG36-C11",
+                "startTime": "4/24/2026 6:00",
+                "startPos": "Đà Nẵng",
+                "endTime": "4/24/2026 9:30",
+                "endPos": "Chân Mây",
+                "hours": 3.5,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-7bfaa59a",
+                "fuelVoyageId": "FV-VG36-C11",
+                "startTime": "4/26/2026 9:00",
+                "startPos": "Chân Mây",
+                "endTime": "5/1/2026 9:30",
+                "endPos": "Hậu giang",
+                "hours": 120.5,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-52a849b6",
+                "fuelVoyageId": "FV-VG05-C11",
+                "startTime": "4/15/2026 21:30",
+                "startPos": "Đà Nẵng",
+                "endTime": "4/16/2026 1:15",
+                "endPos": "Chân Mây",
+                "hours": 3.75,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-2b6a42d0",
+                "fuelVoyageId": "FV-VG05-C11",
+                "startTime": "4/18/2026 9:00",
+                "startPos": "Chân Mây",
+                "endTime": "4/21/2026 15:45",
+                "endPos": "Cái Cui",
+                "hours": 78.75,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-c4375e1a",
+                "fuelVoyageId": "FV-VG05-C12",
+                "startTime": "4/25/2026 6:00",
+                "startPos": "Cái Cui",
+                "endTime": "4/25/2026 16:00",
+                "endPos": "Vĩnh Xương",
+                "hours": 10,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-14e225dc",
+                "fuelVoyageId": "FV-VG05-C12",
+                "startTime": " ",
+                "startPos": "Vĩnh Xương",
+                "endTime": " ",
+                "endPos": "",
+                "hours": 0,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-b40288e5",
+                "fuelVoyageId": "FV-VG09-C1",
+                "startTime": "1/8/2026 9:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "1/13/2026 19:30",
+                "endPos": "Đà Nẵng",
+                "hours": 130.5,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-43aea051",
+                "fuelVoyageId": "FV-VG09-C2",
+                "startTime": "1/18/2026 7:00",
+                "startPos": "Đà Nẵng",
+                "endTime": "1/19/2026 6:00",
+                "endPos": "Sơn Dương",
+                "hours": 23,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-adb89bed",
+                "fuelVoyageId": "FV-VG09-C2",
+                "startTime": "1/20/2026 6:45",
+                "startPos": "Sơn Dương",
+                "endTime": "1/23/2026 22:30",
+                "endPos": "Neo Kỳ Vân",
+                "hours": 87.75,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-a14a3119",
+                "fuelVoyageId": "FV-VG09-C2",
+                "startTime": "1/24/2026 10:45",
+                "startPos": "Neo Kỳ Vân",
+                "endTime": "1/24/2026 18:30",
+                "endPos": "Cảng NMXM",
+                "hours": 7.75,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-82db0626",
+                "fuelVoyageId": "FV-VG09-C3",
+                "startTime": "1/26/2026 20:00",
+                "startPos": "Cảng NMXM",
+                "endTime": "1/27/2026 21:00",
+                "endPos": "Neo phao",
+                "hours": 25,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-804bdcb3",
+                "fuelVoyageId": "FV-VG09-C3",
+                "startTime": "1/29/2026 8:00",
+                "startPos": "Neo phao",
+                "endTime": "1/29/2026 9:20",
+                "endPos": "Vĩnh Tân",
+                "hours": 1.3333333,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-1b8bba4f",
+                "fuelVoyageId": "FV-VG09-C3",
+                "startTime": "1/31/2026 17:30",
+                "startPos": "Vĩnh Tân",
+                "endTime": "2/5/2026 7:30",
+                "endPos": "Nghi Sơn",
+                "hours": 110,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-04924841",
+                "fuelVoyageId": "FV-VG09-C4",
+                "startTime": "2/10/2026 15:00",
+                "startPos": "Nghi Sơn",
+                "endTime": "2/11/2026 3:30",
+                "endPos": "Sơn Dương",
+                "hours": 12.5,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-3bd5efb0",
+                "fuelVoyageId": "FV-VG09-C4",
+                "startTime": "2/22/2026 13:00",
+                "startPos": "Sơn Dương",
+                "endTime": "2/27/2026 18:00",
+                "endPos": "Định An",
+                "hours": 125,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-4ddbd2f7",
+                "fuelVoyageId": "FV-VG09-C5",
+                "startTime": "3/3/2026 6:00",
+                "startPos": "Định An",
+                "endTime": "3/3/2026 17:00",
+                "endPos": "Vĩnh Xương",
+                "hours": 11,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-e2844040",
+                "fuelVoyageId": "FV-VG09-C5",
+                "startTime": "3/4/2026 10:45",
+                "startPos": "Vĩnh Xương",
+                "endTime": "3/4/2026 12:15",
+                "endPos": "Cập cần",
+                "hours": 1.5,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-133897c9",
+                "fuelVoyageId": "FV-VG09-C5",
+                "startTime": "3/7/2026 7:00",
+                "startPos": "Cần",
+                "endTime": "3/7/2026 19:00",
+                "endPos": "Neo",
+                "hours": 12,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-e2e0bd54",
+                "fuelVoyageId": "FV-VG09-C5",
+                "startTime": "3/8/2026 2:00",
+                "startPos": "Neo",
+                "endTime": "3/11/2026 5:40",
+                "endPos": "Xuân Đài",
+                "hours": 75.666667,
+                "fuelRate": 105
+        },
+        {
+                "id": "FL-8503c8aa",
+                "fuelVoyageId": "FV-VG09-C5",
+                "startTime": "3/11/2026 10:00",
+                "startPos": "Xuân Đài",
+                "endTime": "3/13/2026 7:00",
+                "endPos": "Cảng Tiên Sa",
+                "hours": 45,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-ccc0f16b",
+                "fuelVoyageId": "FV-VG09-C6",
+                "startTime": "3/15/2026 10:45",
+                "startPos": "Cảng Tiên Sa",
+                "endTime": "3/16/2026 9:30",
+                "endPos": "Sơn Dương",
+                "hours": 22.75,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-2a857a70",
+                "fuelVoyageId": "FV-VG09-C6",
+                "startTime": "3/17/2026 8:00",
+                "startPos": "Sơn Dương",
+                "endTime": "3/21/2026 9:30",
+                "endPos": "Phao 0 Định An",
+                "hours": 97.5,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-c4f8b624",
+                "fuelVoyageId": "FV-VG09-C6",
+                "startTime": "3/21/2026 13:10",
+                "startPos": "Phao 0 ĐỊnh An",
+                "endTime": "3/21/2026 17:30",
+                "endPos": "Neo",
+                "hours": 4.3333333,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-938c2419",
+                "fuelVoyageId": "FV-VG09-C6",
+                "startTime": "3/22/2026 5:00",
+                "startPos": "Neo",
+                "endTime": "3/22/2026 10:45",
+                "endPos": "NMXM Tây ĐÔ",
+                "hours": 5.75,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-93594e7d",
+                "fuelVoyageId": "FV-VG09-C7",
+                "startTime": "3/26/2026 5:45",
+                "startPos": "NMXM Tây ĐÔ",
+                "endTime": "3/26/2026 15:15",
+                "endPos": "Neo Thường Phước",
+                "hours": 9.5,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-eca498a0",
+                "fuelVoyageId": "FV-VG09-C7",
+                "startTime": "3/30/2026 7:00",
+                "startPos": "Neo Thường Phước",
+                "endTime": "4/3/2026 4:00",
+                "endPos": "Đà Nẵng",
+                "hours": 93,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-8096bf6a",
+                "fuelVoyageId": "FV-VG09-C8",
+                "startTime": "4/5/2026 9:20",
+                "startPos": "Đà Nẵng",
+                "endTime": "4/6/2026 8:00",
+                "endPos": "Sơn Dương",
+                "hours": 22.666667,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-c82ae8b0",
+                "fuelVoyageId": "FV-VG09-C8",
+                "startTime": "4/7/2026 10:10",
+                "startPos": "Sơn Dương",
+                "endTime": "4/12/2026 16:00",
+                "endPos": "NMXM Tây ĐÔ",
+                "hours": 125.83333,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-beea8ca3",
+                "fuelVoyageId": "FV-VG09-C9",
+                "startTime": "4/19/2026 6:30",
+                "startPos": "NMXM Tây ĐÔ",
+                "endTime": "4/19/2026 14:50",
+                "endPos": "Vĩnh Xương",
+                "hours": 8.3333333,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-3134893f",
+                "fuelVoyageId": "FV-VG09-C9",
+                "startTime": "4/26/2026 6:00",
+                "startPos": "Vĩnh Xương",
+                "endTime": "4/26/2026 17:00",
+                "endPos": "Cái Cui",
+                "hours": 11,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-633327f9",
+                "fuelVoyageId": "FV-VG09-C9",
+                "startTime": "4/27/2026 6:00",
+                "startPos": "Cái Cui",
+                "endTime": " ",
+                "endPos": "",
+                "hours": 0,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-5036f5e6",
+                "fuelVoyageId": "FV-VG05-C12",
+                "startTime": "4/29/2026 6:40",
+                "startPos": "",
+                "endTime": "5/4/2026 22:40",
+                "endPos": "",
+                "hours": 136,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-b4b80be6",
+                "fuelVoyageId": "FV-VG05-C13",
+                "startTime": "5/5/2026 16:00",
+                "startPos": "",
+                "endTime": "5/5/2026 23:20",
+                "endPos": "",
+                "hours": 7.33,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-106ce0bc",
+                "fuelVoyageId": "FV-VG05-C13",
+                "startTime": "5/7/2026 13:40",
+                "startPos": "",
+                "endTime": "5/8/2026 16:45",
+                "endPos": "",
+                "hours": 27.08,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-203c8336",
+                "fuelVoyageId": "FV-VG05-C14",
+                "startTime": "5/17/2026 10:56",
+                "startPos": "",
+                "endTime": "5/21/2026 19:00",
+                "endPos": "",
+                "hours": 104.07,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-274ef52c",
+                "fuelVoyageId": "FV-VG05-C15",
+                "startTime": "5/23/2026 7:29",
+                "startPos": "",
+                "endTime": "5/23/2026 16:55",
+                "endPos": "",
+                "hours": 9.43,
+                "fuelRate": 100
+        },
+        {
+                "id": "FL-6d472a2d",
+                "fuelVoyageId": "FV-VG09-C9",
+                "startTime": "4/27/2026 7:00",
+                "startPos": "",
+                "endTime": "5/4/2026 1:00",
+                "endPos": "",
+                "hours": 162,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-8e247f30",
+                "fuelVoyageId": "FV-VG09-C10",
+                "startTime": "5/6/2026 4:00",
+                "startPos": "",
+                "endTime": "5/6/2026 16:10",
+                "endPos": "",
+                "hours": 12.17,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-e0b2a71e",
+                "fuelVoyageId": "FV-VG09-C10",
+                "startTime": "5/9/2026 20:00",
+                "startPos": "",
+                "endTime": "5/10/2026 19:15",
+                "endPos": "",
+                "hours": 23.25,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-0353f457",
+                "fuelVoyageId": "FV-VG09-C11",
+                "startTime": "5/13/2026 18:45",
+                "startPos": "",
+                "endTime": "5/14/2026 9:30",
+                "endPos": "",
+                "hours": 14.75,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-702a11fb",
+                "fuelVoyageId": "FV-VG09-C11",
+                "startTime": "5/18/2026 8:30",
+                "startPos": "",
+                "endTime": "5/22/2026 19:30",
+                "endPos": "",
+                "hours": 107,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-cb94ef28",
+                "fuelVoyageId": "FV-VG09-C11",
+                "startTime": "5/23/2026 5:00",
+                "startPos": "",
+                "endTime": "5/23/2026 11:30",
+                "endPos": "",
+                "hours": 6.5,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-96df0abd",
+                "fuelVoyageId": "FV-VG09-C12",
+                "startTime": "5/25/2026 8:00",
+                "startPos": "",
+                "endTime": "5/25/2026 18:00",
+                "endPos": "",
+                "hours": 10,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-8e2e5f10",
+                "fuelVoyageId": "FV-VG15-C11",
+                "startTime": "5/4/2026 6:00",
+                "startPos": "",
+                "endTime": "5/5/2026 11:19",
+                "endPos": "",
+                "hours": 29.32,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-4fe36877",
+                "fuelVoyageId": "FV-VG15-C11",
+                "startTime": "5/6/2026 2:30",
+                "startPos": "",
+                "endTime": "5/9/2026 19:14",
+                "endPos": "",
+                "hours": 88.73,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-00cd3cc2",
+                "fuelVoyageId": "FV-VG15-C11",
+                "startTime": "5/10/2026 5:30",
+                "startPos": "",
+                "endTime": "5/10/2026 14:15",
+                "endPos": "",
+                "hours": 8.75,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-b81da07d",
+                "fuelVoyageId": "FV-VG15-C12",
+                "startTime": "5/17/2026 6:00",
+                "startPos": "",
+                "endTime": "5/17/2026 17:20",
+                "endPos": "",
+                "hours": 11.33,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-1e9422b0",
+                "fuelVoyageId": "FV-VG15-C12",
+                "startTime": "5/20/2026 6:00",
+                "startPos": "",
+                "endTime": "5/24/2026 15:00",
+                "endPos": "",
+                "hours": 105,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-03933505",
+                "fuelVoyageId": "FV-VG15-C13",
+                "startTime": "5/26/2026 6:00",
+                "startPos": "",
+                "endTime": "5/26/2026 9:21",
+                "endPos": "",
+                "hours": 3.35,
+                "fuelRate": 95
+        },
+        {
+                "id": "FL-f6a3f17b",
+                "fuelVoyageId": "FV-VG18-C1",
+                "startTime": "10/1/2026 15:20",
+                "startPos": "",
+                "endTime": "Invalid Date",
+                "endPos": "",
+                "hours": 0,
+                "fuelRate": 228
+        },
+        {
+                "id": "FL-b024a56b",
+                "fuelVoyageId": "FV-VG18-C10",
+                "startTime": "5/4/2026 13:00",
+                "startPos": "",
+                "endTime": "5/7/2026 17:00",
+                "endPos": "",
+                "hours": 76,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-a25cadc9",
+                "fuelVoyageId": "FV-VG18-C10",
+                "startTime": "5/11/2026 11:29",
+                "startPos": "",
+                "endTime": "5/14/2026 20:40",
+                "endPos": "",
+                "hours": 81.18,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-f4233130",
+                "fuelVoyageId": "FV-VG18-C10",
+                "startTime": "5/15/2026 10:45",
+                "startPos": "",
+                "endTime": "5/15/2026 18:40",
+                "endPos": "",
+                "hours": 7.92,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-d6f9c8c9",
+                "fuelVoyageId": "FV-VG18-C11",
+                "startTime": "5/19/2026 7:00",
+                "startPos": "",
+                "endTime": "5/20/2026 5:15",
+                "endPos": "",
+                "hours": 22.25,
+                "fuelRate": 204
+        },
+        {
+                "id": "FL-6be7fb54",
+                "fuelVoyageId": "FV-VG36-C8",
+                "startTime": "Invalid Date",
+                "startPos": "",
+                "endTime": "3/28/2026 8:00",
+                "endPos": "",
+                "hours": 0,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-e6fca2f9",
+                "fuelVoyageId": "FV-VG36-C12",
+                "startTime": "5/1/2026 5:20",
+                "startPos": "",
+                "endTime": "5/1/2026 15:00",
+                "endPos": "",
+                "hours": 9.67,
+                "fuelRate": 120
+        },
+        {
+                "id": "FL-6bad3fcf",
+                "fuelVoyageId": "FV-VG36-C12",
+                "startTime": "5/3/2026 9:00",
+                "startPos": "",
+                "endTime": "5/7/2026 3:50",
+                "endPos": "",
+                "hours": 90.83,
+                "fuelRate": 130
+        },
+        {
+                "id": "FL-efeb7d9a",
+                "fuelVoyageId": "FV-VG36-C13",
+                "startTime": "5/9/2026 19:40",
+                "startPos": "",
+                "endTime": "5/10/2026 23:00",
+                "endPos": "",
+                "hours": 27.33,
+                "fuelRate": 110
+        },
+        {
+                "id": "FL-8f5536fd",
+                "fuelVoyageId": "FV-VG36-C13",
+                "startTime": "5/16/2026 0:00",
+                "startPos": "",
+                "endTime": "5/19/2026 16:30",
+                "endPos": "",
+                "hours": 88.5,
+                "fuelRate": 130
+        }
+],
+    "monthlyCosts": [],
+    "vesselExpenses": [
+        {
+            "id": "VE-001",
+            "date": "2026-04-03",
+            "vesselId": "VG18",
+            "voyageNo": "C9",
+            "category": "Vật tư & CP khác",
+            "amount": 1500000,
+            "content": "Mua vật tư chổi, chổi quét, sơn tàu chi"
+        },
+        {
+            "id": "VE-002",
+            "date": "2026-04-05",
+            "vesselId": "VG18",
+            "voyageNo": "C9",
+            "category": "Tiền ăn & bồi dưỡng TV",
+            "amount": 8000000,
+            "content": "Tiền ăn cả tháng và bồi dưỡng thêm thuyền viên"
+        },
+        {
+            "id": "VE-003",
+            "date": "2026-04-08",
+            "vesselId": "VG18",
+            "voyageNo": "C9",
+            "category": "Chi phí tại các đầu cảng",
+            "amount": 3000000,
+            "content": "Bồi dưỡng trực tiếp công nhân cẩu chuyến C9"
+        },
+        {
+            "id": "VE-004",
+            "date": "2026-04-10",
+            "vesselId": "VG18",
+            "voyageNo": "C9",
+            "category": "Chi phí tại các đầu cảng",
+            "amount": 2500000,
+            "content": "Chi phí biên phòng đầu cảng chuyến C9"
+        },
+        {
+            "id": "VE-005",
+            "date": "2026-04-12",
+            "vesselId": "VG18",
+            "voyageNo": "C9",
+            "category": "Tiền Bồi dưỡng",
+            "amount": 5000000,
+            "content": "Tiền Bông chuyến C9 bồi dưỡng đối tác"
+        },
+        {
+            "id": "VE-006",
+            "date": "2026-04-15",
+            "vesselId": "VG18",
+            "voyageNo": "C9",
+            "category": "Vật tư & CP khác",
+            "amount": 1000000,
+            "content": "Mua dầu bóng và vật tư phụ"
+        }
     ],
-    fuelLogs: [
-        { id: 'FL-685b57f8', fuelVoyageId: 'FV-VG05-C1', startTime: '12/28/2025 6:00', startPos: 'Vĩnh Xương', endTime: '12/28/2025 15:00', endPos: 'Khu neo Hậu Giang', hours: 9, fuelRate: 95 },
-        { id: 'FL-60477170', fuelVoyageId: 'FV-VG05-C1', startTime: '12/29/2025 13:00', startPos: 'Khu neo Hậu Giang', endTime: '1/2/2026 13:00', endPos: 'Đà Nẵng', hours: 96, fuelRate: 95 },
-        { id: 'FL-9ca28666', fuelVoyageId: 'FV-VG05-C2', startTime: '1/4/2026 16:00', startPos: 'Đà Nẵng', endTime: '1/4/2026 20:30', endPos: 'Neo Cảng Chân Mây', hours: 4.5, fuelRate: 90 },
-        { id: 'FL-03a113d0', fuelVoyageId: 'FV-VG05-C2', startTime: '1/9/2026 13:30', startPos: 'Cảng Chân Mây', endTime: '1/12/2026 22:30', endPos: 'Neo Cái Sắn', hours: 81, fuelRate: 95 },
-        { id: 'FL-933391d1', fuelVoyageId: 'FV-VG05-C2', startTime: '1/13/2026 6:00', startPos: 'Neo cái sắn', endTime: '1/13/2026 7:30', endPos: 'An Giang', hours: 1.5, fuelRate: 95 },
-        { id: 'FL-6e6b0487', fuelVoyageId: 'FV-VG05-C3', startTime: '1/16/2026 6:30', startPos: 'An Giang', endTime: '1/16/2026 13:00', endPos: 'Neo Vĩnh Xương', hours: 6.5, fuelRate: 90 },
-        { id: 'FL-16e6d1c4', fuelVoyageId: 'FV-VG05-C3', startTime: '1/19/2026 6:00', startPos: 'Vĩnh Xương', endTime: '1/24/2026 6:00', endPos: 'Đà Nẵng', hours: 120, fuelRate: 90 },
-        { id: 'FL-f661b183', fuelVoyageId: 'FV-VG05-C4', startTime: '1/26/2026 22:00', startPos: 'Đà Nẵng', endTime: '1/27/2026 5:20', endPos: 'Sơn Dương', hours: 31.333333, fuelRate: 90 },
-        { id: 'FL-4d436ecb', fuelVoyageId: 'FV-VG05-C4', startTime: '1/28/2026 15:30', startPos: 'Sơn Dương', endTime: '2/1/2026 9:35', endPos: 'P0 Định An', hours: 90.083333, fuelRate: 90 },
-        { id: 'FL-5c74384e', fuelVoyageId: 'FV-VG05-C4', startTime: '2/1/2026 17:30', startPos: 'P0 Định An', endTime: '2/1/2026 20:30', endPos: 'Tây Đô', hours: 3, fuelRate: 90 },
-        { id: 'FL-b0784a3d', fuelVoyageId: 'FV-VG05-C5', startTime: '2/6/2026 6:30', startPos: 'Cần Thơ', endTime: '2/6/2026 14:40', endPos: 'Vĩnh Xương', hours: 8.1666667, fuelRate: 90 },
-        { id: 'FL-c7616c18', fuelVoyageId: 'FV-VG05-C5', startTime: '2/10/2026 5:30', startPos: 'Vĩnh Xương', endTime: '2/13/2026 20:40', endPos: 'Đà Nẵng', hours: 87.166667, fuelRate: 90 },
-        { id: 'FL-bb97f307', fuelVoyageId: 'FV-VG05-C6', startTime: '2/25/2026 15:20', startPos: 'Đà Nẵng', endTime: '2/26/2026 7:20', endPos: 'Hòn La', hours: 16, fuelRate: 90 },
-        { id: 'FL-3af1d0c5', fuelVoyageId: 'FV-VG05-C6', startTime: '3/3/2026 1:10', startPos: 'Hòn La', endTime: '3/6/2026 21:20', endPos: 'XM Tây Đô', hours: 92.166667, fuelRate: 95 },
-        { id: 'FL-d51d0f5b', fuelVoyageId: 'FV-VG05-C7', startTime: '3/9/2026 6:00', startPos: 'XM Tây Đô', endTime: '3/9/2026 13:40', endPos: 'Vĩnh Xương', hours: 7.6666667, fuelRate: 95 },
-        { id: 'FL-9a5243ff', fuelVoyageId: 'FV-VG05-C7', startTime: '3/15/2026 6:00', startPos: 'Vĩnh Xương', endTime: '3/21/2026 17:00', endPos: 'Hòn Dấu', hours: 155, fuelRate: 95 },
-        { id: 'FL-53dd02cd', fuelVoyageId: 'FV-VG05-C7', startTime: '3/22/2026 11:00', startPos: 'Hòn Dấu', endTime: '3/22/2026 16:30', endPos: 'Vật Cách', hours: 5.5, fuelRate: 95 },
-        { id: 'FL-e64cd10f', fuelVoyageId: 'FV-VG05-C8', startTime: '3/23/2026 13:00', startPos: 'Vật Cách', endTime: '3/23/2026 18:40', endPos: 'Cửa Ông', hours: 5.6666667, fuelRate: 95 },
-        { id: 'FL-5ce44f77', fuelVoyageId: 'FV-VG05-C8', startTime: '3/27/2026 9:00', startPos: 'Cửa ông', endTime: '3/28/2026 6:30', endPos: 'Nghi Sơn', hours: 21.5, fuelRate: 100 },
-        { id: 'FL-d89269c8', fuelVoyageId: 'FV-VG05-C9', startTime: '3/29/2026 12:20', startPos: 'Nghi Sơn', endTime: '3/29/2026 23:40', endPos: 'Sơn Dương', hours: 11.333333, fuelRate: 105 },
-        { id: 'FL-bf0f57e6', fuelVoyageId: 'FV-VG05-C9', startTime: '3/30/2026 17:00', startPos: 'Sơn Dương', endTime: '4/3/2026 22:00', endPos: 'Hậu Giang', hours: 101, fuelRate: 105 },
-        { id: 'FL-07f0db82', fuelVoyageId: 'FV-VG05-C10', startTime: '4/6/2026 8:40', startPos: 'Hậu Giang', endTime: '4/6/2026 19:00', endPos: 'Vĩnh Xương', hours: 10.333333, fuelRate: 95 },
-        { id: 'FL-1ed1cf4f', fuelVoyageId: 'FV-VG05-C10', startTime: '4/9/2026 6:00', startPos: 'Vĩnh Xương', endTime: '4/13/2026 4:40', endPos: 'Đà Nẵng', hours: 94.666667, fuelRate: 95 },
-        { id: 'FL-395c4eee', fuelVoyageId: 'FV-VG15-C1', startTime: '12/31/2025 14:45', startPos: 'Sơn Dương', endTime: '1/2/2026 15:25', endPos: 'Neo Vũng Rô', hours: 48.666667, fuelRate: 100 },
-        { id: 'FL-8a74386a', fuelVoyageId: 'FV-VG15-C1', startTime: '1/4/2026 4:30', startPos: 'Neo Vũng Rô', endTime: '1/5/2026 22:00', endPos: 'Định An', hours: 41.5, fuelRate: 110 },
-        { id: 'FL-73d94aa9', fuelVoyageId: 'FV-VG15-C1', startTime: '1/6/2026 3:00', startPos: 'Định An', endTime: '1/6/2026 9:20', endPos: 'Buộc phao', hours: 6.3333333, fuelRate: 110 },
-        { id: 'FL-6ed3c839', fuelVoyageId: 'FV-VG15-C2', startTime: '1/11/2026 5:00', startPos: 'Vĩnh Xương', endTime: '1/15/2026 17:00', endPos: 'Đà Nẵng', hours: 108, fuelRate: 105 },
-        { id: 'FL-f80dc0ae', fuelVoyageId: 'FV-VG15-C3', startTime: '1/20/2026 6:00', startPos: 'Đà Nẵng', endTime: '1/21/2026 3:00', endPos: 'Sơn Dương', hours: 21, fuelRate: 105 },
-        { id: 'FL-9220fbdd', fuelVoyageId: 'FV-VG15-C3', startTime: '1/23/2026 9:00', startPos: 'Sơn Dương', endTime: '1/27/2026 11:30', endPos: 'Phao Hậu Giang', hours: 98.5, fuelRate: 105 },
-        { id: 'FL-57a67f9b', fuelVoyageId: 'FV-VG15-C4', startTime: '2/4/2026 5:15', startPos: 'Hậu Giang', endTime: '2/4/2026 15:00', endPos: 'Vĩnh Xương', hours: 9.75, fuelRate: 110 },
-        { id: 'FL-ddc6399a', fuelVoyageId: 'FV-VG15-C4', startTime: '2/11/2026 7:00', startPos: 'Vĩnh Xương', endTime: '2/17/2026 8:00', endPos: 'Hải Phòng', hours: 145, fuelRate: 115 },
-        { id: 'FL-e77e2023', fuelVoyageId: 'FV-VG15-C5', startTime: '2/23/2026 13:00', startPos: 'Vật Cách', endTime: '2/24/2026 17:00', endPos: 'Hòn La', hours: 28, fuelRate: 105 },
-        { id: 'FL-5e312348', fuelVoyageId: 'FV-VG15-C5', startTime: '2/28/2026 18:30', startPos: 'Hòn La', endTime: '2/28/2026 21:30', endPos: 'Sơn Dương', hours: 3, fuelRate: 105 },
-        { id: 'FL-8bb15183', fuelVoyageId: 'FV-VG15-C5', startTime: '3/1/2026 18:00', startPos: 'Sơn Dương', endTime: '3/5/2026 18:40', endPos: 'Phao Hậu Giang', hours: 96.666667, fuelRate: 105 },
-        { id: 'FL-ec5febec', fuelVoyageId: 'FV-VG15-C6', startTime: '3/7/2026 5:30', startPos: 'Phao Hậu Giang', endTime: '3/7/2026 13:10', endPos: 'Vĩnh Xương', hours: 7.6666667, fuelRate: 105 },
-        { id: 'FL-d84c7812', fuelVoyageId: 'FV-VG15-C6', startTime: '3/9/2026 9:00', startPos: 'Vĩnh Xương', endTime: '3/9/2026 19:30', endPos: 'Cái Cui', hours: 10.5, fuelRate: 105 },
-        { id: 'FL-9216a10b', fuelVoyageId: 'FV-VG15-C6', startTime: '3/10/2026 6:00', startPos: 'Cái Cui', endTime: '3/13/2026 14:00', endPos: 'Cù Lao Xanh', hours: 80, fuelRate: 105 },
-        { id: 'FL-7b26ce7b', fuelVoyageId: 'FV-VG15-C6', startTime: '3/15/2026 5:00', startPos: 'Cù Lao Xanh', endTime: '3/16/2026 18:00', endPos: 'Sơn Trà', hours: 37, fuelRate: 105 },
-        { id: 'FL-d88140c9', fuelVoyageId: 'FV-VG15-C7', startTime: '3/20/2026 8:00', startPos: 'Sơn Trà', endTime: '3/20/2026 10:30', endPos: 'Chân Mây', hours: 2.5, fuelRate: 105 },
-        { id: 'FL-cbdacbae', fuelVoyageId: 'FV-VG15-C7', startTime: '3/26/2026 20:00', startPos: 'Chân Mây', endTime: '3/30/2026 6:10', endPos: 'Phao Hậu Giang', hours: 82.166667, fuelRate: 105 },
-        { id: 'FL-ec37d09a', fuelVoyageId: 'FV-VG15-C8', startTime: '4/2/2026 5:30', startPos: 'Phao Hậu Giang', endTime: '4/2/2026 13:50', endPos: 'Vĩnh Xương', hours: 8.3333333, fuelRate: 100 },
-        { id: 'FL-9431eb0d', fuelVoyageId: 'FV-VG15-C8', startTime: '4/5/2026 6:00', startPos: 'Vĩnh Xương', endTime: '4/9/2026 7:25', endPos: 'Đà Nẵng', hours: 97.416667, fuelRate: 100 },
-        { id: 'FL-7900aff3', fuelVoyageId: 'FV-VG15-C9', startTime: '4/11/2026 6:00', startPos: 'Đà Nẵng', endTime: '4/12/2026 3:00', endPos: 'Sơn Dương', hours: 21, fuelRate: 110 },
-        { id: 'FL-6d9f74d9', fuelVoyageId: 'FV-VG15-C9', startTime: '4/12/2026 21:30', startPos: 'Sơn Dương', endTime: '4/17/2026 5:30', endPos: 'Cái Cui', hours: 104, fuelRate: 110 },
-        { id: 'FL-3e068033', fuelVoyageId: 'FV-VG15-C10', startTime: '4/22/2026 8:00', startPos: 'Cái Cui', endTime: '4/22/2026 16:25', endPos: 'Vĩnh Xương', hours: 8.4166667, fuelRate: 110 },
-        { id: 'FL-a5e780c7', fuelVoyageId: 'FV-VG15-C10', startTime: '4/25/2026 6:00', startPos: 'Vĩnh Xương', endTime: '4/29/2026 16:00', endPos: 'Đà Nẵng', hours: 106, fuelRate: 110 },
-        { id: 'FL-d12855af', fuelVoyageId: 'FV-VG18-C1', startTime: '12/30/2025 22:00', startPos: 'HCM', endTime: '12/31/2025 18:00', endPos: 'Vĩnh Tân', hours: 20, fuelRate: 150 },
-        { id: 'FL-d6eccdaf', fuelVoyageId: 'FV-VG18-C1', startTime: '10/1/2026 15:20', startPos: 'Vĩnh Tân', endTime: '14/1/2026 7:30', endPos: 'Nghi Sơn', hours: 88.166667, fuelRate: 228 },
-        { id: 'FL-25998d26', fuelVoyageId: 'FV-VG18-C2', startTime: '1/23/2026 13:00', startPos: 'Nghi Sơn', endTime: '1/26/2026 23:45', endPos: 'Neo kỳ vân', hours: 82.75, fuelRate: 204 },
-        { id: 'FL-7bcef4e2', fuelVoyageId: 'FV-VG18-C2', startTime: '1/28/2026 13:15', startPos: 'Neo kỳ vân', endTime: '1/28/2026 22:00', endPos: 'Phao TT8 Hiệp Phước', hours: 8.75, fuelRate: 204 },
-        { id: 'FL-265ffd56', fuelVoyageId: 'FV-VG18-C2', startTime: '1/31/2026 21:50', startPos: 'Phao TT8 Hiệp Phước', endTime: '1/31/2026 23:10', endPos: 'PM2', hours: 1.3333333, fuelRate: 204 },
-        { id: 'FL-4fc2eedd', fuelVoyageId: 'FV-VG18-C3', startTime: '2/3/2026 5:20', startPos: 'PM2', endTime: '2/3/2026 9:00', endPos: 'G1', hours: 3.6666667, fuelRate: 204 },
-        { id: 'FL-3bfacaee', fuelVoyageId: 'FV-VG18-C3', startTime: '2/4/2026 0:10', startPos: 'G1', endTime: '2/4/2026 2:50', endPos: 'SP-PSA', hours: 2.6666667, fuelRate: 221 },
-        { id: 'FL-96490856', fuelVoyageId: 'FV-VG18-C3', startTime: '2/4/2026 17:00', startPos: 'SP-PSA', endTime: '2/5/2026 22:45', endPos: 'HÒn TRà Là', hours: 29.75, fuelRate: 221 },
-        { id: 'FL-3a69c899', fuelVoyageId: 'FV-VG18-C3', startTime: '2/6/2026 13:20', startPos: 'HÒn TRà Là', endTime: '2/6/2026 15:50', endPos: 'Nam Phong Vân', hours: 2.5, fuelRate: 221 },
-        { id: 'FL-4ac4e574', fuelVoyageId: 'FV-VG18-C4', startTime: '2/10/2026 0:50', startPos: 'Nam Phong Vân', endTime: '2/10/2026 1:40', endPos: 'Neo', hours: 0.8333333, fuelRate: 210 },
-        { id: 'FL-925d2b51', fuelVoyageId: 'FV-VG18-C4', startTime: '2/11/2026 11:20', startPos: 'Neo', endTime: '2/13/2026 6:20', endPos: 'Hòn La', hours: 43, fuelRate: 210 },
-        { id: 'FL-efa47383', fuelVoyageId: 'FV-VG18-C4', startTime: '2/27/2026 0:15', startPos: 'Hòn La', endTime: '3/2/2026 14:30', endPos: 'BP10', hours: 86.25, fuelRate: 231 },
-        { id: 'FL-84db80ca', fuelVoyageId: 'FV-VG18-C5', startTime: '3/7/2026 12:30', startPos: 'Sài Gòn', endTime: '3/9/2026 8:30', endPos: 'Xuân Đài', hours: 44, fuelRate: 204 },
-        { id: 'FL-e86e56f3', fuelVoyageId: 'FV-VG18-C5', startTime: '3/11/2026 12:15', startPos: 'Xuân Đài', endTime: '3/13/2026 8:10', endPos: 'Sơn Dương', hours: 43.916667, fuelRate: 204 },
-        { id: 'FL-7b44070b', fuelVoyageId: 'FV-VG18-C5', startTime: '3/15/2026 3:30', startPos: 'Sơn Dương', endTime: '3/18/2026 15:25', endPos: 'SR6', hours: 83.916667, fuelRate: 204 },
-        { id: 'FL-5b5c240d', fuelVoyageId: 'FV-VG18-C6', startTime: '3/21/2026 18:00', startPos: 'SR6', endTime: '3/21/2026 21:00', endPos: 'H20', hours: 3, fuelRate: 204 },
-        { id: 'FL-cc8ed911', fuelVoyageId: 'FV-VG18-C6', startTime: '3/22/2026 12:00', startPos: 'H20', endTime: '3/22/2026 16:00', endPos: 'Gò Dầu', hours: 4, fuelRate: 204 },
-        { id: 'FL-d8488562', fuelVoyageId: 'FV-VG18-C6', startTime: '3/25/2026 16:30', startPos: 'Gò Dầu', endTime: '3/29/2026 23:00', endPos: 'Hải Phòng', hours: 102.5, fuelRate: 204 },
-        { id: 'FL-c287bb25', fuelVoyageId: 'FV-VG18-C7', startTime: '4/3/2026 5:45', startPos: 'Hải Phòng', endTime: '4/3/2026 13:15', endPos: 'HP4', hours: 7.5, fuelRate: 204 },
-        { id: 'FL-09e19a17', fuelVoyageId: 'FV-VG18-C7', startTime: '4/5/2026 11:45', startPos: 'HP4', endTime: '4/6/2026 13:35', endPos: 'Hòn La', hours: 25.833333, fuelRate: 204 },
-        { id: 'FL-e7f57c88', fuelVoyageId: 'FV-VG18-C8', startTime: '4/9/2026 17:10', startPos: 'Hòn La', endTime: '4/9/2026 21:00', endPos: 'Sơn Dương', hours: 3.8333333, fuelRate: 204 },
-        { id: 'FL-96b2d8a3', fuelVoyageId: 'FV-VG18-C8', startTime: '4/11/2026 22:30', startPos: 'Sơn Dương', endTime: '4/15/2026 15:45', endPos: 'Trà Vinh', hours: 89.25, fuelRate: 204 },
-        { id: 'FL-b173bad4', fuelVoyageId: 'FV-VG18-C8', startTime: '4/16/2026 12:30', startPos: 'Trà Vinh', endTime: '4/16/2026 21:25', endPos: 'Cái cui', hours: 8.9166667, fuelRate: 204 },
-        { id: 'FL-efd3c183', fuelVoyageId: 'FV-VG18-C9', startTime: '4/20/2026 12:00', startPos: 'Cái cui', endTime: '4/23/2026 12:15', endPos: 'Sơn Dương', hours: 72.25, fuelRate: 204 },
-        { id: 'FL-1082dc6f', fuelVoyageId: 'FV-VG18-C9', startTime: '4/25/2026 6:00', startPos: 'Sơn Dương', endTime: '4/28/2026 13:20', endPos: 'Phao 0', hours: 79.333333, fuelRate: 204 },
-        { id: 'FL-7ce30f60', fuelVoyageId: 'FV-VG18-C9', startTime: '4/29/2026 11:00', startPos: 'Phao 0', endTime: '4/29/2026 18:45', endPos: 'Cái Cui', hours: 7.75, fuelRate: 204 },
-        { id: 'FL-65d89c9a', fuelVoyageId: 'FV-VG36-C1', startTime: '12/27/2025 13:00', startPos: 'Sơn Dương', endTime: '12/30/2025 14:00', endPos: 'Neo Kỳ Vân', hours: 73, fuelRate: 130 },
-        { id: 'FL-e65f070b', fuelVoyageId: 'FV-VG36-C1', startTime: '1/1/2026 2:00', startPos: 'Neo Kỳ Vân', endTime: '1/1/2026 10:00', endPos: 'Phao nhà bè', hours: 8, fuelRate: 130 },
-        { id: 'FL-fbfccf90', fuelVoyageId: 'FV-VG36-C1', startTime: '1/3/2026 10:30', startPos: 'Phao nhà bè', endTime: '1/4/2026 16:30', endPos: 'Neo Trà Nóc', hours: 30, fuelRate: 117 },
-        { id: 'FL-8247560d', fuelVoyageId: 'FV-VG36-C1', startTime: '1/5/2026 6:00', startPos: 'Neo Trà Nóc', endTime: '1/5/2026 13:30', endPos: 'Neo Vĩnh Xương', hours: 7.5, fuelRate: 117 },
-        { id: 'FL-ccbebb3b', fuelVoyageId: 'FV-VG36-C2', startTime: '1/8/2026 20:00', startPos: 'Vĩnh Xương', endTime: '1/13/2026 8:00', endPos: 'Đà Nẵng', hours: 108, fuelRate: 120 },
-        { id: 'FL-0228de85', fuelVoyageId: 'FV-VG36-C3', startTime: '1/15/2026 7:00', startPos: 'Đà Nẵng', endTime: '1/15/2026 10:40', endPos: 'Neo Chân Mấy', hours: 3.6666667, fuelRate: 100 },
-        { id: 'FL-322086c2', fuelVoyageId: 'FV-VG36-C3', startTime: '1/15/2026 16:30', startPos: 'Neo Chân Mấy', endTime: '1/16/2026 7:30', endPos: 'Hòn La', hours: 15, fuelRate: 100 },
-        { id: 'FL-25230561', fuelVoyageId: 'FV-VG36-C3', startTime: '1/19/2026 19:00', startPos: 'Hòn La', endTime: '1/23/2026 8:30', endPos: 'CầnThơ', hours: 85.5, fuelRate: 132 },
-        { id: 'FL-c340f5b9', fuelVoyageId: 'FV-VG36-C4', startTime: '1/25/2026 6:00', startPos: 'Cần Thơ', endTime: '1/25/2026 11:00', endPos: 'Phao Mỹ Thới', hours: 5, fuelRate: 110 },
-        { id: 'FL-7b1c1c3f', fuelVoyageId: 'FV-VG36-C4', startTime: '1/31/2026 6:00', startPos: 'Phao Mỹ Thới', endTime: '2/4/2026 23:50', endPos: 'Cửa Lò', hours: 113.83333, fuelRate: 135 },
-        { id: 'FL-25fa8c97', fuelVoyageId: 'FV-VG36-C5', startTime: '2/6/2026 20:00', startPos: 'Cửa Lò', endTime: '2/7/2026 14:00', endPos: 'Sơn Dường', hours: 18, fuelRate: 110 },
-        { id: 'FL-1b1c901e', fuelVoyageId: 'FV-VG36-C5', startTime: '2/9/2026 16:40', startPos: 'Sơn Dương', endTime: '2/13/2026 8:30', endPos: 'Phao 0 Định An', hours: 87.833333, fuelRate: 125 },
-        { id: 'FL-a9745795', fuelVoyageId: 'FV-VG36-C6', startTime: '2/22/2026 6:00', startPos: 'Phao 0 Định An', endTime: '2/22/2026 14:00', endPos: 'Vĩnh Xương', hours: 8, fuelRate: 110 },
-        { id: 'FL-343b4927', fuelVoyageId: 'FV-VG36-C6', startTime: '2/25/2026 8:00', startPos: 'Vĩnh Xương', endTime: '2/25/2026 16:30', endPos: 'Trà Nóc', hours: 8.5, fuelRate: 130 },
-        { id: 'FL-08d8ca39', fuelVoyageId: 'FV-VG36-C6', startTime: '2/26/2026 6:00', startPos: 'Trà Nóc', endTime: '3/3/2026 5:00', endPos: 'Vật Cách', hours: 119, fuelRate: 130 },
-        { id: 'FL-4bb16a2c', fuelVoyageId: 'FV-VG36-C7', startTime: '3/5/2026 5:00', startPos: 'Vật Cách', endTime: '3/6/2026 6:30', endPos: 'Hòn La', hours: 25.5, fuelRate: 115 },
-        { id: 'FL-35e6d557', fuelVoyageId: 'FV-VG36-C7', startTime: '3/11/2026 9:00', startPos: 'Hòn La', endTime: '3/14/2026 13:00', endPos: 'Nhà bè', hours: 76, fuelRate: 130 },
-        { id: 'FL-2a9a3b57', fuelVoyageId: 'FV-VG36-C7', startTime: '3/19/2026 5:30', startPos: 'Nhà bè', endTime: '3/19/2026 8:00', endPos: 'XM Thành Công', hours: 2.5, fuelRate: 130 },
-        { id: 'FL-4a10b2ad', fuelVoyageId: 'FV-VG36-C8', startTime: '3/24/2026 9:00', startPos: 'XM Thành Công', endTime: '3/24/2026 18:00', endPos: 'Bông tông', hours: 9, fuelRate: 115 },
-        { id: 'FL-ee0bb919', fuelVoyageId: 'FV-VG36-C8', startTime: 'Bông tông', startPos: 'Bông tông', endTime: '3/28/2026 8:00', endPos: 'Đà Nẵng', hours: 63, fuelRate: 130 },
-        { id: 'FL-fafc4c0c', fuelVoyageId: 'FV-VG36-C9', startTime: '3/30/2026 10:35', startPos: 'Đà Nẵng', endTime: '3/31/2026 18:00', endPos: 'Sơn Dường', hours: 31.416667, fuelRate: 115 },
-        { id: 'FL-a79b0d67', fuelVoyageId: 'FV-VG36-C9', startTime: '4/1/2026 18:00', startPos: 'Sơn Dương', endTime: '4/5/2026 11:00', endPos: 'Vũng Tàu', hours: 89, fuelRate: 140 },
-        { id: 'FL-5b306e7c', fuelVoyageId: 'FV-VG36-C9', startTime: '4/6/2026 10:00', startPos: 'Vũng Tàu', endTime: '4/6/2026 15:00', endPos: 'Cảng Hạ Long', hours: 5, fuelRate: 140 },
-        { id: 'FL-58338d08', fuelVoyageId: 'FV-VG36-C10', startTime: '4/8/2026 9:00', startPos: 'Cảng Hạ Long', endTime: '4/8/2026 20:00', endPos: 'Phao 0 Định An', hours: 11, fuelRate: 100 },
-        { id: 'FL-0915ff29', fuelVoyageId: 'FV-VG36-C10', startTime: '4/9/2026 2:00', startPos: 'Phao 0 Định An', endTime: '4/9/2026 8:00', endPos: 'Hậu giang', hours: 6, fuelRate: 100 },
-        { id: 'FL-5c6604bc', fuelVoyageId: 'FV-VG36-C10', startTime: '4/11/2026 6:40', startPos: 'Hậu giang', endTime: '4/12/2026 5:00', endPos: 'Cảng Vĩnh Hưng', hours: 22.333333, fuelRate: 100 },
-        { id: 'FL-1bda6e8e', fuelVoyageId: 'FV-VG36-C10', startTime: '4/14/2026 0:30', startPos: 'Cảng Vĩnh Hưng', endTime: '4/16/2026 7:30', endPos: 'Đà Nẵng', hours: 55, fuelRate: 100 },
-        { id: 'FL-f5d7ac26', fuelVoyageId: 'FV-VG36-C11', startTime: '4/24/2026 6:00', startPos: 'Đà Nẵng', endTime: '4/24/2026 9:30', endPos: 'Chân Mây', hours: 3.5, fuelRate: 100 },
-        { id: 'FL-7bfaa59a', fuelVoyageId: 'FV-VG36-C11', startTime: '4/26/2026 9:00', startPos: 'Chân Mây', endTime: '5/1/2026 9:30', endPos: 'Hậu giang', hours: 120.5, fuelRate: 100 },
-        { id: 'FL-52a849b6', fuelVoyageId: 'FV-VG05-C11', startTime: '4/15/2026 21:30', startPos: 'Đà Nẵng', endTime: '4/16/2026 1:15', endPos: 'Chân Mây', hours: 3.75, fuelRate: 95 },
-        { id: 'FL-2b6a42d0', fuelVoyageId: 'FV-VG05-C11', startTime: '4/18/2026 9:00', startPos: 'Chân Mây', endTime: '4/21/2026 15:45', endPos: 'Cái Cui', hours: 78.75, fuelRate: 95 },
-        { id: 'FL-c4375e1a', fuelVoyageId: 'FV-VG05-C12', startTime: '4/25/2026 6:00', startPos: 'Cái Cui', endTime: '4/25/2026 16:00', endPos: 'Vĩnh Xương', hours: 10, fuelRate: 95 },
-        { id: 'FL-14e225dc', fuelVoyageId: 'FV-VG05-C12', startTime: ' ', startPos: 'Vĩnh Xương', endTime: ' ', endPos: '', hours: 0, fuelRate: 95 },
-        { id: 'FL-b40288e5', fuelVoyageId: 'FV-VG09-C1', startTime: '1/8/2026 9:00', startPos: 'Vĩnh Xương', endTime: '1/13/2026 19:30', endPos: 'Đà Nẵng', hours: 130.5, fuelRate: 105 },
-        { id: 'FL-43aea051', fuelVoyageId: 'FV-VG09-C2', startTime: '1/18/2026 7:00', startPos: 'Đà Nẵng', endTime: '1/19/2026 6:00', endPos: 'Sơn Dương', hours: 23, fuelRate: 100 },
-        { id: 'FL-adb89bed', fuelVoyageId: 'FV-VG09-C2', startTime: '1/20/2026 6:45', startPos: 'Sơn Dương', endTime: '1/23/2026 22:30', endPos: 'Neo Kỳ Vân', hours: 87.75, fuelRate: 110 },
-        { id: 'FL-a14a3119', fuelVoyageId: 'FV-VG09-C2', startTime: '1/24/2026 10:45', startPos: 'Neo Kỳ Vân', endTime: '1/24/2026 18:30', endPos: 'Cảng NMXM', hours: 7.75, fuelRate: 105 },
-        { id: 'FL-82db0626', fuelVoyageId: 'FV-VG09-C3', startTime: '1/26/2026 20:00', startPos: 'Cảng NMXM', endTime: '1/27/2026 21:00', endPos: 'Neo phao', hours: 25, fuelRate: 100 },
-        { id: 'FL-804bdcb3', fuelVoyageId: 'FV-VG09-C3', startTime: '1/29/2026 8:00', startPos: 'Neo phao', endTime: '1/29/2026 9:20', endPos: 'Vĩnh Tân', hours: 1.3333333, fuelRate: 100 },
-        { id: 'FL-1b8bba4f', fuelVoyageId: 'FV-VG09-C3', startTime: '1/31/2026 17:30', startPos: 'Vĩnh Tân', endTime: '2/5/2026 7:30', endPos: 'Nghi Sơn', hours: 110, fuelRate: 110 },
-        { id: 'FL-04924841', fuelVoyageId: 'FV-VG09-C4', startTime: '2/10/2026 15:00', startPos: 'Nghi Sơn', endTime: '2/11/2026 3:30', endPos: 'Sơn Dương', hours: 12.5, fuelRate: 110 },
-        { id: 'FL-3bd5efb0', fuelVoyageId: 'FV-VG09-C4', startTime: '2/22/2026 13:00', startPos: 'Sơn Dương', endTime: '2/27/2026 18:00', endPos: 'Định An', hours: 125, fuelRate: 110 },
-        { id: 'FL-4ddbd2f7', fuelVoyageId: 'FV-VG09-C5', startTime: '3/3/2026 6:00', startPos: 'Định An', endTime: '3/3/2026 17:00', endPos: 'Vĩnh Xương', hours: 11, fuelRate: 100 },
-        { id: 'FL-e2844040', fuelVoyageId: 'FV-VG09-C5', startTime: '3/4/2026 10:45', startPos: 'Vĩnh Xương', endTime: '3/4/2026 12:15', endPos: 'Cập cần', hours: 1.5, fuelRate: 105 },
-        { id: 'FL-133897c9', fuelVoyageId: 'FV-VG09-C5', startTime: '3/7/2026 7:00', startPos: 'Cần', endTime: '3/7/2026 19:00', endPos: 'Neo', hours: 12, fuelRate: 105 },
-        { id: 'FL-e2e0bd54', fuelVoyageId: 'FV-VG09-C5', startTime: '3/8/2026 2:00', startPos: 'Neo', endTime: '3/11/2026 5:40', endPos: 'Xuân Đài', hours: 75.666667, fuelRate: 105 },
-        { id: 'FL-8503c8aa', fuelVoyageId: 'FV-VG09-C5', startTime: '3/11/2026 10:00', startPos: 'Xuân Đài', endTime: '3/13/2026 7:00', endPos: 'Cảng Tiên Sa', hours: 45, fuelRate: 110 },
-        { id: 'FL-ccc0f16b', fuelVoyageId: 'FV-VG09-C6', startTime: '3/15/2026 10:45', startPos: 'Cảng Tiên Sa', endTime: '3/16/2026 9:30', endPos: 'Sơn Dương', hours: 22.75, fuelRate: 95 },
-        { id: 'FL-2a857a70', fuelVoyageId: 'FV-VG09-C6', startTime: '3/17/2026 8:00', startPos: 'Sơn Dương', endTime: '3/21/2026 9:30', endPos: 'Phao 0 Định An', hours: 97.5, fuelRate: 110 },
-        { id: 'FL-c4f8b624', fuelVoyageId: 'FV-VG09-C6', startTime: '3/21/2026 13:10', startPos: 'Phao 0 ĐỊnh An', endTime: '3/21/2026 17:30', endPos: 'Neo', hours: 4.3333333, fuelRate: 110 },
-        { id: 'FL-938c2419', fuelVoyageId: 'FV-VG09-C6', startTime: '3/22/2026 5:00', startPos: 'Neo', endTime: '3/22/2026 10:45', endPos: 'NMXM Tây ĐÔ', hours: 5.75, fuelRate: 110 },
-        { id: 'FL-93594e7d', fuelVoyageId: 'FV-VG09-C7', startTime: '3/26/2026 5:45', startPos: 'NMXM Tây ĐÔ', endTime: '3/26/2026 15:15', endPos: 'Neo Thường Phước', hours: 9.5, fuelRate: 110 },
-        { id: 'FL-eca498a0', fuelVoyageId: 'FV-VG09-C7', startTime: '3/30/2026 7:00', startPos: 'Neo Thường Phước', endTime: '4/3/2026 4:00', endPos: 'Đà Nẵng', hours: 93, fuelRate: 110 },
-        { id: 'FL-8096bf6a', fuelVoyageId: 'FV-VG09-C8', startTime: '4/5/2026 9:20', startPos: 'Đà Nẵng', endTime: '4/6/2026 8:00', endPos: 'Sơn Dương', hours: 22.666667, fuelRate: 100 },
-        { id: 'FL-c82ae8b0', fuelVoyageId: 'FV-VG09-C8', startTime: '4/7/2026 10:10', startPos: 'Sơn Dương', endTime: '4/12/2026 16:00', endPos: 'NMXM Tây ĐÔ', hours: 125.83333, fuelRate: 110 },
-        { id: 'FL-beea8ca3', fuelVoyageId: 'FV-VG09-C9', startTime: '4/19/2026 6:30', startPos: 'NMXM Tây ĐÔ', endTime: '4/19/2026 14:50', endPos: 'Vĩnh Xương', hours: 8.3333333, fuelRate: 110 },
-        { id: 'FL-3134893f', fuelVoyageId: 'FV-VG09-C9', startTime: '4/26/2026 6:00', startPos: 'Vĩnh Xương', endTime: '4/26/2026 17:00', endPos: 'Cái Cui', hours: 11, fuelRate: 110 },
-        { id: 'FL-633327f9', fuelVoyageId: 'FV-VG09-C9', startTime: '4/27/2026 6:00', startPos: 'Cái Cui', endTime: ' ', endPos: '', hours: 0, fuelRate: 110 }
-    ],
-    monthlyCosts: [
-        // { month: '2026-05', salary: 0, insurance: 0, food: 0, materialCompany: 0, materialVessel: 0, other: 0 }
-    ],
-    vesselExpenses: [
-        { id: 'VE-001', date: '2026-04-03', vesselId: 'VG18', voyageNo: 'C9', category: 'Vật tư & CP khác', amount: 1500000, content: 'Mua vật tư chổi, chổi quét, sơn tàu chi' },
-        { id: 'VE-002', date: '2026-04-05', vesselId: 'VG18', voyageNo: 'C9', category: 'Tiền ăn & bồi dưỡng TV', amount: 8000000, content: 'Tiền ăn cả tháng và bồi dưỡng thêm thuyền viên' },
-        { id: 'VE-003', date: '2026-04-08', vesselId: 'VG18', voyageNo: 'C9', category: 'Chi phí tại các đầu cảng', amount: 3000000, content: 'Bồi dưỡng trực tiếp công nhân cẩu chuyến C9' },
-        { id: 'VE-004', date: '2026-04-10', vesselId: 'VG18', voyageNo: 'C9', category: 'Chi phí tại các đầu cảng', amount: 2500000, content: 'Chi phí biên phòng đầu cảng chuyến C9' },
-        { id: 'VE-005', date: '2026-04-12', vesselId: 'VG18', voyageNo: 'C9', category: 'Tiền Bồi dưỡng', amount: 5000000, content: 'Tiền Bông chuyến C9 bồi dưỡng đối tác' },
-        { id: 'VE-006', date: '2026-04-15', vesselId: 'VG18', voyageNo: 'C9', category: 'Vật tư & CP khác', amount: 1000000, content: 'Mua dầu bóng và vật tư phụ' }
-    ],
-        shipments: [
+    "shipments": [
         {
-            id: 'S-VG05-C1',
-            contractNo: 'HD02',
-            voyageNo: 'C1',
-            dateStart: '2025-12-27',
-            dateEnd: '2026-01-02',
-            vesselId: 'VG05',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 3922.05,
-            rate: 125000,
-            markup: 13000,
-            fuelPrice: 20000,
-            revenueReal: 490256250,
-            revenueInvoice: 541242900,
-            refundAmount: 37767889,
-            costs: {
-                agent: 9531480,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 299956800,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 13303752,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C1",
+            "contractNo": "HD02",
+            "voyageNo": "C1",
+            "dateStart": "2025-12-27",
+            "dateEnd": "2026-01-02",
+            "vesselId": "VG05",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 3922.05,
+            "rate": 125000,
+            "markup": 13000,
+            "fuelPrice": 20000,
+            "revenueReal": 490256250,
+            "revenueInvoice": 541242900,
+            "refundAmount": 37767889,
+            "costs": {
+                "agent": 9531480,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 299956800,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 13303752,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C2',
-            contractNo: 'HD04',
-            voyageNo: 'C2',
-            dateStart: '2026-01-03',
-            dateEnd: '2026-01-13',
-            vesselId: 'VG05',
-            customer: 'B\u00ecnh Minh',
-            cargo: 'Clinker',
-            portLoad: 'Chân Mây',
-            portDischarge: 'Hậu Giang',
-            qty: 3987.95,
-            rate: 160000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 638072000,
-            revenueInvoice: 638072000,
-            refundAmount: 0,
-            costs: {
-                agent: 51479227,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 137195125,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 37326248,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C2",
+            "contractNo": "HD04",
+            "voyageNo": "C2",
+            "dateStart": "2026-01-03",
+            "dateEnd": "2026-01-13",
+            "vesselId": "VG05",
+            "customer": "Bình Minh",
+            "cargo": "Clinker",
+            "portLoad": "Chân Mây",
+            "portDischarge": "Hậu Giang",
+            "qty": 3987.95,
+            "rate": 160000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 638072000,
+            "revenueInvoice": 638072000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 51479227,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 137195125,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 37326248,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C3',
-            contractNo: 'HD11',
-            voyageNo: 'C3',
-            dateStart: '2026-01-14',
-            dateEnd: '2026-01-24',
-            vesselId: 'VG05',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 3975.02,
-            rate: 120000,
-            markup: 4824,
-            fuelPrice: 20000,
-            revenueReal: 477002400,
-            revenueInvoice: 496177896.48,
-            refundAmount: 14204071,
-            costs: {
-                agent: 9122710,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 92749799,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 30419252,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C3",
+            "contractNo": "HD11",
+            "voyageNo": "C3",
+            "dateStart": "2026-01-14",
+            "dateEnd": "2026-01-24",
+            "vesselId": "VG05",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 3975.02,
+            "rate": 120000,
+            "markup": 4824,
+            "fuelPrice": 20000,
+            "revenueReal": 477002400,
+            "revenueInvoice": 496177896.48,
+            "refundAmount": 14204071,
+            "costs": {
+                "agent": 9122710,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 92749799,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 30419252,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C4',
-            contractNo: 'HD14',
-            voyageNo: 'C4',
-            dateStart: '2026-01-25',
-            dateEnd: '2026-02-01',
-            vesselId: 'VG05',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Cần Thơ',
-            qty: 4008,
-            rate: 223000,
-            markup: 8000,
-            fuelPrice: 20000,
-            revenueReal: 893784000,
-            revenueInvoice: 925848000,
-            refundAmount: 23751111,
-            costs: {
-                agent: 21134056,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 5049000,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 73562940,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C4",
+            "contractNo": "HD14",
+            "voyageNo": "C4",
+            "dateStart": "2026-01-25",
+            "dateEnd": "2026-02-01",
+            "vesselId": "VG05",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Cần Thơ",
+            "qty": 4008,
+            "rate": 223000,
+            "markup": 8000,
+            "fuelPrice": 20000,
+            "revenueReal": 893784000,
+            "revenueInvoice": 925848000,
+            "refundAmount": 23751111,
+            "costs": {
+                "agent": 21134056,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 5049000,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 73562940,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C5',
-            contractNo: 'HD20',
-            voyageNo: 'C5',
-            dateStart: '2026-02-02',
-            dateEnd: '2026-02-13',
-            vesselId: 'VG05',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Cần Thơ',
-            portDischarge: 'Đà Nẵng',
-            qty: 3960.99,
-            rate: 120000,
-            markup: 15000,
-            fuelPrice: 20000,
-            revenueReal: 475318800,
-            revenueInvoice: 534733650,
-            refundAmount: 44011000,
-            costs: {
-                agent: 18705998,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 258022051,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 16976487,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C5",
+            "contractNo": "HD20",
+            "voyageNo": "C5",
+            "dateStart": "2026-02-02",
+            "dateEnd": "2026-02-13",
+            "vesselId": "VG05",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Cần Thơ",
+            "portDischarge": "Đà Nẵng",
+            "qty": 3960.99,
+            "rate": 120000,
+            "markup": 15000,
+            "fuelPrice": 20000,
+            "revenueReal": 475318800,
+            "revenueInvoice": 534733650,
+            "refundAmount": 44011000,
+            "costs": {
+                "agent": 18705998,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 258022051,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 16976487,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C6',
-            contractNo: 'HD25',
-            voyageNo: 'C6',
-            dateStart: '2026-02-14',
-            dateEnd: '2026-03-06',
-            vesselId: 'VG05',
-            customer: 'Th\u00e1i B\u00ecnh D\u01b0\u01a1ng',
-            cargo: 'Cliker',
-            portLoad: 'Hòn La',
-            portDischarge: 'Cần Thơ',
-            qty: 3999.6,
-            rate: 200000,
-            markup: 17000,
-            fuelPrice: 20000,
-            revenueReal: 799920000,
-            revenueInvoice: 867913200,
-            refundAmount: 50365333,
-            costs: {
-                agent: 11331240,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 167094481,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 52723608,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C6",
+            "contractNo": "HD25",
+            "voyageNo": "C6",
+            "dateStart": "2026-02-14",
+            "dateEnd": "2026-03-06",
+            "vesselId": "VG05",
+            "customer": "Thái Bình Dương",
+            "cargo": "Cliker",
+            "portLoad": "Hòn La",
+            "portDischarge": "Cần Thơ",
+            "qty": 3999.6,
+            "rate": 200000,
+            "markup": 17000,
+            "fuelPrice": 20000,
+            "revenueReal": 799920000,
+            "revenueInvoice": 867913200,
+            "refundAmount": 39107200,
+            "costs": {
+                "agent": 11331240,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 167094481,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 52723608,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C7',
-            contractNo: 'HD33',
-            voyageNo: 'C7',
-            dateStart: '2026-03-07',
-            dateEnd: '2026-03-23',
-            vesselId: 'VG05',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Quặng',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Hải Phòng',
-            qty: 3998.61,
-            rate: 151000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 603790110,
-            revenueInvoice: 603790110,
-            refundAmount: 0,
-            costs: {
-                agent: 51316155,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 502011033,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: -1897894,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C7",
+            "contractNo": "HD33",
+            "voyageNo": "C7",
+            "dateStart": "2026-03-07",
+            "dateEnd": "2026-03-23",
+            "vesselId": "VG05",
+            "customer": "Ngọc Anh",
+            "cargo": "Quặng",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Hải Phòng",
+            "qty": 3998.61,
+            "rate": 151000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 603790110,
+            "revenueInvoice": 603790110,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 51316155,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 502011033,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": -1897894,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C8',
-            contractNo: 'HD31',
-            voyageNo: 'C8',
-            dateStart: '2026-03-24',
-            dateEnd: '2026-03-29',
-            vesselId: 'VG05',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Than',
-            portLoad: 'Quảng Ninh',
-            portDischarge: 'Nghi Sơn',
-            qty: 3849.62,
-            rate: 90000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 346465800,
-            revenueInvoice: 346465800,
-            refundAmount: 0,
-            costs: {
-                agent: 7000000,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 38442666,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 23872997,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C8",
+            "contractNo": "HD31",
+            "voyageNo": "C8",
+            "dateStart": "2026-03-24",
+            "dateEnd": "2026-03-29",
+            "vesselId": "VG05",
+            "customer": "Ngọc Anh",
+            "cargo": "Than",
+            "portLoad": "Quảng Ninh",
+            "portDischarge": "Nghi Sơn",
+            "qty": 3849.62,
+            "rate": 90000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 346465800,
+            "revenueInvoice": 346465800,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 7000000,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 38442666,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 23872997,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C9',
-            contractNo: 'HD37',
-            voyageNo: 'C9',
-            dateStart: '2026-03-30',
-            dateEnd: '2026-04-06',
-            vesselId: 'VG05',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Cần Thơ',
-            qty: 3997,
-            rate: 253000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1011241000,
-            revenueInvoice: 1011241000,
-            refundAmount: 0,
-            costs: {
-                agent: 8331267,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 35685649,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 77330715,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C9",
+            "contractNo": "HD37",
+            "voyageNo": "C9",
+            "dateStart": "2026-03-30",
+            "dateEnd": "2026-04-06",
+            "vesselId": "VG05",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Cần Thơ",
+            "qty": 3997,
+            "rate": 253000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1011241000,
+            "revenueInvoice": 1011241000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 8331267,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 35685649,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 77330715,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C10',
-            contractNo: 'HD41',
-            voyageNo: 'C10',
-            dateStart: '2026-04-07',
-            dateEnd: '2026-04-15',
-            vesselId: 'VG05',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 3981.43,
-            rate: 155000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 617121650,
-            revenueInvoice: 617121650,
-            refundAmount: 0,
-            costs: {
-                agent: 7000000,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 152061434,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 34163589,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C10",
+            "contractNo": "HD41",
+            "voyageNo": "C10",
+            "dateStart": "2026-04-07",
+            "dateEnd": "2026-04-15",
+            "vesselId": "VG05",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 3981.43,
+            "rate": 155000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 617121650,
+            "revenueInvoice": 617121650,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 7000000,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 152061434,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 34163589,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C11',
-            contractNo: 'HD45',
-            voyageNo: 'C11',
-            dateStart: '2026-04-16',
-            dateEnd: '2026-04-24',
-            vesselId: 'VG05',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Clinker',
-            portLoad: 'Chân Mây',
-            portDischarge: 'Hậu Giang',
-            qty: 4008.27,
-            rate: 210000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 841736700,
-            revenueInvoice: 841736700,
-            refundAmount: 0,
-            costs: {
-                agent: 0,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 31245500,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 64214386,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C11",
+            "contractNo": "HD45",
+            "voyageNo": "C11",
+            "dateStart": "2026-04-16",
+            "dateEnd": "2026-04-24",
+            "vesselId": "VG05",
+            "customer": "Ngọc Anh",
+            "cargo": "Clinker",
+            "portLoad": "Chân Mây",
+            "portDischarge": "Hậu Giang",
+            "qty": 4008.27,
+            "rate": 210000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 841736700,
+            "revenueInvoice": 841736700,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 0,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 31245500,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 64214386,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG05-C12',
-            contractNo: 'HD51',
-            voyageNo: 'C12',
-            dateStart: '2026-04-25',
-            dateEnd: '2026-05-08',
-            vesselId: 'VG05',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Quặng',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Vật Cách',
-            qty: 3951.44,
-            rate: 160000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 632230400,
-            revenueInvoice: 632230400,
-            refundAmount: 0,
-            costs: {
-                agent: 0,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 407753775,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 9803054,
-                portFees: 0,
-                others: 0
+            "id": "S-VG05-C12",
+            "contractNo": "HD51",
+            "voyageNo": "C12",
+            "dateStart": "2026-04-25",
+            "dateEnd": "2026-05-08",
+            "vesselId": "VG05",
+            "customer": "Ngọc Anh",
+            "cargo": "Quặng",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Vật Cách",
+            "qty": 3951.44,
+            "rate": 160000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 632230400,
+            "revenueInvoice": 632230400,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 0,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 407753775,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 9803054,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C1',
-            contractNo: 'HD06',
-            voyageNo: 'C1',
-            dateStart: '2025-12-30',
-            dateEnd: '2026-01-15',
-            vesselId: 'VG09',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4585.48,
-            rate: 125000,
-            markup: -2706,
-            fuelPrice: 20000,
-            revenueReal: 573185000,
-            revenueInvoice: 560776691.12,
-            refundAmount: 0,
-            costs: {
-                agent: 57146836,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 0,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 0,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C1",
+            "contractNo": "HD06",
+            "voyageNo": "C1",
+            "dateStart": "2025-12-30",
+            "dateEnd": "2026-01-15",
+            "vesselId": "VG09",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4585.48,
+            "rate": 125000,
+            "markup": -2706,
+            "fuelPrice": 20000,
+            "revenueReal": 573185000,
+            "revenueInvoice": 560776691.12,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 57146836,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 0,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 0,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C2',
-            contractNo: 'HD10',
-            voyageNo: 'C2',
-            dateStart: '2026-01-16',
-            dateEnd: '2026-01-24',
-            vesselId: 'VG09',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'HCM',
-            qty: 4695.28,
-            rate: 180000,
-            markup: 10000,
-            fuelPrice: 20000,
-            revenueReal: 845150400,
-            revenueInvoice: 892103200,
-            refundAmount: 34779852,
-            costs: {
-                agent: 76803260,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 203148000,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 51053456,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C2",
+            "contractNo": "HD10",
+            "voyageNo": "C2",
+            "dateStart": "2026-01-16",
+            "dateEnd": "2026-01-24",
+            "vesselId": "VG09",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "HCM",
+            "qty": 4695.28,
+            "rate": 180000,
+            "markup": 10000,
+            "fuelPrice": 20000,
+            "revenueReal": 845150400,
+            "revenueInvoice": 892103200,
+            "refundAmount": 34779852,
+            "costs": {
+                "agent": 76803260,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 203148000,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 51053456,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C3',
-            contractNo: 'HD17',
-            voyageNo: 'C3',
-            dateStart: '2026-01-25',
-            dateEnd: '2026-02-05',
-            vesselId: 'VG09',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Tro ẩm',
-            portLoad: 'Vĩnh Tân',
-            portDischarge: 'Nghi Sơn',
-            qty: 4576.5,
-            rate: 95000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 434767500,
-            revenueInvoice: 434767500,
-            refundAmount: 0,
-            costs: {
-                agent: 43024312,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 340560000,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 725400,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C3",
+            "contractNo": "HD17",
+            "voyageNo": "C3",
+            "dateStart": "2026-01-25",
+            "dateEnd": "2026-02-05",
+            "vesselId": "VG09",
+            "customer": "Ngọc Anh",
+            "cargo": "Tro ẩm",
+            "portLoad": "Vĩnh Tân",
+            "portDischarge": "Nghi Sơn",
+            "qty": 4576.5,
+            "rate": 95000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 434767500,
+            "revenueInvoice": 434767500,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 43024312,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 340560000,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 725400,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C4',
-            contractNo: 'HD21',
-            voyageNo: 'C4',
-            dateStart: '2026-02-06',
-            dateEnd: '2026-02-27',
-            vesselId: 'VG09',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 4745,
-            rate: 193000,
-            markup: 10000,
-            fuelPrice: 20000,
-            revenueReal: 915785000,
-            revenueInvoice: 963235000,
-            refundAmount: 35148148,
-            costs: {
-                agent: 80517025,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 249562500,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 52102550,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C4",
+            "contractNo": "HD21",
+            "voyageNo": "C4",
+            "dateStart": "2026-02-06",
+            "dateEnd": "2026-02-27",
+            "vesselId": "VG09",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 4745,
+            "rate": 193000,
+            "markup": 10000,
+            "fuelPrice": 20000,
+            "revenueReal": 915785000,
+            "revenueInvoice": 963235000,
+            "refundAmount": 35148148,
+            "costs": {
+                "agent": 80517025,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 249562500,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 52102550,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C5',
-            contractNo: 'HD26',
-            voyageNo: 'C5',
-            dateStart: '2026-02-28',
-            dateEnd: '2026-03-15',
-            vesselId: 'VG09',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4604.89,
-            rate: 120000,
-            markup: 20000,
-            fuelPrice: 20000,
-            revenueReal: 552586800,
-            revenueInvoice: 644684600,
-            refundAmount: 68220593,
-            costs: {
-                agent: 56025556,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 328098601,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 18764908,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C5",
+            "contractNo": "HD26",
+            "voyageNo": "C5",
+            "dateStart": "2026-02-28",
+            "dateEnd": "2026-03-15",
+            "vesselId": "VG09",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4604.89,
+            "rate": 120000,
+            "markup": 20000,
+            "fuelPrice": 20000,
+            "revenueReal": 552586800,
+            "revenueInvoice": 644684600,
+            "refundAmount": 68220593,
+            "costs": {
+                "agent": 56025556,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 328098601,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 18764908,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C6',
-            contractNo: 'HD29',
-            voyageNo: 'C6',
-            dateStart: '2026-03-16',
-            dateEnd: '2026-03-26',
-            vesselId: 'VG09',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'XM Tây Đô',
-            qty: 4740,
-            rate: 210000,
-            markup: 30000,
-            fuelPrice: 20000,
-            revenueReal: 995400000,
-            revenueInvoice: 1137600000,
-            refundAmount: 105333333,
-            costs: {
-                agent: 64825931,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 42637100,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 86744290,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C6",
+            "contractNo": "HD29",
+            "voyageNo": "C6",
+            "dateStart": "2026-03-16",
+            "dateEnd": "2026-03-26",
+            "vesselId": "VG09",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "XM Tây Đô",
+            "qty": 4740,
+            "rate": 210000,
+            "markup": 30000,
+            "fuelPrice": 20000,
+            "revenueReal": 995400000,
+            "revenueInvoice": 1137600000,
+            "refundAmount": 105333333,
+            "costs": {
+                "agent": 64825931,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 42637100,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 86744290,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C7',
-            contractNo: 'HD36',
-            voyageNo: 'C7',
-            dateStart: '2026-03-27',
-            dateEnd: '2026-04-04',
-            vesselId: 'VG09',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4589.19,
-            rate: 150000,
-            markup: 20000,
-            fuelPrice: 20000,
-            revenueReal: 688378500,
-            revenueInvoice: 780162300,
-            refundAmount: 67988000,
-            costs: {
-                agent: 56448916,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 77193601,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 54693624,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C7",
+            "contractNo": "HD36",
+            "voyageNo": "C7",
+            "dateStart": "2026-03-27",
+            "dateEnd": "2026-04-04",
+            "vesselId": "VG09",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4589.19,
+            "rate": 150000,
+            "markup": 20000,
+            "fuelPrice": 20000,
+            "revenueReal": 688378500,
+            "revenueInvoice": 780162300,
+            "refundAmount": 67988000,
+            "costs": {
+                "agent": 56448916,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 77193601,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 54693624,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C8',
-            contractNo: 'HD42',
-            voyageNo: 'C8',
-            dateStart: '2026-04-05',
-            dateEnd: '2026-04-18',
-            vesselId: 'VG09',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 4589.19,
-            rate: 150000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 688378500,
-            revenueInvoice: 688378500,
-            refundAmount: 0,
-            costs: {
-                agent: 57352367,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 37514583,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 51318822,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C8",
+            "contractNo": "HD42",
+            "voyageNo": "C8",
+            "dateStart": "2026-04-05",
+            "dateEnd": "2026-04-18",
+            "vesselId": "VG09",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 4589.19,
+            "rate": 150000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 688378500,
+            "revenueInvoice": 688378500,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 57352367,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 37514583,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 51318822,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG09-C9',
-            contractNo: 'HD50',
-            voyageNo: 'C9',
-            dateStart: '2026-04-19',
-            dateEnd: '2026-05-06',
-            vesselId: 'VG09',
-            customer: 'B\u00ecnh Minh',
-            cargo: 'Cát',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Huy Văn',
-            qty: 1,
-            rate: 818640000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 818640000,
-            revenueInvoice: 818640000,
-            refundAmount: 0,
-            costs: {
-                agent: 50353338,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 0,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 65491200,
-                portFees: 0,
-                others: 0
+            "id": "S-VG09-C9",
+            "contractNo": "HD50",
+            "voyageNo": "C9",
+            "dateStart": "2026-04-19",
+            "dateEnd": "2026-05-06",
+            "vesselId": "VG09",
+            "customer": "Bình Minh",
+            "cargo": "Cát",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Huy Văn",
+            "qty": 1,
+            "rate": 818640000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 818640000,
+            "revenueInvoice": 818640000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 50353338,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 0,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 65491200,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C1',
-            contractNo: 'HD03',
-            voyageNo: 'C1',
-            dateStart: '2025-12-31',
-            dateEnd: '2026-01-06',
-            vesselId: 'VG15',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 4814,
-            rate: 183000,
-            markup: 10000,
-            fuelPrice: 20000,
-            revenueReal: 880962000,
-            revenueInvoice: 929102000,
-            refundAmount: 35659259,
-            costs: {
-                agent: 80111428,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 23331367,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 71995023,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C1",
+            "contractNo": "HD03",
+            "voyageNo": "C1",
+            "dateStart": "2025-12-31",
+            "dateEnd": "2026-01-06",
+            "vesselId": "VG15",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 4814,
+            "rate": 183000,
+            "markup": 10000,
+            "fuelPrice": 20000,
+            "revenueReal": 880962000,
+            "revenueInvoice": 929102000,
+            "refundAmount": 35659259,
+            "costs": {
+                "agent": 80111428,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 23331367,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 71995023,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C2',
-            contractNo: 'HD08',
-            voyageNo: 'C2',
-            dateStart: '2026-01-07',
-            dateEnd: '2026-01-19',
-            vesselId: 'VG15',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4619.2,
-            rate: 125000,
-            markup: 8585,
-            fuelPrice: 20000,
-            revenueReal: 577400000,
-            revenueInvoice: 617055832,
-            refundAmount: 29374690,
-            costs: {
-                agent: 55058278,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 73845450,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 41979922,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C2",
+            "contractNo": "HD08",
+            "voyageNo": "C2",
+            "dateStart": "2026-01-07",
+            "dateEnd": "2026-01-19",
+            "vesselId": "VG15",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4619.2,
+            "rate": 125000,
+            "markup": 8585,
+            "fuelPrice": 20000,
+            "revenueReal": 577400000,
+            "revenueInvoice": 617055832,
+            "refundAmount": 29374690,
+            "costs": {
+                "agent": 55058278,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 73845450,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 41979922,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C3',
-            contractNo: 'HD12',
-            voyageNo: 'C3',
-            dateStart: '2026-01-20',
-            dateEnd: '2026-02-03',
-            vesselId: 'VG15',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 4810,
-            rate: 193000,
-            markup: 10000,
-            fuelPrice: 20000,
-            revenueReal: 928330000,
-            revenueInvoice: 976430000,
-            refundAmount: 35629630,
-            costs: {
-                agent: 82886836,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 18345600,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 76279840,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C3",
+            "contractNo": "HD12",
+            "voyageNo": "C3",
+            "dateStart": "2026-01-20",
+            "dateEnd": "2026-02-03",
+            "vesselId": "VG15",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 4810,
+            "rate": 193000,
+            "markup": 10000,
+            "fuelPrice": 20000,
+            "revenueReal": 928330000,
+            "revenueInvoice": 976430000,
+            "refundAmount": 35629630,
+            "costs": {
+                "agent": 82886836,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 18345600,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 76279840,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C4',
-            contractNo: 'HD18',
-            voyageNo: 'C4',
-            dateStart: '2026-02-04',
-            dateEnd: '2026-02-23',
-            vesselId: 'VG15',
-            customer: 'Th\u00e1i B\u00ecnh D\u01b0\u01a1ng',
-            cargo: 'Quặng',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Hải Phòng',
-            qty: 4657.7,
-            rate: 145000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 675366500,
-            revenueInvoice: 675366500,
-            refundAmount: 0,
-            costs: {
-                agent: 83766933,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 107837800,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 43245540,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C4",
+            "contractNo": "HD18",
+            "voyageNo": "C4",
+            "dateStart": "2026-02-04",
+            "dateEnd": "2026-02-23",
+            "vesselId": "VG15",
+            "customer": "Bình Minh",
+            "cargo": "Quặng",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Hải Phòng",
+            "qty": 4657.7,
+            "rate": 145000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 675366500,
+            "revenueInvoice": 675366500,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 83766933,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 107837800,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 43245540,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C5',
-            contractNo: 'HD23',
-            voyageNo: 'C5',
-            dateStart: '2026-02-24',
-            dateEnd: '2026-03-07',
-            vesselId: 'VG15',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'HCM',
-            qty: 4796,
-            rate: 193000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 925628000,
-            revenueInvoice: 925628000,
-            refundAmount: 0,
-            costs: {
-                agent: 11979485,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 339923501,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 40057890,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C5",
+            "contractNo": "HD23",
+            "voyageNo": "C5",
+            "dateStart": "2026-02-24",
+            "dateEnd": "2026-03-07",
+            "vesselId": "VG15",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "HCM",
+            "qty": 4796,
+            "rate": 193000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 925628000,
+            "revenueInvoice": 925628000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 11979485,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 339923501,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 40057890,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C6',
-            contractNo: 'HD27',
-            voyageNo: 'C6',
-            dateStart: '2026-03-08',
-            dateEnd: '2026-03-20',
-            vesselId: 'VG15',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4685.9,
-            rate: 120000,
-            markup: 20000,
-            fuelPrice: 20000,
-            revenueReal: 562308000,
-            revenueInvoice: 656026000,
-            refundAmount: 69420741,
-            costs: {
-                agent: 78056498,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 167031375,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 35778942,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C6",
+            "contractNo": "HD27",
+            "voyageNo": "C6",
+            "dateStart": "2026-03-08",
+            "dateEnd": "2026-03-20",
+            "vesselId": "VG15",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4685.9,
+            "rate": 120000,
+            "markup": 20000,
+            "fuelPrice": 20000,
+            "revenueReal": 562308000,
+            "revenueInvoice": 656026000,
+            "refundAmount": 69420741,
+            "costs": {
+                "agent": 78056498,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 167031375,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 35778942,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C7',
-            contractNo: 'HD34',
-            voyageNo: 'C7',
-            dateStart: '2026-03-21',
-            dateEnd: '2026-04-01',
-            vesselId: 'VG15',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Clkiner',
-            portLoad: 'Chân Mây',
-            portDischarge: 'Hậu Giang',
-            qty: 4750.8,
-            rate: 235000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1116438000,
-            revenueInvoice: 1116438000,
-            refundAmount: 0,
-            costs: {
-                agent: 54802633,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 327758726,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 56539167,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C7",
+            "contractNo": "HD34",
+            "voyageNo": "C7",
+            "dateStart": "2026-03-21",
+            "dateEnd": "2026-04-01",
+            "vesselId": "VG15",
+            "customer": "Ngọc Anh",
+            "cargo": "Clkiner",
+            "portLoad": "Chân Mây",
+            "portDischarge": "Hậu Giang",
+            "qty": 4750.8,
+            "rate": 235000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1116438000,
+            "revenueInvoice": 1116438000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 54802633,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 327758726,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 56539167,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C8',
-            contractNo: 'HD40',
-            voyageNo: 'C8',
-            dateStart: '2026-04-02',
-            dateEnd: '2026-04-11',
-            vesselId: 'VG15',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4683.3,
-            rate: 145000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 679078500,
-            revenueInvoice: 679078500,
-            refundAmount: 0,
-            costs: {
-                agent: 37347457,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 326248418,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 21701438,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C8",
+            "contractNo": "HD40",
+            "voyageNo": "C8",
+            "dateStart": "2026-04-02",
+            "dateEnd": "2026-04-11",
+            "vesselId": "VG15",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4683.3,
+            "rate": 145000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 679078500,
+            "revenueInvoice": 679078500,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 37347457,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 326248418,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 21701438,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C9',
-            contractNo: 'HD44',
-            voyageNo: 'C9',
-            dateStart: '2026-04-12',
-            dateEnd: '2026-04-22',
-            vesselId: 'VG15',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 4795,
-            rate: 253000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1213135000,
-            revenueInvoice: 1213135000,
-            refundAmount: 0,
-            costs: {
-                agent: 54487716,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 383125600,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 58738240,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C9",
+            "contractNo": "HD44",
+            "voyageNo": "C9",
+            "dateStart": "2026-04-12",
+            "dateEnd": "2026-04-22",
+            "vesselId": "VG15",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 4795,
+            "rate": 253000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1213135000,
+            "revenueInvoice": 1213135000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 54487716,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 383125600,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 58738240,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG15-C10',
-            contractNo: 'HD49',
-            voyageNo: 'C10',
-            dateStart: '2026-04-23',
-            dateEnd: '2026-05-03',
-            vesselId: 'VG15',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4713.1,
-            rate: 130000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 612703000,
-            revenueInvoice: 612703000,
-            refundAmount: 0,
-            costs: {
-                agent: 75640393,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 390493400,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 9966900,
-                portFees: 0,
-                others: 0
+            "id": "S-VG15-C10",
+            "contractNo": "HD49",
+            "voyageNo": "C10",
+            "dateStart": "2026-04-23",
+            "dateEnd": "2026-05-03",
+            "vesselId": "VG15",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4713.1,
+            "rate": 130000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 612703000,
+            "revenueInvoice": 612703000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 75640393,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 390493400,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 9966900,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C1',
-            contractNo: 'HD01',
-            voyageNo: 'C1',
-            dateStart: '2025-12-27',
-            dateEnd: '2026-01-03',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'HCM',
-            qty: 4769,
-            rate: 173000,
-            markup: 10000,
-            fuelPrice: 20000,
-            revenueReal: 825037000,
-            revenueInvoice: 872727000,
-            refundAmount: 35325926,
-            costs: {
-                agent: 38929631,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 51369825,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 64681178,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C1",
+            "contractNo": "HD01",
+            "voyageNo": "C1",
+            "dateStart": "2025-12-27",
+            "dateEnd": "2026-01-03",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "HCM",
+            "qty": 4769,
+            "rate": 173000,
+            "markup": 10000,
+            "fuelPrice": 20000,
+            "revenueReal": 825037000,
+            "revenueInvoice": 872727000,
+            "refundAmount": 35325926,
+            "costs": {
+                "agent": 38929631,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 51369825,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 64681178,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C2',
-            contractNo: 'HD05',
-            voyageNo: 'C2',
-            dateStart: '2026-01-04',
-            dateEnd: '2026-01-13',
-            vesselId: 'VG36',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4586.89,
-            rate: 130000,
-            markup: 2935,
-            fuelPrice: 20000,
-            revenueReal: 596295700,
-            revenueInvoice: 609758222.15,
-            refundAmount: 9972239,
-            costs: {
-                agent: 68550556,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 11787600,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 47601898,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C2",
+            "contractNo": "HD05",
+            "voyageNo": "C2",
+            "dateStart": "2026-01-04",
+            "dateEnd": "2026-01-13",
+            "vesselId": "VG36",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4586.89,
+            "rate": 130000,
+            "markup": 2935,
+            "fuelPrice": 20000,
+            "revenueReal": 596295700,
+            "revenueInvoice": 609758222.15,
+            "refundAmount": 9972239,
+            "costs": {
+                "agent": 68550556,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 11787600,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 47601898,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C3',
-            contractNo: 'HD09',
-            voyageNo: 'C3',
-            dateStart: '2026-01-14',
-            dateEnd: '2026-01-23',
-            vesselId: 'VG36',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Clinker',
-            portLoad: 'Hòn La',
-            portDischarge: 'Hậu Giang',
-            qty: 4765.3,
-            rate: 183000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 872049900,
-            revenueInvoice: 872049900,
-            refundAmount: 0,
-            costs: {
-                agent: 34226090,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 152361000,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 54527892,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C3",
+            "contractNo": "HD09",
+            "voyageNo": "C3",
+            "dateStart": "2026-01-14",
+            "dateEnd": "2026-01-23",
+            "vesselId": "VG36",
+            "customer": "Hoàng Quyên",
+            "cargo": "Clinker",
+            "portLoad": "Hòn La",
+            "portDischarge": "Hậu Giang",
+            "qty": 4765.3,
+            "rate": 183000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 872049900,
+            "revenueInvoice": 872049900,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 34226090,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 152361000,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 54527892,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C4',
-            contractNo: 'HD15',
-            voyageNo: 'C4',
-            dateStart: '2026-01-24',
-            dateEnd: '2026-02-06',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Gỗ',
-            portLoad: 'Cần Thơ',
-            portDischarge: 'Cửa Lò',
-            qty: 1,
-            rate: 320000000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 320000000,
-            revenueInvoice: 320000000,
-            refundAmount: 0,
-            costs: {
-                agent: 42729942,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 335455440,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: -7945544,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C4",
+            "contractNo": "HD15",
+            "voyageNo": "C4",
+            "dateStart": "2026-01-24",
+            "dateEnd": "2026-02-06",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Gỗ",
+            "portLoad": "Cần Thơ",
+            "portDischarge": "Cửa Lò",
+            "qty": 1,
+            "rate": 320000000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 320000000,
+            "revenueInvoice": 320000000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 42729942,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 335455440,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": -7945544,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C5',
-            contractNo: 'HD18',
-            voyageNo: 'C5',
-            dateStart: '2026-02-07',
-            dateEnd: '2026-02-15',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 4762,
-            rate: 193000,
-            markup: 10000,
-            fuelPrice: 20000,
-            revenueReal: 919066000,
-            revenueInvoice: 966686000,
-            refundAmount: 35274074,
-            costs: {
-                agent: 86538115,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 179030683,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 59431812,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C5",
+            "contractNo": "HD18",
+            "voyageNo": "C5",
+            "dateStart": "2026-02-07",
+            "dateEnd": "2026-02-15",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 4762,
+            "rate": 193000,
+            "markup": 10000,
+            "fuelPrice": 20000,
+            "revenueReal": 919066000,
+            "revenueInvoice": 966686000,
+            "refundAmount": 35274074,
+            "costs": {
+                "agent": 86538115,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 179030683,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 59431812,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C6',
-            contractNo: 'HD22',
-            voyageNo: 'C6',
-            dateStart: '2026-02-16',
-            dateEnd: '2026-03-05',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Quặng',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Hải Phòng',
-            qty: 4694.65,
-            rate: 145000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 680724250,
-            revenueInvoice: 680724250,
-            refundAmount: 0,
-            costs: {
-                agent: 86422459,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 81047500,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 46353190,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C6",
+            "contractNo": "HD22",
+            "voyageNo": "C6",
+            "dateStart": "2026-02-16",
+            "dateEnd": "2026-03-05",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Quặng",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Hải Phòng",
+            "qty": 4694.65,
+            "rate": 145000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 680724250,
+            "revenueInvoice": 680724250,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 86422459,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 81047500,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 46353190,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C7',
-            contractNo: 'HD30',
-            voyageNo: 'C7',
-            dateStart: '2026-03-06',
-            dateEnd: '2026-03-24',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Clinker',
-            portLoad: 'Hòn La',
-            portDischarge: 'HCM',
-            qty: 4785.3,
-            rate: 193000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 923562900,
-            revenueInvoice: 923562900,
-            refundAmount: 0,
-            costs: {
-                agent: 0,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 6344000,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 73250632,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C7",
+            "contractNo": "HD30",
+            "voyageNo": "C7",
+            "dateStart": "2026-03-06",
+            "dateEnd": "2026-03-24",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Clinker",
+            "portLoad": "Hòn La",
+            "portDischarge": "HCM",
+            "qty": 4785.3,
+            "rate": 193000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 923562900,
+            "revenueInvoice": 923562900,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 0,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 6344000,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 73250632,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C8',
-            contractNo: 'HD32',
-            voyageNo: 'C8',
-            dateStart: '2026-03-24',
-            dateEnd: '2026-03-30',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Than',
-            portLoad: 'Gò Da',
-            portDischarge: 'Đà Nẵng',
-            qty: 1,
-            rate: 510000000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 510000000,
-            revenueInvoice: 510000000,
-            refundAmount: 0,
-            costs: {
-                agent: 43325404,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 194093550,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 21390645,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C8",
+            "contractNo": "HD32",
+            "voyageNo": "C8",
+            "dateStart": "2026-03-24",
+            "dateEnd": "2026-03-30",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Than",
+            "portLoad": "Gò Da",
+            "portDischarge": "Đà Nẵng",
+            "qty": 1,
+            "rate": 510000000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 510000000,
+            "revenueInvoice": 510000000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 43325404,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 194093550,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 21390645,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C9',
-            contractNo: 'HD38',
-            voyageNo: 'C9',
-            dateStart: '2026-03-30',
-            dateEnd: '2026-04-08',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'HCM',
-            qty: 4773.09,
-            rate: 243000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1159860870,
-            revenueInvoice: 1159860870,
-            refundAmount: 0,
-            costs: {
-                agent: 72605793,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 431436000,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 49645270,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C9",
+            "contractNo": "HD38",
+            "voyageNo": "C9",
+            "dateStart": "2026-03-30",
+            "dateEnd": "2026-04-08",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "HCM",
+            "qty": 4773.09,
+            "rate": 243000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1159860870,
+            "revenueInvoice": 1159860870,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 72605793,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 431436000,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 49645270,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C10',
-            contractNo: 'HD46',
-            voyageNo: 'C10',
-            dateStart: '2026-04-09',
-            dateEnd: '2026-04-24',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Gỗ',
-            portLoad: 'Hậu Giang',
-            portDischarge: 'Đà Nẵng',
-            qty: 1,
-            rate: 687807407,
-            markup: -277807407,
-            fuelPrice: 20000,
-            revenueReal: 687807407,
-            revenueInvoice: 410000000,
-            refundAmount: 0,
-            costs: {
-                agent: 33300235,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 69207499,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 25879250,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C10",
+            "contractNo": "HD46",
+            "voyageNo": "C10",
+            "dateStart": "2026-04-09",
+            "dateEnd": "2026-04-24",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Gỗ",
+            "portLoad": "Hậu Giang",
+            "portDischarge": "Đà Nẵng",
+            "qty": 1,
+            "rate": 687807407,
+            "markup": -277807407,
+            "fuelPrice": 20000,
+            "revenueReal": 687807407,
+            "revenueInvoice": 410000000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 33300235,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 69207499,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 25879250,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C11',
-            contractNo: 'HD47',
-            voyageNo: 'C11',
-            dateStart: '2026-04-25',
-            dateEnd: '2026-05-01',
-            vesselId: 'VG36',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Clinker',
-            portLoad: 'Chân Mây',
-            portDischarge: 'Hậu Giang',
-            qty: 4785.03,
-            rate: 210000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1004856300,
-            revenueInvoice: 1004856300,
-            refundAmount: 0,
-            costs: {
-                agent: 0,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 10046250,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 79383879,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C11",
+            "contractNo": "HD47",
+            "voyageNo": "C11",
+            "dateStart": "2026-04-25",
+            "dateEnd": "2026-05-01",
+            "vesselId": "VG36",
+            "customer": "Ngọc Anh",
+            "cargo": "Clinker",
+            "portLoad": "Chân Mây",
+            "portDischarge": "Hậu Giang",
+            "qty": 4785.03,
+            "rate": 210000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1004856300,
+            "revenueInvoice": 1004856300,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 0,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 10046250,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 79383879,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG36-C12',
-            contractNo: 'HD52',
-            voyageNo: 'C12',
-            dateStart: '2026-05-02',
-            dateEnd: '2026-05-10',
-            vesselId: 'VG36',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Cát',
-            portLoad: 'Vĩnh Xương',
-            portDischarge: 'Đà Nẵng',
-            qty: 4695.13,
-            rate: 125000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 586891250,
-            revenueInvoice: 586891250,
-            refundAmount: 0,
-            costs: {
-                agent: 0,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 0,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 0,
-                portFees: 0,
-                others: 0
+            "id": "S-VG36-C12",
+            "contractNo": "HD52",
+            "voyageNo": "C12",
+            "dateStart": "2026-05-02",
+            "dateEnd": "2026-05-10",
+            "vesselId": "VG36",
+            "customer": "Hoàng Quyên",
+            "cargo": "Cát",
+            "portLoad": "Vĩnh Xương",
+            "portDischarge": "Đà Nẵng",
+            "qty": 4695.13,
+            "rate": 125000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 586891250,
+            "revenueInvoice": 586891250,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 0,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 0,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 0,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C1',
-            contractNo: 'HD07',
-            voyageNo: 'C1',
-            dateStart: '2026-01-07',
-            dateEnd: '2026-01-19',
-            vesselId: 'VG18',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Tro ẩm',
-            portLoad: 'Vĩnh Tân',
-            portDischarge: 'Nghi Sơn',
-            qty: 7323,
-            rate: 95000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 695685000,
-            revenueInvoice: 695685000,
-            refundAmount: 0,
-            costs: {
-                agent: 51613525,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 363952001,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 19259600,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C1",
+            "contractNo": "HD07",
+            "voyageNo": "C1",
+            "dateStart": "2026-01-07",
+            "dateEnd": "2026-01-19",
+            "vesselId": "VG18",
+            "customer": "Ngọc Anh",
+            "cargo": "Tro ẩm",
+            "portLoad": "Vĩnh Tân",
+            "portDischarge": "Nghi Sơn",
+            "qty": 7323,
+            "rate": 95000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 695685000,
+            "revenueInvoice": 695685000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 51613525,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 363952001,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 19259600,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C2',
-            contractNo: 'HD13',
-            voyageNo: 'C2',
-            dateStart: '2026-01-20',
-            dateEnd: '2026-02-02',
-            vesselId: 'VG18',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Clinker',
-            portLoad: 'Nghi Sơn',
-            portDischarge: 'Hiệp Phước',
-            qty: 7996,
-            rate: 183000,
-            markup: 10000,
-            fuelPrice: 20000,
-            revenueReal: 1463268000,
-            revenueInvoice: 1543228000,
-            refundAmount: 59229630,
-            costs: {
-                agent: 64837024,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 44910090,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 118967231,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C2",
+            "contractNo": "HD13",
+            "voyageNo": "C2",
+            "dateStart": "2026-01-20",
+            "dateEnd": "2026-02-02",
+            "vesselId": "VG18",
+            "customer": "Ngọc Anh",
+            "cargo": "Clinker",
+            "portLoad": "Nghi Sơn",
+            "portDischarge": "Hiệp Phước",
+            "qty": 7996,
+            "rate": 183000,
+            "markup": 10000,
+            "fuelPrice": 20000,
+            "revenueReal": 1463268000,
+            "revenueInvoice": 1543228000,
+            "refundAmount": 59229630,
+            "costs": {
+                "agent": 64837024,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 44910090,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 118967231,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C3',
-            contractNo: 'HD16',
-            voyageNo: 'C3',
-            dateStart: '2026-02-03',
-            dateEnd: '2026-02-09',
-            vesselId: 'VG18',
-            customer: 'Việt Anh',
-            cargo: 'Đường',
-            portLoad: 'Phú Mỹ',
-            portDischarge: 'Nam Vân Phong',
-            qty: 4981,
-            rate: 92000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 458252000,
-            revenueInvoice: 458252000,
-            refundAmount: 0,
-            costs: {
-                agent: 133519412,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 124093710,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 24250789,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C3",
+            "contractNo": "HD16",
+            "voyageNo": "C3",
+            "dateStart": "2026-02-03",
+            "dateEnd": "2026-02-09",
+            "vesselId": "VG18",
+            "customer": "Việt Anh",
+            "cargo": "Đường",
+            "portLoad": "Phú Mỹ",
+            "portDischarge": "Nam Vân Phong",
+            "qty": 4981,
+            "rate": 92000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 458252000,
+            "revenueInvoice": 458252000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 133519412,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 124093710,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 24250789,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C4',
-            contractNo: 'HD24',
-            voyageNo: 'C4',
-            dateStart: '2026-02-10',
-            dateEnd: '2026-03-07',
-            vesselId: 'VG18',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Clinker',
-            portLoad: 'Hòn La',
-            portDischarge: 'HCM',
-            qty: 7972,
-            rate: 187500,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1494750000,
-            revenueInvoice: 1494750000,
-            refundAmount: 0,
-            costs: {
-                agent: 46981024,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 356272875,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 83952712,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C4",
+            "contractNo": "HD24",
+            "voyageNo": "C4",
+            "dateStart": "2026-02-10",
+            "dateEnd": "2026-03-07",
+            "vesselId": "VG18",
+            "customer": "Ngọc Anh",
+            "cargo": "Clinker",
+            "portLoad": "Hòn La",
+            "portDischarge": "HCM",
+            "qty": 7972,
+            "rate": 187500,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1494750000,
+            "revenueInvoice": 1494750000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 46981024,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 356272875,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 83952712,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C5',
-            contractNo: 'HD28',
-            voyageNo: 'C5',
-            dateStart: '2026-03-08',
-            dateEnd: '2026-03-21',
-            vesselId: 'VG18',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'HCM',
-            qty: 7998.3,
-            rate: 200000,
-            markup: 25000,
-            fuelPrice: 20000,
-            revenueReal: 1599660000,
-            revenueInvoice: 1799617500,
-            refundAmount: 148116667,
-            costs: {
-                agent: 91095292,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 269997912,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 116969609,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C5",
+            "contractNo": "HD28",
+            "voyageNo": "C5",
+            "dateStart": "2026-03-08",
+            "dateEnd": "2026-03-21",
+            "vesselId": "VG18",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "HCM",
+            "qty": 7998.3,
+            "rate": 200000,
+            "markup": 25000,
+            "fuelPrice": 20000,
+            "revenueReal": 1599660000,
+            "revenueInvoice": 1799617500,
+            "refundAmount": 148116667,
+            "costs": {
+                "agent": 91095292,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 269997912,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 116969609,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C6',
-            contractNo: 'HD35',
-            voyageNo: 'C6',
-            dateStart: '2026-03-22',
-            dateEnd: '2026-04-03',
-            vesselId: 'VG18',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Tôn Cuộn',
-            portLoad: 'Gò Dầu',
-            portDischarge: 'Hải Phòng',
-            qty: 8030,
-            rate: 147000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1180410000,
-            revenueInvoice: 1180410000,
-            refundAmount: 0,
-            costs: {
-                agent: 79949241,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 575443200,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 36888480,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C6",
+            "contractNo": "HD35",
+            "voyageNo": "C6",
+            "dateStart": "2026-03-22",
+            "dateEnd": "2026-04-03",
+            "vesselId": "VG18",
+            "customer": "Ngọc Anh",
+            "cargo": "Tôn Cuộn",
+            "portLoad": "Gò Dầu",
+            "portDischarge": "Hải Phòng",
+            "qty": 8030,
+            "rate": 147000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1180410000,
+            "revenueInvoice": 1180410000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 79949241,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 575443200,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 36888480,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C7',
-            contractNo: 'HD39',
-            voyageNo: 'C7',
-            dateStart: '2026-04-04',
-            dateEnd: '2026-04-11',
-            vesselId: 'VG18',
-            customer: 'Ho\u00e0ng Quy\u00ean',
-            cargo: 'Than',
-            portLoad: 'Quảng Ninh',
-            portDischarge: 'Hòn La',
-            qty: 7815,
-            rate: 107000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 836205000,
-            revenueInvoice: 836205000,
-            refundAmount: 0,
-            costs: {
-                agent: 75699340,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 187822798,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 48114120,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C7",
+            "contractNo": "HD39",
+            "voyageNo": "C7",
+            "dateStart": "2026-04-04",
+            "dateEnd": "2026-04-11",
+            "vesselId": "VG18",
+            "customer": "Hoàng Quyên",
+            "cargo": "Than",
+            "portLoad": "Quảng Ninh",
+            "portDischarge": "Hòn La",
+            "qty": 7815,
+            "rate": 107000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 836205000,
+            "revenueInvoice": 836205000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 75699340,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 187822798,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 48114120,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C8',
-            contractNo: 'HD43',
-            voyageNo: 'C8',
-            dateStart: '2026-04-12',
-            dateEnd: '2026-04-20',
-            vesselId: 'VG18',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 7794,
-            rate: 258000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 2010852000,
-            revenueInvoice: 2010852000,
-            refundAmount: 0,
-            costs: {
-                agent: 85566050,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 906673920,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 70200768,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C8",
+            "contractNo": "HD43",
+            "voyageNo": "C8",
+            "dateStart": "2026-04-12",
+            "dateEnd": "2026-04-20",
+            "vesselId": "VG18",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 7794,
+            "rate": 258000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 2010852000,
+            "revenueInvoice": 2010852000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 85566050,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 906673920,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 70200768,
+                "portFees": 0,
+                "others": 0
             }
         },
         {
-            id: 'S-VG18-C9',
-            contractNo: 'HD48',
-            voyageNo: 'C9',
-            dateStart: '2026-04-21',
-            dateEnd: '2026-05-04',
-            vesselId: 'VG18',
-            customer: 'Ng\u1ecdc Anh',
-            cargo: 'Xỉ',
-            portLoad: 'Sơn Dương',
-            portDischarge: 'Hậu Giang',
-            qty: 7497,
-            rate: 248000,
-            markup: 0,
-            fuelPrice: 20000,
-            revenueReal: 1859256000,
-            revenueInvoice: 1859256000,
-            refundAmount: 0,
-            costs: {
-                agent: 0,
-                pilot: 0,
-                tugboat: 0,
-                port: 0,
-                fuelDO: 43509120,
-                fuelLO: 0,
-                materialCompany: 0,
-                materialVessel: 0,
-                crewFood: 0,
-                crewSalary: 0,
-                monthlyOther: 0,
-                vessel2ends: 0,
-                brokerage: 0,
-                vat: 144389568,
-                portFees: 0,
-                others: 0
+            "id": "S-VG18-C9",
+            "contractNo": "HD48",
+            "voyageNo": "C9",
+            "dateStart": "2026-04-21",
+            "dateEnd": "2026-05-04",
+            "vesselId": "VG18",
+            "customer": "Ngọc Anh",
+            "cargo": "Xỉ",
+            "portLoad": "Sơn Dương",
+            "portDischarge": "Hậu Giang",
+            "qty": 7497,
+            "rate": 248000,
+            "markup": 0,
+            "fuelPrice": 20000,
+            "revenueReal": 1859256000,
+            "revenueInvoice": 1859256000,
+            "refundAmount": 0,
+            "costs": {
+                "agent": 0,
+                "pilot": 0,
+                "tugboat": 0,
+                "port": 0,
+                "fuelDO": 43509120,
+                "fuelLO": 0,
+                "materialCompany": 0,
+                "materialVessel": 0,
+                "crewFood": 0,
+                "crewSalary": 0,
+                "monthlyOther": 0,
+                "vessel2ends": 0,
+                "brokerage": 0,
+                "vat": 144389568,
+                "portFees": 0,
+                "others": 0
             }
         }
     ],
-    captainReports: [
+    "captainReports": [
         {
-            id: 'CR-VG18-2026-04',
-            vesselId: 'VG18',
-            month: '2026-04',
-            food: 8000000,
-            material: 2500000,
-            portExpenses: [
-                { port: 'Bồi dưỡng cẩu', amount: 3000000, voyageNo: 'C9' },
-                { port: 'Biên phòng cảng', amount: 2500000, voyageNo: 'C9' }
+            "id": "CR-VG18-2026-04",
+            "vesselId": "VG18",
+            "month": "2026-04",
+            "food": 8000000,
+            "material": 2500000,
+            "portExpenses": [
+                {
+                    "port": "Bồi dưỡng cẩu",
+                    "amount": 3000000,
+                    "voyageNo": "C9"
+                },
+                {
+                    "port": "Biên phòng cảng",
+                    "amount": 2500000,
+                    "voyageNo": "C9"
+                }
             ],
-            brokerages: [
-                { voyageNo: 'C9', amount: 5000000 }
+            "brokerages": [
+                {
+                    "voyageNo": "C9",
+                    "amount": 5000000
+                }
             ]
         }
-    ]
+    ],
+    "timesheets": []
 };
 
 const DB_KEY = 'shipManageDB_v2';
@@ -2411,98 +9903,419 @@ const AppData = {
         if (stored) {
             try {
                 this.state = JSON.parse(stored);
+
+                
+                // === Transaction Safety Migration v276 ===
+                if (!localStorage.getItem('tx_merge_v276')) {
+                    try {
+                        const existingIds = new Set((this.state.transactions || []).map(t => t.id));
+                        let added = 0;
+                        (DEFAULT_STATE.transactions || []).forEach(t => {
+                            if (!existingIds.has(t.id)) {
+                                this.state.transactions.push(t);
+                                existingIds.add(t.id);
+                                added++;
+                            }
+                        });
+                        if (added > 0) {
+                            console.log('[Migration] Added', added, 'missing transactions from DEFAULT_STATE');
+                            this.save();
+                        }
+                    } catch(e) { console.warn('[Migration] tx_merge_v276 error:', e); }
+                    localStorage.setItem('tx_merge_v276', '1');
+                }
+                // === End Transaction Safety Migration ===
+
+if (!localStorage.getItem('allowances_extracted_v6')) {
+                    const extractedAllowances = {"Lê Ngọc Ngọ":{"meal":2500000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":4500000,"completionBonus":0},"Vũ Đức Ngọ":{"meal":2500000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":4500000,"completionBonus":0},"Bùi Thị Phương":{"meal":2000000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":5200000,"completionBonus":0},"Nguyễn Thị Nhị":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":3900000,"completionBonus":0},"Hoàng Thị Diệp Linh":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":3900000,"completionBonus":0},"Lương Thị Bích Hằng":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":3900000,"completionBonus":0},"Vũ Ngọc Vĩnh":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":4550000,"completionBonus":0},"Phạm Ngọc Tùng":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0,"deliveryAllowance":4550000,"completionBonus":0},"Lê Ngọc Huế":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":10500000,"deliveryAllowance":9000000,"completionBonus":0},"Lê Duy Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000,"deliveryAllowance":6000000,"completionBonus":0},"Lưu Quang Trường":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000,"deliveryAllowance":6000000,"completionBonus":0},"Vũ Đức Trọng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000,"deliveryAllowance":5400000,"completionBonus":0},"Nguyễn Xuân Toàn":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000,"deliveryAllowance":6000000,"completionBonus":0},"Nguyễn Văn Tú":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000,"deliveryAllowance":5400000,"completionBonus":0},"Lê Đức Mừng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Nguyễn Trọng Dương":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Vũ Đức An":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Nguyễn Trọng Vũ":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Nguyễn Đức Giang":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3100000,"completionBonus":0},"Nguyễn Hữu Quyết":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Tạ Quang Hợp":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7000000,"deliveryAllowance":6000000,"completionBonus":0},"Lê Ngọc Hoàng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000,"deliveryAllowance":4000000,"completionBonus":0},"Nguyễn Trọng Vinh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000,"deliveryAllowance":4000000,"completionBonus":0},"Bùi Đình Thịnh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5600000,"deliveryAllowance":4600000,"completionBonus":0},"Tạ Duy Trưởng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000,"deliveryAllowance":4400000,"completionBonus":0},"Nguyễn Văn Danh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4400000,"deliveryAllowance":3600000,"completionBonus":0},"Lê Duy Tới":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Nguyễn Đức Huy":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Lê Ngọc Hà":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Đinh Ngọc Hà":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3400000,"deliveryAllowance":2400000,"completionBonus":0},"Nguyễn Đức Dũng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Nguyễn Dương Thân":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Lê Bá Thạo":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Tạ Quang Đức":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":12000000,"deliveryAllowance":10200000,"completionBonus":0},"Nguyễn Trường Giang":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":10500000,"deliveryAllowance":8000000,"completionBonus":0},"Nguyễn Trọng Hồng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":9000000,"deliveryAllowance":7500000,"completionBonus":0},"Vũ Đình Đại":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":8100000,"deliveryAllowance":5850000,"completionBonus":0},"Lê Văn Cường":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":8100000,"deliveryAllowance":5700000,"completionBonus":0},"Lê Mạnh Hùng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":8100000,"deliveryAllowance":5850000,"completionBonus":0},"Vũ Đức Thắng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Lê Ngọc Cung":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Lê Văn Cường(QB)":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Lê Ngọc Hoa":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Nguyễn Trọng Tuấn Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Lương Anh Tuấn":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Lê Văn Thắng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Trần Văn Phiến":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"CỘNG SX":{"meal":35000000,"phone":5600000,"clothing":35000000,"transport":91800000,"deliveryAllowance":67100000,"completionBonus":0},"Lại Xuân Kiều":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7000000,"deliveryAllowance":6000000,"completionBonus":0},"Nguyễn Xuân Soái":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5600000,"deliveryAllowance":4600000,"completionBonus":0},"Phạm Văn Long":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000,"deliveryAllowance":4000000,"completionBonus":0},"Nguyễn Trọng Hiếu":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000,"deliveryAllowance":4000000,"completionBonus":0},"Bùi Thế Tuấn Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000,"deliveryAllowance":4000000,"completionBonus":0},"Vũ Hội":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4400000,"deliveryAllowance":3600000,"completionBonus":0},"Trần Bá Trọng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4400000,"deliveryAllowance":3600000,"completionBonus":0},"Bùi Thế Tiến":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Lê Ngọc Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Lại Xuân Hà":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Phạm Văn Khiêm":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Lê Xuân Hồng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000,"deliveryAllowance":2000000,"completionBonus":0},"Cộng":{"meal":27500000,"phone":4400000,"clothing":27500000,"transport":68700000,"deliveryAllowance":52800000,"completionBonus":0},"Lê Thân Thắng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":10500000,"deliveryAllowance":9000000,"completionBonus":0},"Đỗ Hữu Xuần":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000,"deliveryAllowance":6000000,"completionBonus":0},"Nguyễn Đức Hiền":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000,"deliveryAllowance":6000000,"completionBonus":0},"Nguyễn Thái Bình":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000,"deliveryAllowance":6000000,"completionBonus":0},"Bùi Đình Kha":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000,"deliveryAllowance":5400000,"completionBonus":0},"Nguyễn Văn Bắc":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Phạm Văn Tứ":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Nguyễn Trọng Hậu":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000,"deliveryAllowance":5400000,"completionBonus":0},"Đỗ Hữu Xoa":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Nguyễn Văn Luân":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Vũ Văn Cường":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000,"deliveryAllowance":3000000,"completionBonus":0},"Tổng cộng":{"meal":169500000,"phone":28000000,"clothing":171000000,"transport":338500000,"deliveryAllowance":291600000,"completionBonus":0}};
+                    
+                    if (this.state.employees) {
+                        this.state.employees.forEach(emp => {
+                            let match = extractedAllowances[emp.name];
+                            if (!match) {
+                                if (emp.name.includes('Đỗ Hữu Xuân') && extractedAllowances['Đỗ Hữu Xuần']) match = extractedAllowances['Đỗ Hữu Xuần'];
+                                else if (emp.name.includes('Đỗ Hữu Xuân') && extractedAllowances['Đỗ Hữu Xoa']) match = extractedAllowances['Đỗ Hữu Xoa'];
+                            }
+                            
+                            if (match) {
+                                emp.mealAllowance = match.meal;
+                                emp.phoneAllowance = match.phone;
+                                emp.clothingAllowance = match.clothing;
+                                emp.transportAllowance = match.transport;
+                                emp.deliveryAllowance = match.deliveryAllowance;
+                                emp.completionBonus = match.completionBonus;
+                            }
+                        });
+                    }
+                    localStorage.setItem('allowances_extracted_v6', 'true');
+                    this.save();
+                }
+
+
+
+                // Ensure employees exist
+                if (!this.state.employees || this.state.employees.length === 0) {
+                    this.state.employees = JSON.parse(JSON.stringify(DEFAULT_STATE.employees || []));
+                    this.save();
+                }
+                if (!this.state.timesheets) {
+                    this.state.timesheets = [];
+                    this.save();
+                }
+
+                if (!localStorage.getItem('vg18_salaries_updated_v2')) {
+                    const updates = {
+                        "Tạ Quang Đức": { actualSalary: 30000000, insurance: 1102500 },
+                        "Nguyễn Trọng Hồng": { actualSalary: 24000000, insurance: 798000 },
+                        "Vũ Đình Đại": { actualSalary: 20000000, insurance: 798000 },
+                        "Lê Ngọc Hoa": { actualSalary: 15000000, insurance: 525000 },
+                        "Lê Văn Cường(QB)": { actualSalary: 15000000, insurance: 525000 },
+                        "Lê Ngọc Cung": { actualSalary: 15000000, insurance: 525000 },
+                        "Nguyễn Trường Giang": { actualSalary: 25000000, insurance: 798000 },
+                        "Lê Văn Cường": { actualSalary: 21000000, insurance: 630000 },
+                        "Lê Mạnh Hùng": { actualSalary: 20000000, insurance: 630000 },
+                        "Nguyễn Trọng Tuấn Anh": { actualSalary: 16000000, insurance: 525000 },
+                        "Trần Văn Phiến": { actualSalary: 15000000, insurance: 525000 },
+                        "Lê Văn Thắng": { actualSalary: 15000000, insurance: 525000 }
+                    };
+                    
+                    // Remove Lê Ngọc Vũ if it was added previously
+                    this.state.employees = this.state.employees.filter(e => e.name !== "Lê Ngọc Vũ");
+
+                    let foundNames = new Set();
+                    
+                    this.state.employees.forEach(emp => {
+                        if (emp.department === 'VG18' && updates[emp.name]) {
+                            emp.actualSalary = updates[emp.name].actualSalary;
+                            emp.insurance = updates[emp.name].insurance;
+                            foundNames.add(emp.name);
+                        }
+                    });
+                    
+                    Object.keys(updates).forEach(name => {
+                        if (!foundNames.has(name)) {
+                            this.state.employees.push({
+                                id: 'EMP-' + Math.random().toString(36).substr(2, 9),
+                                name: name,
+                                role: "Nhân viên",
+                                department: "VG18",
+                                basicSalary: 5000000,
+                                actualSalary: updates[name].actualSalary,
+                                insurance: updates[name].insurance,
+                                allowances: 0,
+                                personalDeduction: 15500000,
+                                dependents: 0,
+                                joinDate: "", leaveDate: "", phone: "", notes: ""
+                            });
+                        }
+                    });
+
+                    localStorage.setItem('vg18_salaries_updated_v2', '1');
+                    this.save();
+                }
+
+                if (!localStorage.getItem('vg09_salaries_updated')) {
+                    const updates = {
+                        "Lại Xuân Kiều": { actualSalary: 28000000, insurance: 1102500 },
+                        "Phạm Văn Long": { actualSalary: 22000000, insurance: 798000 },
+                        "Nguyễn Trọng Hiếu": { actualSalary: 20000000, insurance: 630000 },
+                        "Lê Ngọc Anh": { actualSalary: 15000000, insurance: 525000 },
+                        "Bùi Thế Tiến": { actualSalary: 15000000, insurance: 525000 },
+                        "Lại Xuân Hà": { actualSalary: 15000000, insurance: 0 },
+                        "Nguyễn Xuân Soái": { actualSalary: 23000000, insurance: 798000 },
+                        "Vũ Hội": { actualSalary: 19000000, insurance: 630000 },
+                        "Bùi Thế Tuấn Anh": { actualSalary: 20000000, insurance: 630000 },
+                        "Trần Bá Trọng": { actualSalary: 19000000, insurance: 630000 },
+                        "Lê Xuân Hồng": { actualSalary: 15000000, insurance: 0 }
+                    };
+                    
+                    let foundNames = new Set();
+                    
+                    this.state.employees.forEach(emp => {
+                        if (emp.department === 'VG09' && updates[emp.name]) {
+                            emp.actualSalary = updates[emp.name].actualSalary;
+                            emp.insurance = updates[emp.name].insurance;
+                            foundNames.add(emp.name);
+                        }
+                    });
+                    
+                    Object.keys(updates).forEach(name => {
+                        if (!foundNames.has(name)) {
+                            this.state.employees.push({
+                                id: 'EMP-' + Math.random().toString(36).substr(2, 9),
+                                name: name,
+                                role: "Nhân viên",
+                                department: "VG09",
+                                basicSalary: 5000000,
+                                actualSalary: updates[name].actualSalary,
+                                insurance: updates[name].insurance,
+                                allowances: 0,
+                                personalDeduction: 15500000,
+                                dependents: 0,
+                                joinDate: "", leaveDate: "", phone: "", notes: ""
+                            });
+                        }
+                    });
+
+                    localStorage.setItem('vg09_salaries_updated', '1');
+                    this.save();
+                }
+
+                if (!localStorage.getItem('vg_multiple_salaries_updated')) {
+                    const updates = [
+                        { name: "Lê Thân Thắng", dept: "VG05", actualSalary: 26000000, insurance: 1102500, role: "Thuyền trưởng" },
+                        { name: "Nguyễn Đức Hiền", dept: "VG05", actualSalary: 22000000, insurance: 798000, role: "Thuyền phó" },
+                        { name: "Bùi Đình Kha", dept: "VG05", actualSalary: 19000000, insurance: 0, role: "Nhân viên" },
+                        { name: "Phạm Văn Tứ", dept: "VG05", actualSalary: 15500000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Nguyễn Văn Luân", dept: "VG05", actualSalary: 15000000, insurance: 0, role: "Thủy thủ" },
+                        { name: "Nguyễn Văn Bắc", dept: "VG05", actualSalary: 15000000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Nguyễn Trọng Hậu", dept: "VG05", actualSalary: 17000000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Nguyễn Viết Xuân", dept: "VG05", actualSalary: 23000000, insurance: 0, role: "Máy trưởng" },
+                        { name: "Nguyễn Thái Bình", dept: "VG05", actualSalary: 21000000, insurance: 630000, role: "Nhân viên" },
+                        { name: "Đỗ Hữu Xoa", dept: "VG05", actualSalary: 16000000, insurance: 525000, role: "Nhân viên" },
+                        { name: "Vũ Văn Cường", dept: "VG05", actualSalary: 15000000, insurance: 0, role: "Bếp" },
+
+                        { name: "Lê Ngọc Huế", dept: "VG15", actualSalary: 28000000, insurance: 1102500, role: "Thuyền trưởng" },
+                        { name: "Lê Duy Quỳnh", dept: "VG15", actualSalary: 22000000, insurance: 798000, role: "Thuyền phó" },
+                        { name: "Vũ Đức Trọng", dept: "VG15", actualSalary: 19000000, insurance: 525000, role: "Nhân viên" },
+                        { name: "Lê Đức Mừng", dept: "VG15", actualSalary: 15000000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Nguyễn Trọng Dương", dept: "VG15", actualSalary: 15000000, insurance: 0, role: "Thủy thủ" },
+                        { name: "Nguyễn Trọng Vũ", dept: "VG15", actualSalary: 14000000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Lưu Quang Trường", dept: "VG15", actualSalary: 23000000, insurance: 798000, role: "Máy trưởng" },
+                        { name: "Nguyễn Xuân Toản", dept: "VG15", actualSalary: 20000000, insurance: 630000, role: "Nhân viên" },
+                        { name: "Nguyễn Văn Tú", dept: "VG15", actualSalary: 19000000, insurance: 0, role: "Nhân viên" },
+                        { name: "Nguyễn Đức Giang", dept: "VG15", actualSalary: 18000000, insurance: 525000, role: "Nhân viên" },
+                        { name: "Nguyễn Hữu Quyết", dept: "VG15", actualSalary: 15000000, insurance: 0, role: "Bếp" },
+
+                        { name: "Tạ Quang Hợp", dept: "VG36", actualSalary: 28000000, insurance: 1102500, role: "Thuyền trưởng" },
+                        { name: "Lê Ngọc Hoàng", dept: "VG36", actualSalary: 22000000, insurance: 798000, role: "Thuyền phó" },
+                        { name: "Nguyễn Trọng Vinh", dept: "VG36", actualSalary: 14666667, insurance: 630000, role: "Nhân viên" },
+                        { name: "Nguyễn Đức Huy", dept: "VG36", actualSalary: 15000000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Lê Ngọc Hà", dept: "VG36", actualSalary: 15000000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Lê Duy Tới", dept: "VG36", actualSalary: 15000000, insurance: 525000, role: "Thủy thủ" },
+                        { name: "Bùi Đình Thịnh", dept: "VG36", actualSalary: 23000000, insurance: 0, role: "Máy trưởng" },
+                        { name: "Nguyễn Văn Danh", dept: "VG36", actualSalary: 19000000, insurance: 630000, role: "Nhân viên" },
+                        { name: "Tạ Duy Trưởng", dept: "VG36", actualSalary: 22000000, insurance: 630000, role: "Nhân viên" },
+                        { name: "Đinh Ngọc Hà", dept: "VG36", actualSalary: 16000000, insurance: 525000, role: "Nhân viên" },
+                        { name: "Lê Bá Thạo", dept: "VG36", actualSalary: 15000000, insurance: 0, role: "Bếp" }
+                    ];
+
+                    let processedKeys = new Set();
+
+                    // Update existing employees
+                    this.state.employees.forEach(emp => {
+                        const target = updates.find(u => u.name === emp.name && u.dept === emp.department);
+                        if (target) {
+                            emp.actualSalary = target.actualSalary;
+                            emp.insurance = target.insurance;
+                            processedKeys.add(`${target.name}-${target.dept}`);
+                        }
+                    });
+
+                    // Add missing employees
+                    updates.forEach(u => {
+                        const key = `${u.name}-${u.dept}`;
+                        if (!processedKeys.has(key)) {
+                            this.state.employees.push({
+                                id: 'EMP-' + Math.random().toString(36).substr(2, 9),
+                                name: u.name,
+                                role: u.role,
+                                department: u.dept,
+                                basicSalary: 5000000,
+                                actualSalary: u.actualSalary,
+                                insurance: u.insurance,
+                                allowances: 0,
+                                personalDeduction: 15500000,
+                                dependents: 0,
+                                joinDate: "", leaveDate: "", phone: "", notes: ""
+                            });
+                        }
+                    });
+
+                    localStorage.setItem('vg_multiple_salaries_updated', '1');
+                    this.save();
+                }
+
+                if (!localStorage.getItem('allowances_added_v1')) {
+                    const allowanceUpdates = {
+                        "Lê Ngọc Ngọ": { delivery: 0, bonus: 400000 },
+                        "Vũ Đức Ngọ": { delivery: 0, bonus: 400000 },
+                        "Bùi Thị Phương": { delivery: 0, bonus: 400000 },
+                        "Nguyễn Thị Nhị": { delivery: 0, bonus: 300000 },
+                        "Hoàng Thị Diệp Linh": { delivery: 0, bonus: 300000 },
+                        "Lương Thị Bích Hằng": { delivery: 0, bonus: 300000 },
+                        "Vũ Ngọc Vĩnh": { delivery: 0, bonus: 350000 },
+                        "Phạm Ngọc Tùng": { delivery: 0, bonus: 350000 },
+
+                        "Lê Ngọc Huế": { delivery: 3500000, bonus: 3000000 },
+                        "Lê Duy Anh": { delivery: 2500000, bonus: 2000000 },
+                        "Lưu Quang Trường": { delivery: 2500000, bonus: 2000000 },
+                        "Vũ Đức Trọng": { delivery: 2200000, bonus: 1800000 },
+                        "Nguyễn Xuân Toàn": { delivery: 2500000, bonus: 2000000 },
+                        "Nguyễn Văn Tú": { delivery: 2200000, bonus: 1800000 },
+                        "Lê Đức Mừng": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Trọng Dương": { delivery: 1500000, bonus: 1000000 },
+                        "Vũ Đức An": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Trọng Vũ": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Đức Giang": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Hữu Quyết": { delivery: 1500000, bonus: 1000000 },
+
+                        "Lê Ngọc Hoàng": { delivery: 2500000, bonus: 2000000 },
+                        "Nguyễn Trọng Vinh": { delivery: 2500000, bonus: 2000000 },
+                        "Bùi Đình Thịnh": { delivery: 2800000, bonus: 2300000 },
+                        "Tạ Duy Trưởng": { delivery: 2500000, bonus: 2200000 },
+                        "Nguyễn Văn Danh": { delivery: 2200000, bonus: 1800000 },
+                        "Lê Duy Tới": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Đức Huy": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Ngọc Hà": { delivery: 1500000, bonus: 1000000 },
+                        "Đinh Ngọc Hà": { delivery: 1700000, bonus: 1200000 },
+                        "Nguyễn Đức Dũng": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Dương Thân": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Bá Thạo": { delivery: 1500000, bonus: 1000000 },
+
+                        "Tạ Quang Đức": { delivery: 4000000, bonus: 3500000 },
+                        "Nguyễn Trường Giang": { delivery: 3500000, bonus: 3000000 },
+                        "Nguyễn Trọng Hồng": { delivery: 3000000, bonus: 2500000 },
+                        "Vũ Đình Đại": { delivery: 2700000, bonus: 1950000 },
+                        "Lê Văn Cường": { delivery: 2700000, bonus: 1950000 },
+                        "Lê Mạnh Hùng": { delivery: 2700000, bonus: 1950000 },
+                        "Vũ Đức Thắng": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Ngọc Cung": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Văn Cường(QB)": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Ngọc Hoa": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Trọng Tuấn Anh": { delivery: 1500000, bonus: 1000000 },
+                        "Lương Anh Tuấn": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Văn Thắng": { delivery: 1500000, bonus: 1000000 },
+                        "Trần Văn Phiến": { delivery: 1500000, bonus: 1000000 },
+
+                        "Lại Xuân Kiều": { delivery: 3500000, bonus: 3000000 },
+                        "Nguyễn Xuân Soái": { delivery: 2800000, bonus: 2300000 },
+                        "Phạm Văn Long": { delivery: 2500000, bonus: 2000000 },
+                        "Nguyễn Trọng Hiếu": { delivery: 2500000, bonus: 2000000 },
+                        "Bùi Thế Tuấn Anh": { delivery: 2500000, bonus: 2000000 },
+                        "Vũ Hội": { delivery: 2200000, bonus: 1800000 },
+                        "Trần Bá Trọng": { delivery: 2200000, bonus: 1800000 },
+                        "Bùi Thế Tiến": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Ngọc Anh": { delivery: 1500000, bonus: 1000000 },
+                        "Lại Xuân Hà": { delivery: 1500000, bonus: 1000000 },
+                        "Phạm Văn Khiêm": { delivery: 1500000, bonus: 1000000 },
+                        "Lê Xuân Hồng": { delivery: 1500000, bonus: 1000000 }
+                    };
+
+                    this.state.employees.forEach(emp => {
+                        let nameKey = emp.name;
+                        // Some basic normalizations might apply, but exact match first
+                        if (allowanceUpdates[nameKey]) {
+                            emp.deliveryAllowance = allowanceUpdates[nameKey].delivery;
+                            emp.completionBonus = allowanceUpdates[nameKey].bonus;
+                        } else {
+                            // Try removing spaces or matching partly if needed. We'll stick to exact first.
+                            // Handle cases like "Bùi Thế T.Anh" -> "Bùi Thế Tuấn Anh" (which were mapped previously)
+                            const matchedKey = Object.keys(allowanceUpdates).find(k => 
+                                k.replace(/\s+/g, '').toLowerCase() === nameKey.replace(/\s+/g, '').toLowerCase()
+                            );
+                            if (matchedKey) {
+                                emp.deliveryAllowance = allowanceUpdates[matchedKey].delivery;
+                                emp.completionBonus = allowanceUpdates[matchedKey].bonus;
+                            }
+                        }
+                    });
+
+                    localStorage.setItem('allowances_added_v1', '1');
+                    this.save();
+                }
+
+                if (!localStorage.getItem('allowances_added_v2_vg05')) {
+                    const vg05Updates = {
+                        "Lê Thân Thắng": { delivery: 3500000, bonus: 3000000 },
+                        "Đỗ Hữu Xuân": { delivery: 2500000, bonus: 2000000 },
+                        "Nguyễn Viết Xuân": { delivery: 2500000, bonus: 2000000 },
+                        "Nguyễn Đức Hiền": { delivery: 2500000, bonus: 2000000 },
+                        "Nguyễn Thái Bình": { delivery: 2500000, bonus: 2000000 },
+                        "Bùi Đình Kha": { delivery: 2200000, bonus: 1800000 },
+                        "Nguyễn Văn Bắc": { delivery: 1500000, bonus: 1000000 },
+                        "Phạm Văn Tứ": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Trọng Hậu": { delivery: 2200000, bonus: 1800000 },
+                        "Đỗ Hữu Xoa": { delivery: 1500000, bonus: 1000000 },
+                        "Nguyễn Văn Luân": { delivery: 1500000, bonus: 1000000 },
+                        "Vũ Văn Cường": { delivery: 1500000, bonus: 1000000 }
+                    };
+
+                    this.state.employees.forEach(emp => {
+                        if (emp.department === 'VG05') {
+                            let nameKey = emp.name;
+                            if (vg05Updates[nameKey]) {
+                                emp.deliveryAllowance = vg05Updates[nameKey].delivery;
+                                emp.completionBonus = vg05Updates[nameKey].bonus;
+                            } else {
+                                const matchedKey = Object.keys(vg05Updates).find(k => 
+                                    k.replace(/\s+/g, '').toLowerCase() === nameKey.replace(/\s+/g, '').toLowerCase()
+                                );
+                                if (matchedKey) {
+                                    emp.deliveryAllowance = vg05Updates[matchedKey].delivery;
+                                    emp.completionBonus = vg05Updates[matchedKey].bonus;
+                                }
+                            }
+                        }
+                    });
+
+                    localStorage.setItem('allowances_added_v2_vg05', '1');
+                    this.save();
+                }
+
+                                if (!localStorage.getItem('importedTchinh12345')) {
+                    this.state.transactions = JSON.parse(JSON.stringify(DEFAULT_STATE.transactions));
+                    localStorage.setItem('importedTchinh12345', 'true');
+                    localStorage.setItem('transactionsClearedV1', 'true');
+                    this.save();
+                }
+                                if (!localStorage.getItem('importedFuelReport20260526')) {
+                    this.state.fuelVoyages = JSON.parse(JSON.stringify(DEFAULT_STATE.fuelVoyages));
+                    this.state.fuelLogs = JSON.parse(JSON.stringify(DEFAULT_STATE.fuelLogs));
+                    localStorage.setItem('importedFuelReport20260526', 'true');
+                    this.save();
+                }
                 if (!this.state.transactions) this.state.transactions = [];
                 if (!this.state.fuelLogs) this.state.fuelLogs = [];
                 if (!this.state.fuelVoyages) this.state.fuelVoyages = [];
                 if (!this.state.vesselExpenses) this.state.vesselExpenses = [];
                 if (!this.state.captainReports) this.state.captainReports = [];
+                if (!this.state.monthlyCosts) this.state.monthlyCosts = [];
                 
-                // Migrate shipments if necessary
-                this.state.shipments = this.state.shipments.map(s => {
-                    if (s.voyageNo && !s.contractNo) {
-                        return { ...s, contractNo: s.voyageNo, voyageNo: '' };
-                    }
-                    return s;
-                });
-
-                // Standardize active state
-                this.cleanAndStandardizeState();
-
-                this.mergeDefaultTransactions();
-                this.mergeDefaultShipments();
-                this.mergeDefaultCustomers();
-                this.mergeDefaultPartnersFromTransactions();
-                this.mergeDefaultFuelData();
-                
-                // Sync DO fuel hours and cost for all shipments from logs
-                this.state.shipments.forEach(s => this.syncShipmentFuelFromLogs(s));
-                
-                this.mergeDefaultVesselExpenses();
-                this.mergeDefaultCaptainReports();
-                this.recalculateVesselAllocations('VG18', '2026-04');
-            } catch (e) {
-                this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
-            }
-        } else {
-            this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
-            this.state.shipments.forEach(s => this.syncShipmentFuelFromLogs(s));
-            this.save();
-        }
-    },
-
-    cleanAndStandardizeState() {
-        if (!this.state) return;
-
-        // 1. Correct list of standard vendors and customers
-        const correctVendors = [
-            { name: 'Petrolimex', type: 'D\u1ea7u DO/LO', contact: '0987654321', address: 'H\u1ea3i Ph\u00f2ng' },
-            { name: 'C\u1ea3ng Ch\u00e2n M\u00e2y', type: 'C\u1ea3ng', contact: '0987654322', address: 'Hu\u1ebf' },
-            { name: 'L\u00ea Ph\u1ea1m', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Sunshine', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'S\u00f4ng H\u1eadu', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Qu\u1ed1c T\u1ebf Xanh', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Ho\u00e0ng \u0110\u0103ng', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Alberta', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'C\u00f4ng ty \u0110\u1ea1i D\u01b0\u01a1ng', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Petrotime', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Ho\u00e0ng Kh\u1ea3i', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Nh\u1ea5t Minh S\u01a1n', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Long B\u00ecnh', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'S\u01a1n HP', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'C\u00f4ng ty T\u1ea5n My', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'Pvoil \u0110\u00e0 N\u1eb5ng', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'PV Oil mi\u1ec1n trung', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'H\u1ed3ng V\u00e2n', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' },
-            { name: 'H\u1ed3ng Minh', type: '\u0110\u1ed1i t\u00e1c giao d\u1ecbch', contact: '---', address: '---' }
-        ];
-
-        const correctCustomers = [
-            { name: 'Ng\u1ecdc Anh', contact: '---', address: '---' },
-            { name: 'Ho\u00e0ng Quy\u00ean', contact: '---', address: '---' },
-            { name: 'B\u00ecnh Minh', contact: '---', address: '---' },
-            { name: 'Th\u00e1i B\u00ecnh D\u01b0\u01a1ng', contact: '---', address: '---' },
-            { name: 'Vi\u1ec7t Anh', contact: '---', address: '---' }
-        ];
-
-        // 2. Helper to identify double-encoded or bad strings (mojibake)
-        const hasFontError = (str) => {
-            if (!str) return false;
-            return /[\u00c3\u00c4\u00c6\u00bb\u00ba\u00bd\u00be\u00bf]/.test(str);
-        };
-
-        const fixMojibake = (str) => {
-            if (!str) return str;
-            try {
-                if (hasFontError(str)) {
-                    const bytes = new Uint8Array(str.split('').map(c => c.charCodeAt(0)));
-                    const decoded = new TextDecoder('utf-8').decode(bytes);
-                    if (decoded && !decoded.includes('\ufffd') && decoded.trim() !== '') {
-                        return decoded;
-                    }
+                // Initialize new allowance fields
+                if (this.state.employees) {
+                    this.state.employees.forEach(emp => {
+                        if (emp.mealAllowance === undefined) emp.mealAllowance = 0;
+                        if (emp.phoneAllowance === undefined) emp.phoneAllowance = 0;
+                        if (emp.clothingAllowance === undefined) emp.clothingAllowance = 0;
+                        if (emp.transportAllowance === undefined) emp.transportAllowance = 0;
+                    });
                 }
-            } catch (e) {}
-            return str;
-        };
+
+                if (!localStorage.getItem('allowances_extracted_v2')) {
+                    const extractedAllowances = {"Lê Ngọc Ngọ":{"meal":2500000,"phone":400000,"clothing":2000000,"transport":0},"Vũ Đức Ngọ":{"meal":2500000,"phone":400000,"clothing":2000000,"transport":0},"Bùi Thị Phương":{"meal":2000000,"phone":400000,"clothing":2000000,"transport":0},"Nguyễn Thị Nhị":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0},"Hoàng Thị Diệp Linh":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0},"Lương Thị Bích Hằng":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0},"Vũ Ngọc Vĩnh":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0},"Phạm Ngọc Tùng":{"meal":1500000,"phone":400000,"clothing":2000000,"transport":0},"Lê Ngọc Huế":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":10500000},"Lê Duy Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000},"Lưu Quang Trường":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000},"Vũ Đức Trọng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000},"Nguyễn Xuân Toàn":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000},"Nguyễn Văn Tú":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000},"Lê Đức Mừng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Nguyễn Trọng Dương":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Vũ Đức An":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Nguyễn Trọng Vũ":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Nguyễn Đức Giang":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Nguyễn Hữu Quyết":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Tạ Quang Hợp":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7000000},"Lê Ngọc Hoàng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000},"Nguyễn Trọng Vinh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000},"Bùi Đình Thịnh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5600000},"Tạ Duy Trưởng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000},"Nguyễn Văn Danh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4400000},"Lê Duy Tới":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Nguyễn Đức Huy":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Lê Ngọc Hà":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Đinh Ngọc Hà":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3400000},"Nguyễn Đức Dũng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Nguyễn Dương Thân":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Lê Bá Thạo":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Tạ Quang Đức":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":12000000},"Nguyễn Trường Giang":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":10500000},"Nguyễn Trọng Hồng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":9000000},"Vũ Đình Đại":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":8100000},"Lê Văn Cường":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":8100000},"Lê Mạnh Hùng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":8100000},"Vũ Đức Thắng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Lê Ngọc Cung":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Lê Văn Cường(QB)":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Lê Ngọc Hoa":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Nguyễn Trọng Tuấn Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Lương Anh Tuấn":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Lê Văn Thắng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Trần Văn Phiến":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"CỘNG SX":{"meal":35000000,"phone":5600000,"clothing":35000000,"transport":91800000},"Lại Xuân Kiều":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7000000},"Nguyễn Xuân Soái":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5600000},"Phạm Văn Long":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000},"Nguyễn Trọng Hiếu":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000},"Bùi Thế Tuấn Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":5000000},"Vũ Hội":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4400000},"Trần Bá Trọng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4400000},"Bùi Thế Tiến":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Lê Ngọc Anh":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Lại Xuân Hà":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Phạm Văn Khiêm":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Lê Xuân Hồng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":3000000},"Cộng":{"meal":27500000,"phone":4400000,"clothing":27500000,"transport":68700000},"Lê Thân Thắng":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":10500000},"Đỗ Hữu Xuần":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000},"Nguyễn Đức Hiền":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000},"Nguyễn Thái Bình":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":7500000},"Bùi Đình Kha":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000},"Nguyễn Văn Bắc":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Phạm Văn Tứ":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Nguyễn Trọng Hậu":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":6600000},"Đỗ Hữu Xoa":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Nguyễn Văn Luân":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Vũ Văn Cường":{"meal":2500000,"phone":400000,"clothing":2500000,"transport":4500000},"Tổng cộng":{"meal":169500000,"phone":28000000,"clothing":171000000,"transport":338500000}};
+                    
+                    if (this.state.employees) {
+                        this.state.employees.forEach(emp => {
+                            let match = extractedAllowances[emp.name];
+                            if (!match) {
+                                if (emp.name.includes('Đỗ Hữu Xuân') && extractedAllowances['Đỗ Hữu Xuần']) match = extractedAllowances['Đỗ Hữu Xuần'];
+                                else if (emp.name.includes('Đỗ Hữu Xuân') && extractedAllowances['Đỗ Hữu Xoa']) match = extractedAllowances['Đỗ Hữu Xoa'];
+                            }
+                            
+                            if (match) {
+                                emp.mealAllowance = match.meal;
+                                emp.phoneAllowance = match.phone;
+                                emp.clothingAllowance = match.clothing;
+                                emp.transportAllowance = match.transport;
+                            }
+                        });
+                    }
+                    localStorage.setItem('allowances_extracted_v2', 'true');
+                    this.save();
+                }
+
+
 
         // Automatically heal double-encoded company info
         if (this.state.company) {
@@ -2583,6 +10396,7 @@ const AppData = {
             'alberta': 'Alberta',
             'cong ty dai duong': 'C\u00f4ng ty \u0110\u1ea1i D\u01b0\u01a1ng',
             'petrotime': 'Petrotime',
+            'petroltime': 'Petrotime',
             'hoang khai': 'Ho\u00e0ng Kh\u1ea3i',
             'nhat minh son': 'Nh\u1ea5t Minh S\u01a1n',
             'long binh': 'Long B\u00ecnh',
@@ -2590,8 +10404,28 @@ const AppData = {
             'cong ty tan my': 'C\u00f4ng ty T\u1ea5n My',
             'cong ty to my': 'C\u00f4ng ty T\u1ed1 My',
             'cang chan may': 'C\u1ea3ng Ch\u00e2n M\u00e2y',
-            'petrolimex': 'Petrolimex'
+            'petrolimex': 'Petrolimex',
+            'pv da nang': 'Pvoil \u0110\u00e0 N\u1eb5ng',
+            'pv \u0111\u00e0 n\u1eb5ng': 'Pvoil \u0110\u00e0 N\u1eb5ng',
+            'pvoil da nang': 'Pvoil \u0110\u00e0 N\u1eb5ng',
+            'pvoil \u0111\u00e0 n\u1eb5ng': 'Pvoil \u0110\u00e0 N\u1eb5ng',
+            'pv oil mien trung': 'PvOil Mi\u1ec1n Trung',
+            'pv oil mi\u1ec1n trung': 'PvOil Mi\u1ec1n Trung',
+            'pvoil mien trung': 'PvOil Mi\u1ec1n Trung',
+            'pvoil mi\u1ec1n trung': 'PvOil Mi\u1ec1n Trung'
         };
+
+        // Standardize fuelVendor in fuel voyages using partnerMap
+        if (this.state.fuelVoyages) {
+            this.state.fuelVoyages.forEach(fv => {
+                if (fv.fuelVendor) {
+                    const trimmedLower = fv.fuelVendor.trim().toLowerCase();
+                    if (partnerMap[trimmedLower]) {
+                        fv.fuelVendor = partnerMap[trimmedLower];
+                    }
+                }
+            });
+        }
 
         // Standardize shipment customer names
         if (this.state.shipments) {
@@ -2600,6 +10434,18 @@ const AppData = {
                     const trimmedLower = s.customer.trim().toLowerCase();
                     if (partnerMap[trimmedLower]) {
                         s.customer = partnerMap[trimmedLower];
+                    }
+                }
+                // Normalize vessel identifiers in shipments
+                if (s.vessel) {
+                    const vesselName = s.vessel.trim();
+                    if (vesselName === 'Công ty' || vesselName === 'Văn phòng' || vesselName === 'Văn phòng Công ty') {
+                        s.vessel = 'VP';
+                    } else {
+                        const match = this.state.vessels.find(v => v.name === vesselName);
+                        if (match) {
+                            s.vessel = match.id;
+                        }
                     }
                 }
             });
@@ -2612,6 +10458,19 @@ const AppData = {
                     const trimmedLower = t.partner.trim().toLowerCase();
                     if (partnerMap[trimmedLower]) {
                         t.partner = partnerMap[trimmedLower];
+                    }
+                }
+                // Normalize vessel identifiers
+                if (t.vessel) {
+                    const vesselName = t.vessel.trim();
+                    if (vesselName === 'Công ty' || vesselName === 'Văn phòng' || vesselName === 'Văn phòng Công ty') {
+                        t.vessel = 'VP';
+                    } else {
+                        // Map full vessel name to its id if present
+                        const match = this.state.vessels.find(v => v.name === vesselName);
+                        if (match) {
+                            t.vessel = match.id;
+                        }
                     }
                 }
             });
@@ -2683,10 +10542,67 @@ const AppData = {
                     if (!s.costs) s.costs = {};
                     s.costs.agent = agencyFees[key];
                 }
+                // Automatically update refundAmount based on the new calcRefund rates (e.g. 20% for HD25 & HD54)
+                if (s.revenueInvoice !== undefined && s.revenueReal !== undefined) {
+                    s.refundAmount = Math.round(this.calcRefund(s.revenueInvoice, s.revenueReal, s.contractNo));
+                }
+                // Force-fix HD18 (VG15-C4) customer to Bình Minh
+                if (s.contractNo === 'HD18' && s.vesselId === 'VG15' && s.voyageNo === 'C4') {
+                    s.customer = 'B\u00ecnh Minh';
+                }
             });
         }
 
+        // Tự động tính lại chi phí Vật Tư từ các giao dịch (Migration + Heal data)
+        if (this.state.transactions) {
+            const monthsAndVessels = new Set();
+            this.state.transactions.forEach(t => {
+                if ((t.category === '9.Vật Tư' || t.category === '6.Lãi Vay') && t.vessel && t.vessel !== 'VP' && t.date) {
+                    monthsAndVessels.add(`${t.vessel}_${t.date.substring(0, 7)}`);
+                }
+            });
+            monthsAndVessels.forEach(key => {
+                const [vesselId, monthStr] = key.split('_');
+                this.recalculateVesselAllocations(vesselId, monthStr);
+            });
+        }
+
+        // Tạm tính chi phí tháng 12/2025 bằng tháng 01/2026 để phân bổ cho các chuyến cuối 2025
+        if (this.state.monthlyCosts && this.state.vessels) {
+            let neededRecalc = false;
+            this.state.vessels.forEach(v => {
+                const janCost = this.state.monthlyCosts.find(c => c.month === '2026-01' && c.vesselId === v.id);
+                if (janCost) {
+                    const decCostIdx = this.state.monthlyCosts.findIndex(c => c.month === '2025-12' && c.vesselId === v.id);
+                    if (decCostIdx === -1) {
+                        this.state.monthlyCosts.push({ ...janCost, month: '2025-12' });
+                        this.recalculateVesselAllocations(v.id, '2025-12');
+                        neededRecalc = true;
+                    } else if (!this.state.monthlyCosts[decCostIdx].salary) {
+                        this.state.monthlyCosts[decCostIdx] = { ...janCost, month: '2025-12' };
+                        this.recalculateVesselAllocations(v.id, '2025-12');
+                        neededRecalc = true;
+                    }
+                }
+            });
+            if (neededRecalc) this.save();
+        }
+
+        if (this.state.shipments) {
+            this.state.shipments.forEach(s => this.syncShipmentFuelFromLogs(s));
+        }
         this.save();
+            } catch (e) {
+                console.error("Error in AppData.init:", e);
+                this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+                this.state.shipments.forEach(s => this.syncShipmentFuelFromLogs(s));
+                this.save();
+            }
+        } else {
+            this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+            this.state.shipments.forEach(s => this.syncShipmentFuelFromLogs(s));
+            this.save();
+        }
     },
 
     mergeDefaultTransactions() {
@@ -2720,6 +10636,7 @@ const AppData = {
                 const existingCosts = this.state.shipments[idx].costs || {};
                 this.state.shipments[idx] = { 
                     ...s, 
+                    ...this.state.shipments[idx],
                     id: this.state.shipments[idx].id,
                     costs: { ...s.costs, ...existingCosts } 
                 };
@@ -2740,7 +10657,7 @@ const AppData = {
             s.fuelHours = Number(stats.totalHours) || 0;
             let price = Number(stats.fuelPrice);
             if (price === 0) {
-                price = this.getLastFuelPrice(s.vesselId);
+                price = this.getLastFuelPrice(s.vesselId, s.voyageNo);
             }
             s.costs.fuelDO = Math.round(stats.totalFuel * price);
             s.fuelPrice = price;
@@ -2838,35 +10755,33 @@ const AppData = {
         if (!this.state.fuelVoyages) this.state.fuelVoyages = [];
         if (!this.state.fuelLogs) this.state.fuelLogs = [];
         
-        // Automated vessels
-        const automatedVessels = ['VG05', 'VG09', 'VG15', 'VG18', 'VG36'];
+        let voyagesAdded = 0;
+        let logsAdded = 0;
 
-        // 1. Sync fuelVoyages - Matching by vesselId and voyageNo for automated vessels
+        // 1. Sync fuelVoyages - Only add if missing
         DEFAULT_STATE.fuelVoyages.forEach(v => {
             const idx = this.state.fuelVoyages.findIndex(curr => 
                 (curr.id === v.id) || (curr.vesselId === v.vesselId && curr.voyageNo === v.voyageNo)
             );
             if (idx === -1) {
                 this.state.fuelVoyages.push(v);
-            } else {
-                // Keep the same ID if it was already matched by vessel/voyageNo
-                const existingId = this.state.fuelVoyages[idx].id;
-                this.state.fuelVoyages[idx] = { ...this.state.fuelVoyages[idx], ...v, id: existingId };
+                voyagesAdded++;
             }
         });
 
-        // 2. Cleanup fuelLogs for automated voyages before re-syncing to avoid duplicates
-        // We will replace all logs for voyages present in DEFAULT_STATE to ensure no duplicates
-        const defaultVoyageIds = new Set(DEFAULT_STATE.fuelVoyages.map(v => v.id));
-        
-        // Remove any existing logs in state that belong to voyages we are syncing
-        this.state.fuelLogs = this.state.fuelLogs.filter(l => !defaultVoyageIds.has(l.fuelVoyageId));
+        // 2. Sync fuelLogs - Only add if the log id does not exist in state
+        const currentLogIds = new Set(this.state.fuelLogs.map(l => l.id));
+        DEFAULT_STATE.fuelLogs.forEach(l => {
+            if (!currentLogIds.has(l.id)) {
+                this.state.fuelLogs.push(l);
+                logsAdded++;
+            }
+        });
 
-        // 3. Push all logs from DEFAULT_STATE
-        this.state.fuelLogs.push(...DEFAULT_STATE.fuelLogs);
-
-        this.save();
-        console.log(`Synced fuel data: Full refresh for ${automatedVessels.join(', ')}.`);
+        if (voyagesAdded > 0 || logsAdded > 0) {
+            console.log(`Merged default fuel data: Added ${voyagesAdded} voyages and ${logsAdded} logs.`);
+            this.save();
+        }
     },
 
     mergeDefaultVesselExpenses() {
@@ -2924,8 +10839,132 @@ const AppData = {
         return (this.state.customers || []).filter(c => c.name && !hasFontError(c.name));
     },
     getTransactions() { return this.state.transactions.sort((a,b) => new Date(b.date) - new Date(a.date)); },
+
+    // HR Management Methods
+    getTimesheets() { return this.state.timesheets || []; },
+    getTimesheet(month, department) {
+        return (this.state.timesheets || []).find(ts => ts.month === month && ts.department === department);
+    },
+    saveTimesheet(timesheet) {
+        if (!this.state.timesheets) this.state.timesheets = [];
+        const index = this.state.timesheets.findIndex(ts => ts.month === timesheet.month && ts.department === timesheet.department);
+        if (index !== -1) {
+            this.state.timesheets[index] = timesheet;
+        } else {
+            this.state.timesheets.push(timesheet);
+        }
+        this.save();
+    },
+
+    getEmployees() { return this.state.employees || []; },
+    getEmployee(id) { return (this.state.employees || []).find(e => e.id === id); },
+    saveEmployee(employee) {
+        if (!this.state.employees) this.state.employees = [];
+        if (employee.id) {
+            const index = this.state.employees.findIndex(e => e.id === employee.id);
+            if (index !== -1) {
+                this.state.employees[index] = { ...this.state.employees[index], ...employee };
+            } else {
+                this.state.employees.push(employee);
+            }
+        } else {
+            employee.id = 'EMP-' + Math.random().toString(36).substr(2, 9);
+            this.state.employees.push(employee);
+        }
+        this.save();
+    },
+    deleteEmployee(id) {
+        if (!this.state.employees) return;
+        this.state.employees = this.state.employees.filter(e => e.id !== id);
+        this.save();
+    },
+    getSupplierDebts() {
+        const suppliers = {};
+        
+        // 1. Calculate Fuel Purchases
+        this.state.fuelVoyages.forEach(v => {
+            if (!v.fuelVendor) return;
+            const vendor = v.fuelVendor.trim().toLowerCase();
+            if (!suppliers[vendor]) suppliers[vendor] = { name: v.fuelVendor.trim(), totalPurchased: 0, totalPaid: 0, debt: 0, purchases: [], payments: [] };
+            
+            const cost = Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0));
+            if (cost > 0) {
+                suppliers[vendor].totalPurchased += cost;
+                suppliers[vendor].purchases.push({
+                    id: v.id,
+                    date: v.fuelDate || new Date().toISOString(),
+                    cost: cost,
+                    vessel: v.vesselId,
+                    qty: v.addedFuel,
+                    price: v.fuelUnitPrice,
+                    paid: 0,
+                    remaining: cost
+                });
+            }
+        });
+        
+        // 2. Calculate Payments from Transactions (Chi)
+        this.state.transactions.forEach(t => {
+            const isDO = t.category && (
+                t.category === '4.Dầu DO' ||
+                t.category === '10.Nhiên Liệu DO' ||
+                t.category === '11.Nhiên Liệu LO' ||
+                t.category.toLowerCase().includes('dầu do')
+            );
+            if (Number(t.chi) > 0 && isDO && t.partner) {
+                const vendor = t.partner.trim().toLowerCase();
+                // We map payments to suppliers even if they don't have purchases yet
+                if (!suppliers[vendor]) suppliers[vendor] = { name: t.partner.trim(), totalPurchased: 0, totalPaid: 0, debt: 0, purchases: [], payments: [] };
+                
+                const amount = Number(t.chi) || 0;
+                suppliers[vendor].totalPaid += amount;
+                suppliers[vendor].payments.push({
+                    date: t.date,
+                    amount: amount
+                });
+            }
+        });
+        
+        // 3. Calculate Debt and FIFO allocation
+        Object.values(suppliers).forEach(s => {
+            s.debt = s.totalPurchased - s.totalPaid;
+            
+            // FIFO Allocation to Purchases
+            s.purchases.sort((a, b) => new Date(a.date) - new Date(b.date));
+            let remainingPayment = s.totalPaid;
+            
+            for (let p of s.purchases) {
+                if (remainingPayment <= 0) break;
+                if (remainingPayment >= p.cost) {
+                    p.paid = p.cost;
+                    p.remaining = 0;
+                    remainingPayment -= p.cost;
+                } else {
+                    p.paid = remainingPayment;
+                    p.remaining = p.cost - remainingPayment;
+                    remainingPayment = 0;
+                }
+            }
+        });
+        
+        return Object.values(suppliers).sort((a,b) => b.debt - a.debt);
+    },
     getMonthlyCosts(month, vesselId) { 
-        return this.state.monthlyCosts.find(c => c.month === month && c.vesselId === vesselId) || { month, vesselId, salary: 0, insurance: 0, food: 0, materialCompany: 0, materialVessel: 0, other: 0 }; 
+        let cost = this.state.monthlyCosts.find(c => c.month === month && c.vesselId === vesselId);
+        let result = cost ? { ...cost } : { month, vesselId, salary: 0, insurance: 0, food: 0, materialCompany: 0, materialVessel: 0, other: 0 };
+        
+        // Nếu chưa có lương và bảo hiểm (bằng 0), lấy từ tháng gần nhất trước đó
+        if (!result.salary && !result.insurance) {
+            const pastCosts = this.state.monthlyCosts
+                .filter(c => c.vesselId === vesselId && c.month < month && (c.salary > 0 || c.insurance > 0))
+                .sort((a, b) => b.month.localeCompare(a.month)); // Sort descending
+                
+            if (pastCosts.length > 0) {
+                if (!result.salary) result.salary = pastCosts[0].salary || 0;
+                if (!result.insurance) result.insurance = pastCosts[0].insurance || 0;
+            }
+        }
+        return result;
     },
     getShipments() { 
         return this.state.shipments.sort((a,b) => {
@@ -2936,6 +10975,27 @@ const AppData = {
             }
             return (a.vesselId || '').localeCompare(b.vesselId || '');
         });
+    },
+
+    getCargos() {
+        const cargos = new Set(['Than cám', 'Cát', 'Đá', 'Clinker', 'Thạch cao', 'Xỉ than', 'Quặng', 'Dăm gỗ', 'Gạo', 'Ngô', 'Thép']);
+        if (this.state.shipments) {
+            this.state.shipments.forEach(s => {
+                if (s.cargo) cargos.add(s.cargo);
+            });
+        }
+        return Array.from(cargos).sort();
+    },
+
+    getPorts() {
+        const ports = new Set(['Cẩm Phả', 'Hòn Gai', 'Nghi Sơn', 'Vũng Áng', 'Cửa Lò', 'Đà Nẵng', 'Quy Nhơn', 'Nha Trang', 'Phú Mỹ', 'Sài Gòn', 'Cần Thơ', 'Hải Phòng', 'Chân Mây', 'Đồng Nai']);
+        if (this.state.shipments) {
+            this.state.shipments.forEach(s => {
+                if (s.portLoad) ports.add(s.portLoad);
+                if (s.portDischarge) ports.add(s.portDischarge);
+            });
+        }
+        return Array.from(ports).sort();
     },
 
     // Captain's Monthly Reports Getters & Setters
@@ -2958,9 +11018,9 @@ const AppData = {
 
     // Vessel Fund Thu-Chi-Ton Calculation
     getVesselFundStats(vesselId, monthStr) {
-        // Thu: Total transactions in company with category '1.TÃ u á»¨ng' and matching vessel
+        // Thu: Total transactions in company with category '1.Tàu Ứng' and matching vessel
         const companyAdvances = this.state.transactions
-            .filter(t => t.vessel === vesselId && t.category === '1.TÃ u á»¨ng' && t.date && typeof t.date === 'string' && t.date.substring(0, 7) === monthStr)
+            .filter(t => t.vessel === vesselId && t.category === '1.Tàu Ứng' && t.date && typeof t.date === 'string' && t.date.substring(0, 7) === monthStr)
             .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
         // Chi: Calculated from the captain's report of this vessel and month
@@ -3004,6 +11064,47 @@ const AppData = {
         };
     },
 
+    syncShipmentExpensesFromReports(vesselId) {
+        const allReports = this.state.captainReports.filter(r => r.vesselId === vesselId);
+        
+        this.state.shipments.forEach(s => {
+            if (s.vesselId !== vesselId) return;
+
+            let hasBrokerage = false;
+            let voyageBrokerage = 0;
+            
+            let hasPortExpenses = false;
+            let voyagePortExpenses = 0;
+
+            allReports.forEach(rep => {
+                if (rep.brokerages) {
+                    const matched = rep.brokerages.filter(b => b.voyageNo === s.voyageNo);
+                    if (matched.length > 0) {
+                        hasBrokerage = true;
+                        voyageBrokerage += matched.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+                    }
+                }
+                
+                if (rep.portExpenses) {
+                    const matched = rep.portExpenses.filter(p => p.voyageNo === s.voyageNo);
+                    if (matched.length > 0) {
+                        hasPortExpenses = true;
+                        voyagePortExpenses += matched.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                    }
+                }
+            });
+
+            if (hasBrokerage) {
+                if (!s.costs) s.costs = {};
+                s.costs.brokerage = voyageBrokerage;
+            }
+            if (hasPortExpenses) {
+                if (!s.costs) s.costs = {};
+                s.costs.vessel2ends = voyagePortExpenses;
+            }
+        });
+    },
+
     // Business Logic Auto-Allocation
     recalculateVesselAllocations(vesselId, monthStr) {
         const report = this.getCaptainReport(vesselId, monthStr);
@@ -3011,34 +11112,26 @@ const AppData = {
         const crewFood = report ? (Number(report.food) || 0) : 0;
         const materialVessel = report ? (Number(report.material) || 0) : 0;
 
+        // Tự động tính vật tư công ty mua (từ Giao dịch)
+        const materialCompany = (this.state.transactions || [])
+            .filter(t => t.vessel === vesselId && t.category === '9.Vật Tư' && t.date && t.date.substring(0, 7) === monthStr)
+            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        // Tự động tính lãi vay (từ Giao dịch)
+        const loanInterest = (this.state.transactions || [])
+            .filter(t => t.vessel === vesselId && t.category === '6.Lãi Vay' && t.date && t.date.substring(0, 7) === monthStr)
+            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
         // 1. Update Monthly Costs
         const monthly = this.getMonthlyCosts(monthStr, vesselId);
         monthly.food = crewFood;
         monthly.materialVessel = materialVessel;
+        monthly.materialCompany = materialCompany;
+        monthly.loanInterest = loanInterest;
         this.saveMonthlyCosts(monthly);
 
-        // 2. Update voyage shipments for this vessel and month
-        this.state.shipments.forEach(s => {
-            if (s.vesselId === vesselId && s.dateStart && typeof s.dateStart === 'string' && s.dateStart.substring(0, 7) === monthStr) {
-                // Sum brokerage for this voyage from the captain's report
-                let voyageBrokerage = 0;
-                if (report && report.brokerages) {
-                    voyageBrokerage = report.brokerages
-                        .filter(b => b.voyageNo === s.voyageNo)
-                        .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
-                }
-                s.costs.brokerage = voyageBrokerage; // Updates or clears to the report's value
-
-                // Sum port expenses for this voyage from the captain's report
-                let voyagePortExpenses = 0;
-                if (report && report.portExpenses) {
-                    voyagePortExpenses = report.portExpenses
-                        .filter(p => p.voyageNo === s.voyageNo)
-                        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                }
-                s.costs.vessel2ends = voyagePortExpenses; // Updates or clears to the report's value
-            }
-        });
+        // 2. Sync exact expenses from all captain reports across all months
+        this.syncShipmentExpensesFromReports(vesselId);
         this.save();
 
         // 3. Recalculate daily allocations
@@ -3046,32 +11139,79 @@ const AppData = {
     },
 
     recalculateAllShipmentAllocations(vesselId, monthStr) {
-        const monthly = this.getMonthlyCosts(monthStr, vesselId);
-        const [year, month] = monthStr.split('-').map(Number);
-        const daysInMonth = new Date(year, month, 0).getDate();
-
         this.state.shipments.forEach(s => {
-            if (s.vesselId === vesselId && s.dateStart && typeof s.dateStart === 'string' && s.dateStart.substring(0, 7) === monthStr) {
-                const voyageDays = this.calcDays(s.dateStart, s.dateEnd);
-                const allocate = (total) => Math.round((Number(total) || 0) / daysInMonth * voyageDays);
-
+            const sMonth = s.reportMonth || (s.dateStart && typeof s.dateStart === 'string' ? s.dateStart.substring(0, 7) : '');
+            if (s.vesselId === vesselId && sMonth === monthStr) {
                 if (!s.costs) s.costs = {};
-                s.costs.crewSalary = allocate(monthly.salary);
-                s.costs.crewFood = allocate(monthly.food);
-                s.costs.crewInsurance = allocate(monthly.insurance);
-                s.costs.materialCompany = allocate(monthly.materialCompany);
-                s.costs.materialVessel = allocate(monthly.materialVessel);
-                s.costs.monthlyOther = allocate(monthly.other);
+                s.costs.crewSalary = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'salary');
+                s.costs.crewFood = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'food');
+                s.costs.crewInsurance = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'insurance');
+                s.costs.materialCompany = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'materialCompany');
+                s.costs.materialVessel = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'materialVessel');
+                s.costs.loanInterest = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'loanInterest');
+                s.costs.monthlyOther = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'other');
             }
         });
         this.save();
     },
     
     // Fuel Voyages & Logs
+    sortVoyages(voyages, order = 'asc') {
+        return [...voyages].sort((a, b) => {
+            const getNum = s => {
+                if (!s || !s.voyageNo) return 0;
+                const match = s.voyageNo.match(/\d+/);
+                return match ? parseInt(match[0], 10) : 0;
+            };
+            const numA = getNum(a);
+            const numB = getNum(b);
+            if (numA !== numB) {
+                return order === 'asc' ? numA - numB : numB - numA;
+            }
+            return order === 'asc' ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id);
+        });
+    },
+
+    getNextContractNo() {
+        let max = 0;
+        this.state.shipments.forEach(s => {
+            if (s.contractNo && s.contractNo.toUpperCase().startsWith('HD')) {
+                const num = parseInt(s.contractNo.substring(2), 10);
+                if (!isNaN(num) && num > max) max = num;
+            }
+        });
+        return max > 0 ? 'HD' + (max + 1) : 'HD1';
+    },
+
+    getNextVoyageNo(vesselId) {
+        if (!vesselId) return 'C1';
+        let max = 0;
+        this.state.shipments.forEach(s => {
+            if (s.vesselId === vesselId && s.voyageNo && s.voyageNo.toUpperCase().startsWith('C')) {
+                const num = parseInt(s.voyageNo.substring(1), 10);
+                if (!isNaN(num) && num > max) max = num;
+            }
+        });
+        return max > 0 ? 'C' + (max + 1) : 'C1';
+    },
+
+    getNextLoadDate(vesselId) {
+        if (!vesselId) return '';
+        // Find latest shipment by dateEnd
+        const vesselShipments = this.state.shipments.filter(s => s.vesselId === vesselId && s.dateEnd);
+        if (vesselShipments.length === 0) return '';
+        
+        vesselShipments.sort((a, b) => new Date(b.dateEnd) - new Date(a.dateEnd));
+        const lastDischarge = vesselShipments[0].dateEnd; // yyyy-mm-dd
+        
+        const d = new Date(lastDischarge);
+        d.setDate(d.getDate() + 1);
+        return d.toISOString().split('T')[0];
+    },
+
     getFuelVoyages(vesselId) { 
         let list = vesselId ? this.state.fuelVoyages.filter(v => v.vesselId === vesselId) : [...this.state.fuelVoyages];
-        // Sort by ID descending (assuming IDs like FV-VG05-C12 > FV-VG05-C1)
-        return list.sort((a, b) => b.id.localeCompare(a.id, undefined, {numeric: true, sensitivity: 'base'}));
+        return this.sortVoyages(list, 'desc'); // Newest first
     },
     getFuelVoyage(id) { return this.state.fuelVoyages.find(v => v.id === id); },
     getFuelLogs(voyageId) { return this.state.fuelLogs.filter(l => l.fuelVoyageId === voyageId); },
@@ -3085,11 +11225,12 @@ const AppData = {
     },
 
     getVesselFuelBalance(vesselId) {
-        const voyages = this.getFuelVoyages(vesselId).sort((a,b) => a.id.localeCompare(b.id));
-        if (voyages.length === 0) return 0;
+        const voyages = this.getFuelVoyages(vesselId);
+        const sortedAsc = this.sortVoyages(voyages, 'asc'); // Oldest first
+        if (sortedAsc.length === 0) return 0;
         
-        let balance = Number(voyages[0].initialFuel || 0);
-        voyages.forEach(v => {
+        let balance = Number(sortedAsc[0].initialFuel || 0);
+        sortedAsc.forEach(v => {
             const stats = this.getFuelVoyageStats(v.id);
             balance += Number(v.addedFuel || 0);
             balance -= stats.totalFuel;
@@ -3097,8 +11238,21 @@ const AppData = {
         return balance;
     },
 
-    getLastFuelPrice(vesselId) {
-        const voyages = this.getFuelVoyages(vesselId).sort((a,b) => b.id.localeCompare(a.id)); // Newest first
+    getLastFuelPrice(vesselId, voyageNo = null) {
+        const voyages = this.getFuelVoyages(vesselId); // getFuelVoyages is already sorted desc
+        if (voyageNo) {
+            const getNum = s => {
+                if (!s) return 0;
+                const match = String(s).match(/\d+/);
+                return match ? parseInt(match[0], 10) : 0;
+            };
+            const currentNum = getNum(voyageNo);
+            const vWithPrice = voyages.find(v => {
+                const vNum = getNum(v.voyageNo);
+                return Number(v.fuelUnitPrice) > 0 && vNum <= currentNum;
+            });
+            if (vWithPrice) return Number(vWithPrice.fuelUnitPrice);
+        }
         const vWithPrice = voyages.find(v => Number(v.fuelUnitPrice) > 0);
         return vWithPrice ? Number(vWithPrice.fuelUnitPrice) : 20000;
     },
@@ -3120,13 +11274,32 @@ const AppData = {
     addTransaction(t) { 
         t.id = t.id || ('TR' + Date.now()); 
         const idx = this.state.transactions.findIndex(x => x.id === t.id);
-        if(idx >= 0) this.state.transactions[idx] = t;
-        else this.state.transactions.push(t); 
+        let oldTx = null;
+        if(idx >= 0) {
+            oldTx = { ...this.state.transactions[idx] };
+            this.state.transactions[idx] = t;
+        } else {
+            this.state.transactions.push(t); 
+        }
         this.save(); 
+
+        // Auto-recalculate if vessel/date/category changed
+        if (t.vessel && t.vessel !== 'VP' && t.date && (t.category === '9.Vật Tư' || t.category === '6.Lãi Vay')) {
+            this.recalculateVesselAllocations(t.vessel, t.date.substring(0, 7));
+        }
+        if (oldTx && oldTx.vessel && oldTx.vessel !== 'VP' && oldTx.date && (oldTx.category === '9.Vật Tư' || oldTx.category === '6.Lãi Vay')) {
+            if (oldTx.vessel !== t.vessel || oldTx.date.substring(0,7) !== t.date.substring(0,7) || oldTx.category !== t.category) {
+                this.recalculateVesselAllocations(oldTx.vessel, oldTx.date.substring(0, 7));
+            }
+        }
     },
     deleteTransaction(id) {
-        this.state.transactions = this.state.transactions.filter(t => t.id !== id);
+        const t = this.state.transactions.find(x => x.id === id);
+        this.state.transactions = this.state.transactions.filter(x => x.id !== id);
         this.save();
+        if (t && t.vessel && t.vessel !== 'VP' && t.date && (t.category === '9.Vật Tư' || t.category === '6.Lãi Vay')) {
+            this.recalculateVesselAllocations(t.vessel, t.date.substring(0, 7));
+        }
     },
 
     saveMonthlyCosts(data) {
@@ -3205,11 +11378,46 @@ const AppData = {
         return Math.max(1, diffDays);
     },
 
-    calcRefund(invoiceRev, realRev) {
+    calcExactAllocation(startStr, endStr, vesselId, field) {
+        if (!startStr || !endStr) return 0;
+        const d1 = new Date(startStr);
+        const d2 = new Date(endStr);
+        
+        if (d2 <= d1) {
+            const mStr = startStr.substring(0, 7);
+            const monthly = this.getMonthlyCosts(mStr, vesselId);
+            const [y, m] = mStr.split('-').map(Number);
+            const daysInMonth = new Date(y, m, 0).getDate();
+            return Math.round((Number(monthly[field]) || 0) / daysInMonth);
+        }
+
+        let totalCost = 0;
+        let current = new Date(d1);
+
+        while (current < d2) {
+            let next = new Date(current);
+            next.setDate(current.getDate() + 1);
+            if (next > d2) next = new Date(d2);
+
+            const mStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+            const monthly = this.getMonthlyCosts(mStr, vesselId);
+            const [y, m] = mStr.split('-').map(Number);
+            const daysInMonth = new Date(y, m, 0).getDate();
+            
+            const fraction = (next - current) / (1000 * 60 * 60 * 24);
+            totalCost += ((Number(monthly[field]) || 0) / daysInMonth) * fraction;
+
+            current = next;
+        }
+
+        return Math.round(totalCost);
+    },
+
+    calcRefund(invoiceRev, realRev, contractNo) {
         const diff = invoiceRev - realRev;
-        if (diff <= 0) return 0;
-        // Formula: (Diff) - (Diff / 1.08 * 28%)
-        return diff - (diff / 1.08 * 0.28);
+        const rate = (contractNo === 'HD25' || contractNo === 'HD54') ? 0.20 : 0.28;
+        // Formula: (Diff) - (Diff / 1.08 * rate)
+        return diff - (diff / 1.08 * rate);
     },
 
     formatCurrency(amount) {

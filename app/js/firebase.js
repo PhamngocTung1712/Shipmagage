@@ -1,5 +1,7 @@
 /**
- * Firebase Integration & Cloud Database Sync V2.0 (Firestore Version)
+ * Firebase Integration & Cloud Database Sync V2.5
+ * Author: Antigravity Code Assistant
+ * Functions: Firebase authentication observer, Firestore sync, and REST API force sync fallback.
  */
 
 // Your web app's Firebase configuration
@@ -15,41 +17,155 @@ const firebaseConfig = {
 
 let db = null;
 let isFirebaseInitialized = false;
+const DB_KEY = 'shipManageDB_v2'; // Must match data.js
 
+// Initialize Firebase App
 function initFirebase() {
     try {
         if (typeof firebase !== 'undefined') {
             firebase.initializeApp(firebaseConfig);
-            if (typeof firebase.analytics === 'function') {
-                firebase.analytics();
-            }
             db = firebase.firestore();
             isFirebaseInitialized = true;
-            console.log("Firebase Firestore initialized successfully!");
-            setupFirebaseSync();
+            console.log("Firebase initialized successfully!");
+            
+            // Listen for authentication changes
+            setupAuthObserver();
         } else {
             console.warn("Firebase SDK is not loaded. Working in local-only mode.");
+            showAppContainer();
             updateServerStatus('offline', 'Ngoại tuyến (Lưu cục bộ)');
         }
     } catch (e) {
         console.error("Failed to initialize Firebase:", e);
+        showAppContainer();
         updateServerStatus('error', 'Lỗi kết nối Firebase');
     }
 }
 
-// Helper to update premium UI status indicator
+// Setup Firebase Authentication Observer
+function setupAuthObserver() {
+    firebase.auth().onAuthStateChanged((user) => {
+        const loginScreen = document.getElementById('login-screen');
+        const appContainer = document.querySelector('.app-container');
+        
+        if (user) {
+            console.log("User is logged in:", user.email);
+            // Hide login screen, show application
+            if (loginScreen) loginScreen.style.display = 'none';
+            if (appContainer) appContainer.style.display = 'flex';
+            
+            // Customize user profile in sidebar if available
+            updateUserProfileUI(user.email);
+            
+            // Start listening to database changes
+            setupFirebaseSync();
+        } else {
+            console.log("User is logged out.");
+            // Show login screen, hide application
+            if (loginScreen) loginScreen.style.display = 'flex';
+            if (appContainer) appContainer.style.display = 'none';
+            
+            updateServerStatus('offline', 'Chưa đăng nhập');
+        }
+    });
+}
+
+// Helper to show app if Firebase fails or is offline
+function showAppContainer() {
+    const loginScreen = document.getElementById('login-screen');
+    const appContainer = document.querySelector('.app-container');
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'flex';
+}
+
+// Update sidebar user display with email
+function updateUserProfileUI(email) {
+    const userNameEl = document.querySelector('.user-profile .user-name');
+    const userRoleEl = document.querySelector('.user-profile .user-role');
+    if (userNameEl) {
+        userNameEl.innerText = email.split('@')[0];
+        userNameEl.title = email;
+    }
+    if (userRoleEl) {
+        userRoleEl.innerHTML = `Admin <a href="#" onclick="event.preventDefault(); handleLogout();" style="color: var(--accent); margin-left: 8px; font-size: 0.75rem;"><i class="fa-solid fa-right-from-bracket"></i> Thoát</a>`;
+    }
+}
+
+// Sign-in handler
+window.handleLoginSubmit = function() {
+    const emailEl = document.getElementById('login-email');
+    const passwordEl = document.getElementById('login-password');
+    const errorEl = document.getElementById('login-error');
+    const submitBtn = document.getElementById('login-submit-btn');
+    
+    if (!emailEl || !passwordEl) return;
+    
+    const email = emailEl.value.trim();
+    const password = passwordEl.value;
+    
+    if (errorEl) {
+        errorEl.style.display = 'none';
+        errorEl.innerText = '';
+    }
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực...`;
+    }
+    
+    firebase.auth().signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            console.log("Login successful!");
+        })
+        .catch((error) => {
+            console.error("Login failed:", error);
+            if (errorEl) {
+                errorEl.style.display = 'block';
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                    errorEl.innerText = 'Sai email đăng nhập hoặc mật khẩu!';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorEl.innerText = 'Định dạng Email không hợp lệ!';
+                } else {
+                    errorEl.innerText = 'Đăng nhập thất bại: ' + error.message;
+                }
+            }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Đăng nhập hệ thống`;
+            }
+        });
+};
+
+// Sign-out handler
+window.handleLogout = function() {
+    if (confirm("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?")) {
+        firebase.auth().signOut()
+            .then(() => {
+                // Clear localStorage cached database to protect data when logging out
+                localStorage.removeItem(DB_KEY);
+                console.log("Logged out successfully, cache cleared.");
+                window.location.reload();
+            })
+            .catch((error) => {
+                console.error("Sign out error:", error);
+                alert("Đăng xuất thất bại: " + error.message);
+            });
+    }
+};
+
+// Update Premium Server Status dot
 function updateServerStatus(status, text) {
     const container = document.querySelector('.server-status');
     if (!container) return;
     
-    let dotColor = '#10b981'; // Green (Online / Synced)
+    let dotColor = '#10b981'; // Green
     let pulseClass = '';
     
     if (status === 'connecting') {
-        dotColor = '#f59e0b'; // Amber (Connecting)
+        dotColor = '#f59e0b'; // Amber
         pulseClass = 'animation: pulse 1s infinite alternate;';
     } else if (status === 'error' || status === 'offline') {
-        dotColor = '#ef4444'; // Red (Offline)
+        dotColor = '#ef4444'; // Red
     }
     
     container.innerHTML = `
@@ -72,84 +188,150 @@ function updateServerStatus(status, text) {
 function setupFirebaseSync() {
     if (!db) return;
     
-    // We store the state in a single document 'state' in a collection 'shipmanage'
     const docRef = db.collection('shipmanage').doc('state');
-    
-    updateServerStatus('connecting', 'Đang tải dữ liệu đám mây...');
+    updateServerStatus('connecting', 'Đang kết nối Cloud...');
 
     // 1. Listen for updates in Firestore
     docRef.onSnapshot((doc) => {
         if (doc.exists) {
-            const cloudState = doc.data();
+            let cloudState = doc.data();
             console.log("Received state update from Firebase Firestore.");
             
-            // Update local state in AppData
-            AppData.state = cloudState;
-            
-            // Persist to localStorage as a cache
-            localStorage.setItem(DB_KEY, JSON.stringify(cloudState));
-            
-            // If the main application is already initialized and rendered, refresh the current view
-            if (typeof app !== 'undefined' && app.currentView) {
-                app.navigate(app.currentView);
+            // Check if document stores state as a string in 'data' field
+            if (cloudState && typeof cloudState === 'object' && cloudState.data && typeof cloudState.data === 'string') {
+                try {
+                    cloudState = JSON.parse(cloudState.data);
+                } catch (e) {
+                    console.error('Failed to parse cloud state JSON:', e);
+                }
             }
             
-            updateServerStatus('online', 'Đã đồng bộ đám mây');
+            // Update AppData local state and localStorage
+            if (cloudState && typeof cloudState === 'object' && Object.keys(cloudState).length > 0) {
+                AppData.state = cloudState;
+                localStorage.setItem(DB_KEY, JSON.stringify(cloudState));
+                
+                // Refresh active view if initialized
+                if (typeof app !== 'undefined' && app.currentView) {
+                    app.navigate(app.currentView);
+                }
+                
+                updateServerStatus('online', 'Đồng bộ Đám mây');
+            } else {
+                console.warn("Received empty or invalid state from Firestore.");
+                updateServerStatus('error', 'Dữ liệu trống');
+            }
         } else {
-            // First time use: Firestore is empty, upload local storage state to Firebase
+            // First time use: Firestore is empty, upload local state as initial backup
             console.log("Firestore has no existing data. Uploading local state as backup.");
             if (AppData.state) {
-                docRef.set(AppData.state)
-                    .then(() => {
-                        updateServerStatus('online', 'Đã đồng bộ đám mây');
-                    })
-                    .catch((err) => {
-                        console.error("Error setting initial state in Firestore:", err);
-                        if (err.code === 'permission-denied') {
-                            updateServerStatus('error', 'Lỗi phân quyền (Chưa bật Rules)');
-                        } else {
-                            updateServerStatus('error', 'Lỗi đồng bộ (Offline)');
-                        }
-                    });
+                pushStateToCloud(AppData.state);
             }
         }
     }, (error) => {
-        console.error("Firebase Firestore subscription error:", error);
+        console.error("Firestore sync subscription error:", error);
         if (error.code === 'permission-denied') {
-            updateServerStatus('error', 'Lỗi phân quyền (Chưa bật Rules)');
+            updateServerStatus('error', 'Lỗi bảo mật (Chưa phân quyền rules)');
         } else {
-            updateServerStatus('error', 'Lỗi đồng bộ (Offline)');
+            updateServerStatus('error', 'Lỗi đồng bộ (Ngoại tuyến)');
         }
     });
 
-    // 2. Intercept AppData.save() to push updates to Firestore
+    // 2. Intercept AppData.save() to automatically push changes to Firestore
     const originalSave = AppData.save;
     AppData.save = function() {
-        // Run original save to localStorage (keeps it lightning fast)
+        // Save locally first for speed
         originalSave.call(AppData);
         
-        // Push state to Firebase in background
-        if (isFirebaseInitialized && db) {
-            updateServerStatus('connecting', 'Đang lưu đám mây...');
-            docRef.set(AppData.state)
-                .then(() => {
-                    updateServerStatus('online', 'Đã đồng bộ đám mây');
-                })
-                .catch((err) => {
-                    console.error("Failed to save to Firebase Firestore:", err);
-                    if (err.code === 'permission-denied') {
-                        updateServerStatus('error', 'Lỗi phân quyền (Chưa bật Rules)');
-                    } else {
-                        updateServerStatus('error', 'Lỗi lưu dữ liệu (Offline)');
-                    }
-                });
+        // Push to Firebase in background
+        if (isFirebaseInitialized && db && firebase.auth().currentUser) {
+            pushStateToCloud(AppData.state);
         }
     };
 }
 
-// Auto-run initialization when DOM is loaded
+// Core function to push state to Firestore (supports direct object and stringified data fields)
+function pushStateToCloud(stateData) {
+    if (!db) return;
+    const docRef = db.collection('shipmanage').doc('state');
+    updateServerStatus('connecting', 'Đang lưu đám mây...');
+    
+    // We stringify the state inside a single field 'data' to prevent Firestore depth/field limits
+    const payload = {
+        data: JSON.stringify(stateData),
+        updatedAt: new Date().toISOString()
+    };
+    
+    docRef.set(payload)
+        .then(() => {
+            updateServerStatus('online', 'Đồng bộ Đám mây');
+        })
+        .catch((err) => {
+            console.error("Failed to save to Firebase Firestore:", err);
+            if (err.code === 'permission-denied') {
+                updateServerStatus('error', 'Lỗi ghi dữ liệu (Quyền rules)');
+            } else {
+                updateServerStatus('error', 'Lỗi lưu (Offline)');
+            }
+        });
+}
+
+// Force local data up to Firebase Firestore using direct Google REST API (bypasses WebSocket issues on file:// protocol)
+window.forceSyncToCloud = function() {
+    if (!AppData.state) {
+        alert("Lỗi: Không có dữ liệu cục bộ để đẩy!");
+        return;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        alert("Lỗi: Bạn cần đăng nhập để đồng bộ dữ liệu!");
+        return;
+    }
+    
+    if (confirm("HÀNH ĐỘNG NÀY SẼ GHI ĐÈ TOÀN BỘ DỮ LIỆU ĐÁM MÂY BẰNG DỮ LIỆU ĐANG CÓ TRÊN MÁY TÍNH NÀY.\n\nBạn có chắc chắn muốn ép đẩy dữ liệu Local lên Cloud không?")) {
+        updateServerStatus('connecting', 'Đang ép lưu (REST API)...');
+        
+        const url = `https://firestore.googleapis.com/v1/projects/shipmanagevgt/databases/(default)/documents/shipmanage/state?key=${firebaseConfig.apiKey}`;
+        
+        const payload = {
+            fields: {
+                data: {
+                    stringValue: JSON.stringify(AppData.state)
+                },
+                updatedAt: {
+                    stringValue: new Date().toISOString()
+                }
+            }
+        };
+
+        fetch(url, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw err; });
+            }
+            return response.json();
+        })
+        .then(() => {
+            alert("✅ ĐỒNG BỘ THÀNH CÔNG!\n\nĐã ghi đè dữ liệu cục bộ lên Đám mây. Các thiết bị khác (iPad, Điện thoại) sẽ tự động đồng bộ sau vài giây!");
+            updateServerStatus('online', 'Đồng bộ Đám mây');
+        })
+        .catch((err) => {
+            console.error("REST API force sync failed:", err);
+            updateServerStatus('error', 'Lỗi ép đồng bộ');
+            let errorMsg = err.error && err.error.message ? err.error.message : JSON.stringify(err);
+            alert("❌ THẤT BẠI: Lỗi đồng bộ đám mây!\n\nChi tiết: " + errorMsg);
+        });
+    }
+};
+
+// Initialize connection when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Add CSS keyframes for connecting status indicator pulsing
+    // Add pulsing CSS keyframes for indicator
     const style = document.createElement('style');
     style.innerHTML = `
         @keyframes pulse {
@@ -159,6 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(style);
     
-    // Initialize Firebase
+    // Start Firebase setup
     initFirebase();
 });

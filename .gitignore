@@ -10,3 +10,31 @@ temp_excel/
 # Office temporary files
 ~$*.xlsx
 ~$*.docx
+
+# Exclude sensitive business spreadsheets and documents
+*.xlsx
+*.xls
+*.docx
+*.doc
+*.pdf
+*.txt
+*.zip
+
+# Exclude dependencies and lock files
+node_modules/
+
+# Exclude script backups
+*.bak*
+*.disabled
+*_backup*
+temp_tx.json
+temp_tx_fixed.json
+allowances.json
+fuel_data_*.json
+extracted_data.txt
+bc_dong_tien_full.txt
+bc_headers.txt
+debts_sheet.txt
+fuel_js_content*.txt
+fuel_js_logs*.txt
+fuel_js_voyages*.txt
