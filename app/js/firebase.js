@@ -19,7 +19,6 @@ const firebaseConfig = {
 let db = null;
 let docRef = null;
 let isFirebaseInitialized = false;
-const DB_KEY = 'shipManageDB_v2'; // Must match data.js
 
 // Initialize Firebase App
 function initFirebase() {
