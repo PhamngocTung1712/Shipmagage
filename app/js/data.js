@@ -11138,7 +11138,11 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
     getVesselFundStats(vesselId, monthStr) {
         // Thu: Total transactions in company with category '1.Tàu Ứng' and matching vessel
         const companyAdvances = this.state.transactions
-            .filter(t => t.vessel === vesselId && t.category === '1.Tàu Ứng' && t.date && typeof t.date === 'string' && t.date.substring(0, 7) === monthStr)
+            .filter(t => t.vessel === vesselId && t.category && (
+                t.category === '1.Tàu Ứng' ||
+                t.category === '1.Tàu ứng' ||
+                t.category.trim().toLowerCase().includes('tàu ứng')
+            ) && t.date && typeof t.date === 'string' && t.date.substring(0, 7) === monthStr)
             .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
         // Chi: Calculated from the captain's report of this vessel and month
@@ -11157,7 +11161,11 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         
         // Sum previous company advances
         const prevAdvances = this.state.transactions
-            .filter(t => t.vessel === vesselId && t.category === '1.Tàu Ứng' && t.date && typeof t.date === 'string' && t.date.substring(0, 7) < monthStr)
+            .filter(t => t.vessel === vesselId && t.category && (
+                t.category === '1.Tàu Ứng' ||
+                t.category === '1.Tàu ứng' ||
+                t.category.trim().toLowerCase().includes('tàu ứng')
+            ) && t.date && typeof t.date === 'string' && t.date.substring(0, 7) < monthStr)
             .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
             
         // Sum previous captain reports' spending
@@ -11432,7 +11440,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                 this.recalculateVesselAllocations(oldTx.vessel, oldTx.date.substring(0, 7));
             }
         }
-        if (t.category === '2.Chi Phí Cảng' || (oldTx && oldTx.category === '2.Chi Phí Cảng')) {
+        if (t.category === '2.Chi Phí Cảng' || t.category === 'Vật tư sửa chữa lớn' || (oldTx && (oldTx.category === '2.Chi Phí Cảng' || oldTx.category === 'Vật tư sửa chữa lớn'))) {
             this.recalculateAllShipments();
         }
     },
@@ -11443,7 +11451,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         if (t && t.vessel && t.vessel !== 'VP' && t.date && (t.category === '9.Vật Tư' || t.category === '6.Lãi Vay')) {
             this.recalculateVesselAllocations(t.vessel, t.date.substring(0, 7));
         }
-        if (t && t.category === '2.Chi Phí Cảng') {
+        if (t && (t.category === '2.Chi Phí Cảng' || t.category === 'Vật tư sửa chữa lớn')) {
             this.recalculateAllShipments();
         }
     },
@@ -11470,12 +11478,20 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         if(idx >= 0) this.state.fuelVoyages[idx] = v;
         else this.state.fuelVoyages.push(v);
         this.save();
+        
+        this.syncShipmentFromFuelVoyage(v.vesselId, v.voyageNo);
+        
         return v.id;
     },
     deleteFuelVoyage(id) {
+        const v = this.getFuelVoyage(id);
         this.state.fuelVoyages = this.state.fuelVoyages.filter(v => v.id !== id);
         this.state.fuelLogs = this.state.fuelLogs.filter(l => l.fuelVoyageId !== id);
         this.save();
+        
+        if (v) {
+            this.syncShipmentFromFuelVoyage(v.vesselId, v.voyageNo);
+        }
     },
 
     addFuelLog(log) {
@@ -11484,10 +11500,23 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         if(idx >= 0) this.state.fuelLogs[idx] = log;
         else this.state.fuelLogs.push(log);
         this.save();
+        
+        const v = this.getFuelVoyage(log.fuelVoyageId);
+        if (v) {
+            this.syncShipmentFromFuelVoyage(v.vesselId, v.voyageNo);
+        }
     },
     deleteFuelLog(id) {
+        const log = this.state.fuelLogs.find(t => t.id === id);
         this.state.fuelLogs = this.state.fuelLogs.filter(t => t.id !== id);
         this.save();
+        
+        if (log) {
+            const v = this.getFuelVoyage(log.fuelVoyageId);
+            if (v) {
+                this.syncShipmentFromFuelVoyage(v.vesselId, v.voyageNo);
+            }
+        }
     },
 
     getLOSupplies(vesselId) {
@@ -11532,6 +11561,47 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
     },
     deleteShipment(id) {
         this.state.shipments = this.state.shipments.filter(t => t.id !== id);
+        this.save();
+    },
+    
+    syncShipmentFromFuelVoyage(vesselId, voyageNo) {
+        const shipmentIdx = this.state.shipments.findIndex(s => s.vesselId === vesselId && s.voyageNo === voyageNo);
+        if (shipmentIdx < 0) return;
+        
+        const shipment = this.state.shipments[shipmentIdx];
+        const fuelVoy = this.findFuelVoyageByVesselAndNo(vesselId, voyageNo);
+        if (!fuelVoy) return;
+        
+        const stats = this.getFuelVoyageStats(fuelVoy.id);
+        
+        // 1. Update hours
+        shipment.fuelHours = stats.totalHours;
+        
+        // 2. Update fuel DO cost
+        let price = Number(stats.fuelPrice);
+        if (price === 0) {
+            price = this.getLastFuelPrice(vesselId, voyageNo);
+        }
+        shipment.fuelPrice = price;
+        shipment.costs.fuelDO = Math.round(stats.totalFuel * price);
+        
+        // 3. Update LO cost
+        const vessel = this.getVessel(vesselId);
+        if (vessel) {
+            const loHours = Number(vessel.loHours) || 800;
+            const loRepl = Number(vessel.loReplacementQty) || 8;
+            const loTopup = Number(vessel.loTopupQty) || 3;
+            const loHourlyRate = (loRepl + (loHours / 24 * loTopup)) / loHours;
+            const loPrice = this.getLastLOPrice(vesselId, shipment.dateStart);
+            shipment.costs.fuelLO = Math.round(stats.totalHours * loHourlyRate * loPrice);
+        }
+        
+        // 4. Update VAT
+        const revenueReal = Number(shipment.revenueReal) || 0;
+        const revenueInvoice = Number(shipment.revenueInvoice) || 0;
+        const vat = Math.round((0.08 * (revenueInvoice || revenueReal)) - (0.10 * shipment.costs.fuelDO));
+        shipment.costs.vat = vat > 0 ? vat : 0;
+        
         this.save();
     },
     addVendor(v) {
@@ -11650,9 +11720,72 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
 
     recalculateAllShipments() {
         if (!this.state.shipments) this.state.shipments = [];
+        if (!this.state.annualCosts) this.state.annualCosts = [];
+
+        // Auto-aggregate large repair material costs into annual configurations
+        const largeRepairCombinations = new Set();
+        (this.state.transactions || []).forEach(t => {
+            if (t.category === 'Vật tư sửa chữa lớn' && t.vessel && t.vessel !== 'VP' && t.date) {
+                const year = new Date(t.date).getFullYear();
+                if (!isNaN(year)) {
+                    largeRepairCombinations.add(`${t.vessel}_${year}`);
+                }
+            }
+        });
+
+        largeRepairCombinations.forEach(combo => {
+            const [vesselId, yearStr] = combo.split('_');
+            const year = Number(yearStr);
+            let config = this.state.annualCosts.find(c => c.year === year && c.vesselId === vesselId);
+            if (!config) {
+                config = {
+                    year,
+                    vesselId,
+                    dockingIntermediateCost: 0,
+                    dockingIntermediateYears: 2.5,
+                    dockingIntermediateDate: '',
+                    dockingPeriodicCost: 0,
+                    dockingPeriodicYears: 5,
+                    dockingPeriodicDate: '',
+                    registryAnnualCost: 0,
+                    registryAnnualYears: 1,
+                    registryAnnualDate: '',
+                    depreciationCost: 0,
+                    hullInsuranceCost: 0,
+                    largeRepairCost: 0
+                };
+                this.state.annualCosts.push(config);
+            }
+        });
+
+        this.state.annualCosts.forEach(config => {
+            const sumActual = (this.state.transactions || [])
+                .filter(t => t.vessel === config.vesselId && 
+                             t.category === 'Vật tư sửa chữa lớn' && 
+                             t.date && 
+                             new Date(t.date).getFullYear() === config.year)
+                .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+            config.largeRepairCost = sumActual;
+            config.largeRepairDaily = sumActual / 365;
+        });
+
         this.state.shipments.forEach(s => {
             if (!s.costs) s.costs = {};
             const vesselId = s.vesselId;
+
+            // Đồng bộ dữ liệu giờ chạy và chi phí dầu DO từ Nhật trình nhiên liệu nếu có
+            const fuelVoy = this.findFuelVoyageByVesselAndNo(vesselId, s.voyageNo);
+            if (fuelVoy) {
+                const stats = this.getFuelVoyageStats(fuelVoy.id);
+                s.fuelHours = stats.totalHours;
+                let price = Number(stats.fuelPrice);
+                if (price === 0) {
+                    price = this.getLastFuelPrice(vesselId, s.voyageNo);
+                }
+                s.fuelPrice = price;
+                s.costs.fuelDO = Math.round(stats.totalFuel * price);
+            }
+
             s.costs.crewSalary = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'salary');
             s.costs.crewFood = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'food');
             s.costs.crewInsurance = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'insurance');
@@ -11691,6 +11824,12 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                 const fuelHours = Number(s.fuelHours) || 0;
                 s.costs.fuelLO = Math.round(fuelHours * hourlyRate * loPrice);
             }
+
+            // Tính toán lại thuế VAT chuyến hàng dựa trên chi phí dầu DO mới
+            const revenueReal = Number(s.revenueReal) || 0;
+            const revenueInvoice = Number(s.revenueInvoice) || 0;
+            const vatVal = Math.round((0.08 * (revenueInvoice || revenueReal)) - (0.10 * (s.costs.fuelDO || 0)));
+            s.costs.vat = vatVal > 0 ? vatVal : 0;
         });
         this.save();
     },

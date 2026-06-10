@@ -1361,13 +1361,30 @@ const app = {
         
         // Filter shipments based on active UI filters
         const filterMonth = this.lastShipmentsMonth || '';
+        const filterYear = this.lastShipmentsYear || '';
         const filterVessel = this.lastShipmentsVessel || '';
         const filterCustomer = this.lastShipmentsCustomer || '';
         
         if (filterMonth) {
             ships = ships.filter(s => {
                 const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
-                return m === filterMonth;
+                if (m && m.includes('-')) {
+                    return m.split('-')[1] === filterMonth;
+                }
+                return false;
+            });
+        }
+        if (filterYear) {
+            ships = ships.filter(s => {
+                const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                if (m && m.length >= 4) {
+                    return m.substring(0, 4) === String(filterYear);
+                }
+                const date = s.dateStart || s.dateEnd;
+                if (date) {
+                    return new Date(date).getFullYear() === Number(filterYear);
+                }
+                return false;
             });
         }
         if (filterVessel) {
@@ -1588,14 +1605,22 @@ const app = {
             return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         };
 
-        const doCost = overrides.doCost !== undefined ? Number(overrides.doCost) : AppData.state.fuelVoyages
-            .filter(v => v.vesselId === vesselId && parseFuelMonth(v.fuelDate) === monthStr)
-            .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+        const doCost = overrides.doCost !== undefined ? Number(overrides.doCost) : txs
+            .filter(t => t.category && (
+                t.category === '4.Dầu DO' ||
+                t.category === '10.Nhiên Liệu DO' ||
+                t.category.trim().toLowerCase().includes('dầu do')
+            ))
+            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
         const loCost = overrides.loCost !== undefined ? Number(overrides.loCost) : (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr)
             .reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
 
-        const vesselAdvances = overrides.advances !== undefined ? Number(overrides.advances) : txs.filter(t => t.category && t.category.toLowerCase() === '1.tàu ứng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        const vesselAdvances = overrides.advances !== undefined ? Number(overrides.advances) : txs.filter(t => t.category && (
+            t.category === '1.Tàu Ứng' ||
+            t.category === '1.Tàu ứng' ||
+            t.category.trim().toLowerCase().includes('tàu ứng')
+        )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
         const monthlyCost = AppData.getMonthlyCosts(monthStr, vesselId);
         const crewSalary = overrides.salary !== undefined ? Number(overrides.salary) : (monthlyCost.salary || 0);
@@ -1797,12 +1822,21 @@ const app = {
         // Lấy tất cả giao dịch tài chính liên quan đến tàu này trong tháng
         const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
 
-        // Lấy chi phí dầu DO và LO
-        const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === vesselId && v.fuelDate && v.fuelDate.substring(0, 7) === monthStr).reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+        // Lấy chi phí dầu DO và LO từ giao dịch (Quản lý tài chính)
+        const doCost = txs.filter(t => t.category && (
+            t.category === '4.Dầu DO' ||
+            t.category === '10.Nhiên Liệu DO' ||
+            t.category.trim().toLowerCase().includes('dầu do')
+        )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
         const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr).reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
 
         // Tàu chi
-        const vesselAdvances = txs.filter(t => t.category === '1.Tàu ứng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        const vesselAdvances = txs.filter(t => t.category && (
+            t.category === '1.Tàu Ứng' ||
+            t.category === '1.Tàu ứng' ||
+            t.category.trim().toLowerCase().includes('tàu ứng')
+        )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
         // Lương
         const monthlyCost = AppData.getMonthlyCosts(monthStr, vesselId);
@@ -2449,10 +2483,19 @@ const app = {
         
         const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
         
-        const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === vesselId && v.fuelDate && v.fuelDate.substring(0, 7) === monthStr).reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+        const doCost = txs.filter(t => t.category && (
+            t.category === '4.Dầu DO' ||
+            t.category === '10.Nhiên Liệu DO' ||
+            t.category.trim().toLowerCase().includes('dầu do')
+        )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
         const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr).reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
         
-        const vesselAdvances = txs.filter(t => t.category === '1.Tàu ứng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        const vesselAdvances = txs.filter(t => t.category && (
+            t.category === '1.Tàu Ứng' ||
+            t.category === '1.Tàu ứng' ||
+            t.category.trim().toLowerCase().includes('tàu ứng')
+        )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
         const monthlyCost = AppData.getMonthlyCosts(monthStr, vesselId);
         const crewSalary = monthlyCost.salary || 0;
         
@@ -2813,14 +2856,16 @@ const app = {
                 container.innerHTML = Views.fuel(this.lastFuelVesselId, activeTab);
             } else if (viewName === 'shipments') {
                 const m = args[0] !== undefined ? args[0] : (this.lastShipmentsMonth || '');
-                const v = args[1] !== undefined ? args[1] : (this.lastShipmentsVessel || '');
-                const c = args[2] !== undefined ? args[2] : (this.lastShipmentsCustomer || '');
+                const y = args[1] !== undefined ? args[1] : (this.lastShipmentsYear || '');
+                const v = args[2] !== undefined ? args[2] : (this.lastShipmentsVessel || '');
+                const c = args[3] !== undefined ? args[3] : (this.lastShipmentsCustomer || '');
                 
                 this.lastShipmentsMonth = m;
+                this.lastShipmentsYear = y;
                 this.lastShipmentsVessel = v;
                 this.lastShipmentsCustomer = c;
                 
-                container.innerHTML = Views.shipments(m, v, c);
+                container.innerHTML = Views.shipments(m, y, v, c);
             } else {
                 container.innerHTML = Views[viewName](...args);
             }
@@ -3649,28 +3694,64 @@ const app = {
         const fuelDOPercent = totalRevenue > 0 ? ((totalFuelDO / totalRevenue) * 100).toFixed(1) : 0;
         const crewSalaryPercent = totalRevenue > 0 ? ((totalCrewSalary / totalRevenue) * 100).toFixed(1) : 0;
 
-        // 4. Tính toán so sánh tăng trưởng nếu có chọn tháng
+        // 4. Tính toán so sánh tăng trưởng nếu có chọn kỳ hạch toán
         let growthHTML = '';
         if (filterMonth) {
-            // Xác định tháng trước
-            const parts = filterMonth.split('-');
-            let yr = parseInt(parts[0]);
-            let mo = parseInt(parts[1]);
-            mo--;
-            if (mo === 0) {
-                mo = 12;
-                yr--;
+            let prevPeriodStr = '';
+            let prevPeriodLabel = '';
+            let isQuarter = filterMonth.includes('-Q');
+            let isYear = filterMonth.length === 4;
+            let isMonth = filterMonth.length === 7;
+
+            if (isMonth) {
+                const parts = filterMonth.split('-');
+                let yr = parseInt(parts[0]);
+                let mo = parseInt(parts[1]);
+                mo--;
+                if (mo === 0) {
+                    mo = 12;
+                    yr--;
+                }
+                prevPeriodStr = yr + '-' + String(mo).padStart(2, '0');
+                prevPeriodLabel = `tháng trước (Tháng ${mo}/${yr})`;
+            } else if (isYear) {
+                let yr = parseInt(filterMonth);
+                prevPeriodStr = String(yr - 1);
+                prevPeriodLabel = `năm trước (Năm ${yr - 1})`;
+            } else if (isQuarter) {
+                const [yStr, qStr] = filterMonth.split('-Q');
+                let yr = parseInt(yStr);
+                let q = parseInt(qStr);
+                q--;
+                if (q === 0) {
+                    q = 4;
+                    yr--;
+                }
+                prevPeriodStr = `${yr}-Q${q}`;
+                prevPeriodLabel = `quý trước (Quý ${q}/${yr})`;
             }
-            const prevMonthStr = yr + '-' + String(mo).padStart(2, '0');
-            const prevMonthShipments = allShipments.filter(s => {
+
+            const prevShipments = allShipments.filter(s => {
                 const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
-                return m === prevMonthStr;
+                if (!m) return false;
+                if (isMonth) {
+                    return m === prevPeriodStr;
+                } else if (isYear) {
+                    return m.startsWith(prevPeriodStr);
+                } else if (isQuarter) {
+                    const [y, qValStr] = prevPeriodStr.split('-Q');
+                    const qVal = Number(qValStr);
+                    const mm = Number(m.split('-')[1]);
+                    const mq = Math.ceil(mm / 3);
+                    return m.startsWith(y) && mq === qVal;
+                }
+                return false;
             });
 
-            if (prevMonthShipments.length > 0) {
+            if (prevShipments.length > 0) {
                 let prevRevenue = 0;
                 let prevCost = 0;
-                prevMonthShipments.forEach(s => {
+                prevShipments.forEach(s => {
                     prevRevenue += Number(s.revenueReal || 0);
                     const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
                     const baseCosts = { ...s.costs };
@@ -3692,14 +3773,14 @@ const app = {
                 }
                 
                 if (profitDiff > 0) {
-                    growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-arrow-trend-up" style="color: var(--secondary); margin-right: 8px;"></i>So với tháng trước (Tháng ${mo}/${yr}), lợi nhuận ròng của công ty <strong>tăng trưởng ${growthRate}%</strong> (Tương đương tăng thêm <strong style="color: var(--secondary);">${AppData.formatCurrency(profitDiff)}</strong>).</li>`;
+                    growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-arrow-trend-up" style="color: var(--secondary); margin-right: 8px;"></i>So với ${prevPeriodLabel}, lợi nhuận ròng của công ty <strong>tăng trưởng ${growthRate}%</strong> (Tương đương tăng thêm <strong style="color: var(--secondary);">${AppData.formatCurrency(profitDiff)}</strong>).</li>`;
                 } else if (profitDiff < 0) {
-                    growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-arrow-trend-down" style="color: var(--accent); margin-right: 8px;"></i>So với tháng trước (Tháng ${mo}/${yr}), lợi nhuận ròng của công ty <strong>suy giảm ${Math.abs(growthRate)}%</strong> (Tương đương giảm <strong style="color: var(--accent);">${AppData.formatCurrency(Math.abs(profitDiff))}</strong>). Ban điều hành cần rà soát lại chi phí chuyến.</li>`;
+                    growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-arrow-trend-down" style="color: var(--accent); margin-right: 8px;"></i>So với ${prevPeriodLabel}, lợi nhuận ròng của công ty <strong>suy giảm ${Math.abs(growthRate)}%</strong> (Tương đương giảm <strong style="color: var(--accent);">${AppData.formatCurrency(Math.abs(profitDiff))}</strong>). Ban điều hành cần rà soát lại chi phí chuyến.</li>`;
                 } else {
-                    growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-equals" style="color: var(--info); margin-right: 8px;"></i>Lợi nhuận ròng duy trì ổn định tương đương tháng trước (Tháng ${mo}/${yr}).</li>`;
+                    growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-equals" style="color: var(--info); margin-right: 8px;"></i>Lợi nhuận ròng duy trì ổn định tương đương ${prevPeriodLabel}.</li>`;
                 }
             } else {
-                growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-circle-info" style="color: var(--info); margin-right: 8px;"></i>Không có dữ liệu của tháng trước (${prevMonthStr}) để so sánh tăng trưởng.</li>`;
+                growthHTML = `<li style="margin-bottom: 0.5rem;"><i class="fa-solid fa-circle-info" style="color: var(--info); margin-right: 8px;"></i>Không có dữ liệu của ${prevPeriodLabel.replace('so với ', '')} để so sánh tăng trưởng.</li>`;
             }
         }
 
@@ -3754,7 +3835,18 @@ const app = {
             </div>`;
         }
 
-        let timeStr = filterMonth ? `Tháng ${filterMonth.split('-')[1]}/${filterMonth.split('-')[0]}` : 'Toàn bộ thời gian';
+        let timeStr = 'Toàn bộ thời gian';
+        if (filterMonth) {
+            if (filterMonth.length === 4) {
+                timeStr = `Năm ${filterMonth}`;
+            } else if (filterMonth.includes('-Q')) {
+                const [y, q] = filterMonth.split('-Q');
+                timeStr = `Quý ${q}/${y}`;
+            } else {
+                const [y, m] = filterMonth.split('-');
+                timeStr = `Tháng ${m}/${y}`;
+            }
+        }
 
         el.innerHTML = `
             <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 2rem;">

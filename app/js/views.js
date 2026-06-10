@@ -7,19 +7,45 @@ const Views = {
         const company = AppData.getCompany();
         const allShips = AppData.getShipments();
         
-        // Thu thập danh sách các tháng có dữ liệu chuyến hàng
+        // Thu thập danh sách các năm, quý, tháng có dữ liệu chuyến hàng
+        const yearsSet = new Set();
+        const quartersSet = new Set();
         const monthsSet = new Set();
+        
         allShips.forEach(s => {
             const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
-            if (m) monthsSet.add(m);
+            if (m && m.length === 7) {
+                monthsSet.add(m);
+                const year = m.substring(0, 4);
+                yearsSet.add(year);
+                
+                const mm = Number(m.split('-')[1]);
+                const q = Math.ceil(mm / 3);
+                quartersSet.add(`${year}-Q${q}`);
+            }
         });
+        
+        const availableYears = Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
+        const availableQuarters = Array.from(quartersSet).sort((a, b) => b.localeCompare(a));
         const availableMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
 
         let filteredShips = allShips;
         if (filterMonth) {
             filteredShips = allShips.filter(s => {
                 const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
-                return m === filterMonth;
+                if (!m) return false;
+                
+                if (filterMonth.length === 4) { // Year e.g. "2026"
+                    return m.startsWith(filterMonth);
+                } else if (filterMonth.includes('-Q')) { // Quarter e.g. "2026-Q1"
+                    const [y, qStr] = filterMonth.split('-Q');
+                    const q = Number(qStr);
+                    const mm = Number(m.split('-')[1]);
+                    const mq = Math.ceil(mm / 3);
+                    return m.startsWith(y) && mq === q;
+                } else { // Month e.g. "2026-05"
+                    return m === filterMonth;
+                }
             });
         }
         
@@ -196,11 +222,25 @@ const Views = {
 
                     <div style="display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.03); padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-left: auto;">
                         <label style="font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin: 0; display: flex; align-items: center; gap: 6px;">
-                            <i class="fa-solid fa-filter" style="color:var(--primary-light);"></i> Lọc tháng hạch toán:
+                            <i class="fa-solid fa-filter" style="color:var(--primary-light);"></i> Kỳ hạch toán:
                         </label>
-                        <select class="form-control" style="width: 180px; height: 32px; padding: 4px 8px; font-size: 0.85rem;" onchange="app.navigate('dashboard', this.value)">
-                            <option value="">-- Tất cả các tháng --</option>
-                            ${availableMonths.map(m => `<option value="${m}" ${m === filterMonth ? 'selected' : ''}>Tháng ${m.split('-')[1]}/${m.split('-')[0]}</option>`).join('')}
+                        <select class="form-control" style="width: 220px; height: 32px; padding: 4px 8px; font-size: 0.85rem;" onchange="app.navigate('dashboard', this.value)">
+                            <option value="">-- Tất cả thời gian --</option>
+                            <optgroup label="Theo Năm">
+                                ${availableYears.map(y => `<option value="${y}" ${y === filterMonth ? 'selected' : ''}>Năm ${y}</option>`).join('')}
+                            </optgroup>
+                            <optgroup label="Theo Quý">
+                                ${availableQuarters.map(q => {
+                                    const [y, qNum] = q.split('-Q');
+                                    return `<option value="${q}" ${q === filterMonth ? 'selected' : ''}>Quý ${qNum}/${y}</option>`;
+                                }).join('')}
+                            </optgroup>
+                            <optgroup label="Theo Tháng">
+                                ${availableMonths.map(m => {
+                                    const [y, mm] = m.split('-');
+                                    return `<option value="${m}" ${m === filterMonth ? 'selected' : ''}>Tháng ${mm}/${y}</option>`;
+                                }).join('')}
+                            </optgroup>
                         </select>
                     </div>
                 </div>
@@ -781,6 +821,9 @@ const Views = {
     <option value="Trả gốc vay">Trả gốc vay</option>
     <option value="7.Bảo Hiểm">7. Bảo Hiểm</option>
     <option value="5.Dầu LO">5. Dầu LO</option>
+    <option value="Vật tư sửa chữa trung gian">Vật tư sửa chữa trung gian</option>
+    <option value="Vật tư sửa chữa định kỳ">Vật tư sửa chữa định kỳ</option>
+    <option value="Vật tư sửa chữa lớn">Vật tư sửa chữa lớn</option>
     <option value="Luân chuyển">Luân chuyển</option>
     <option value="Văn phòng">Văn phòng</option>
 </select></div>
@@ -1583,14 +1626,64 @@ const Views = {
         `;
     },
 
-    shipments: () => {
-        const ships = AppData.getShipments()
+    shipments: (filterMonth = '', filterYear = '', filterVessel = '', filterCustomer = '') => {
+        const allShips = AppData.getShipments()
             .slice()
             .sort((a, b) => {
                 const numA = parseInt((a.contractNo || '').replace(/\D/g, '')) || 0;
                 const numB = parseInt((b.contractNo || '').replace(/\D/g, '')) || 0;
                 return numB - numA; // Giảm dần: HD52 lên đầu
             });
+
+        // 1. Extract years dynamically
+        const uniqueYears = Array.from(new Set(allShips.map(s => {
+            if (s.reportMonth && s.reportMonth.length >= 4) return parseInt(s.reportMonth.substring(0, 4));
+            const date = s.dateStart || s.dateEnd;
+            return date ? new Date(date).getFullYear() : null;
+        }).filter(Boolean))).sort((a, b) => b - a);
+
+        // 2. Extract vessels
+        const vessels = AppData.getVessels();
+
+        // 3. Extract customers/partners
+        const uniqueCustomers = Array.from(new Set(allShips.map(s => s.customer).filter(Boolean))).sort();
+
+        // Apply filters
+        let ships = allShips;
+
+        if (filterMonth) {
+            ships = ships.filter(s => {
+                const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                if (m && m.includes('-')) {
+                    const monthPart = m.split('-')[1];
+                    return monthPart === filterMonth;
+                }
+                return false;
+            });
+        }
+
+        if (filterYear) {
+            ships = ships.filter(s => {
+                const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                if (m && m.length >= 4) {
+                    return m.substring(0, 4) === String(filterYear);
+                }
+                const date = s.dateStart || s.dateEnd;
+                if (date) {
+                    return new Date(date).getFullYear() === Number(filterYear);
+                }
+                return false;
+            });
+        }
+
+        if (filterVessel) {
+            ships = ships.filter(s => s.vesselId === filterVessel);
+        }
+
+        if (filterCustomer) {
+            ships = ships.filter(s => s.customer === filterCustomer);
+        }
+
         return `
             <div class="view-section">
                 <div class="page-header">
@@ -1602,6 +1695,53 @@ const Views = {
                         <button class="btn btn-primary" onclick="app.openShipmentModal()"><i class="fa-solid fa-plus"></i> Thêm Chuyến Mới</button>
                     </div>
                 </div>
+
+                <!-- Filter Bar -->
+                <div class="glass-card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;">
+                        <!-- Filter Year -->
+                        <div class="form-group" style="margin: 0; width: 140px;">
+                            <label class="form-label" style="margin-bottom: 0.25rem; font-size: 0.75rem;">Chọn Năm</label>
+                            <select class="form-control" style="width: 100%;" onchange="app.navigate('shipments', '${filterMonth}', this.value, '${filterVessel}', '${filterCustomer}')">
+                                <option value="">-- Tất cả năm --</option>
+                                ${uniqueYears.map(y => `<option value="${y}" ${String(y) === String(filterYear) ? 'selected' : ''}>Năm ${y}</option>`).join('')}
+                            </select>
+                        </div>
+                        <!-- Filter Month -->
+                        <div class="form-group" style="margin: 0; width: 140px;">
+                            <label class="form-label" style="margin-bottom: 0.25rem; font-size: 0.75rem;">Chọn Tháng</label>
+                            <select class="form-control" style="width: 100%;" onchange="app.navigate('shipments', this.value, '${filterYear}', '${filterVessel}', '${filterCustomer}')">
+                                <option value="">-- Tất cả tháng --</option>
+                                ${Array.from({length: 12}, (_, i) => String(i + 1).padStart(2, '0')).map(m => `
+                                    <option value="${m}" ${m === filterMonth ? 'selected' : ''}>Tháng ${m}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <!-- Filter Vessel -->
+                        <div class="form-group" style="margin: 0; width: 160px;">
+                            <label class="form-label" style="margin-bottom: 0.25rem; font-size: 0.75rem;">Chọn Tàu</label>
+                            <select class="form-control" style="width: 100%;" onchange="app.navigate('shipments', '${filterMonth}', '${filterYear}', this.value, '${filterCustomer}')">
+                                <option value="">-- Tất cả tàu --</option>
+                                ${vessels.map(v => `<option value="${v.id}" ${v.id === filterVessel ? 'selected' : ''}>Tàu ${v.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <!-- Filter Customer -->
+                        <div class="form-group" style="margin: 0; width: 220px;">
+                            <label class="form-label" style="margin-bottom: 0.25rem; font-size: 0.75rem;">Chọn Đối Tác</label>
+                            <select class="form-control" style="width: 100%;" onchange="app.navigate('shipments', '${filterMonth}', '${filterYear}', '${filterVessel}', this.value)">
+                                <option value="">-- Tất cả đối tác --</option>
+                                ${uniqueCustomers.map(c => `<option value="${c}" ${c === filterCustomer ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
+                        <!-- Reset Button -->
+                        ${(filterMonth || filterYear || filterVessel || filterCustomer) ? `
+                            <button class="btn btn-outline" style="margin-top: 1.2rem; padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="app.navigate('shipments', '', '', '', '')">
+                                <i class="fa-solid fa-rotate-left"></i> Xóa bộ lọc
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+
                 <div class="glass-card">
                     <div class="double-scroll-wrapper" id="shipments-scroll-wrapper">
                         <div class="top-scrollbar" style="overflow-x: auto; overflow-y: hidden; height: 8px; margin-bottom: 6px; border-radius: 4px; display: none;">
@@ -3007,11 +3147,12 @@ const Views = {
         const dockingIntermediate = app.excludeDockingDepreciation ? 0 : (s.costs.dockingIntermediate || 0);
         const dockingPeriodic = app.excludeDockingDepreciation ? 0 : (s.costs.dockingPeriodic || 0);
         const registryAnnual = s.costs.registryAnnual || 0;
+        const largeRepair = s.costs.largeRepair || 0;
 
         const deduc = fuelDO + fuelLO + agent + portFees;
         const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.08 * deduc));
         
-        const costSum = fuelDO + fuelLO + agent + vessel2ends + portFees + brokerage + crewSalary + crewFood + crewInsurance + materialCompany + materialVessel + loanInterest + loanInterestExternal + monthlyOther + others + depreciation + hullInsurance + dockingIntermediate + dockingPeriodic + registryAnnual + vat;
+        const costSum = fuelDO + fuelLO + agent + vessel2ends + portFees + brokerage + crewSalary + crewFood + crewInsurance + materialCompany + materialVessel + loanInterest + loanInterestExternal + monthlyOther + others + depreciation + hullInsurance + dockingIntermediate + dockingPeriodic + registryAnnual + largeRepair + vat;
         const profit = s.revenueReal - costSum;
         const vessel = AppData.getVessel(s.vesselId);
         
@@ -3057,7 +3198,8 @@ const Views = {
             { label: 'Bảo hiểm thân vỏ', value: s.costs.hullInsurance || 0 },
             { label: 'Lên đà trung gian', value: s.costs.dockingIntermediate || 0 },
             { label: 'Lên đà định kỳ', value: s.costs.dockingPeriodic || 0 },
-            { label: 'Đăng kiểm hàng năm', value: s.costs.registryAnnual || 0 }
+            { label: 'Đăng kiểm hàng năm', value: s.costs.registryAnnual || 0 },
+            { label: 'Sửa chữa lớn', value: s.costs.largeRepair || 0 }
         ];
         costItemsList.sort((a, b) => b.value - a.value);
         const topCost = costItemsList[0];
@@ -3216,6 +3358,7 @@ const Views = {
                             ${costRow('17. Lên đà trung gian (Phân bổ)', dockingIntermediate)}
                             ${costRow('18. Lên đà định kỳ (Phân bổ)', dockingPeriodic)}
                             ${costRow('19. Đăng kiểm hàng năm (Phân bổ)', registryAnnual)}
+                            ${costRow('20. Sửa chữa lớn (Phân bổ)', largeRepair)}
                             <tr style="font-weight: bold; background: rgba(255,0,100,0.05); border-top: 1px solid var(--border-color);">
                                 <td>TỔNG CHI PHÍ</td>
                                 <td style="text-align: right; color: var(--rose-light);">${AppData.formatCurrency(costSum)}</td>
@@ -3360,16 +3503,23 @@ const Views = {
                 // Transactions
                 const txs = (AppData.state.transactions || []).filter(t => t.vessel === fvm && t.date && t.date.substring(0, 7) === fmm);
 
-                // DO cost
-                const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === fvm && v.fuelDate && v.fuelDate.substring(0, 7) === fmm)
-                    .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+                // DO cost calculated from financial transactions (Quản lý tài chính)
+                const doCost = txs.filter(t => t.category && (
+                    t.category === '4.Dầu DO' ||
+                    t.category === '10.Nhiên Liệu DO' ||
+                    t.category.trim().toLowerCase().includes('dầu do')
+                )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
                 // LO cost
                 const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === fvm && s.date && s.date.substring(0, 7) === fmm)
                     .reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
 
                 // Tàu ứng chi phí
-                const vesselAdvanceTxs = txs.filter(t => t.category === '1.Tàu ứng');
+                const vesselAdvanceTxs = txs.filter(t => t.category && (
+                    t.category === '1.Tàu Ứng' ||
+                    t.category === '1.Tàu ứng' ||
+                    t.category.trim().toLowerCase().includes('tàu ứng')
+                ));
                 const vesselAdvances = vesselAdvanceTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
                 // Lương
@@ -4030,6 +4180,22 @@ const Views = {
         const activeVesselId = app.annualCostsVesselId || firstVesselId;
         const activeYear = Number(app.annualCostsYear || currentYear);
         const config = AppData.getAnnualCosts(activeYear, activeVesselId);
+
+        // Sum actual repair material costs for activeVesselId and activeYear
+        const txs = AppData.getTransactions() || [];
+        const actualDockingIntCost = txs
+            .filter(t => t.vessel === activeVesselId && 
+                         t.category === 'Vật tư sửa chữa trung gian' && 
+                         t.date && 
+                         new Date(t.date).getFullYear() === activeYear)
+            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        const actualDockingPerCost = txs
+            .filter(t => t.vessel === activeVesselId && 
+                         t.category === 'Vật tư sửa chữa định kỳ' && 
+                         t.date && 
+                         new Date(t.date).getFullYear() === activeYear)
+            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
         
         // Build docking and registration schedule alerts for all vessels
         const reminders = [];
@@ -4144,8 +4310,9 @@ const Views = {
                                 <h4 style="margin: 0 0 0.75rem 0; color: var(--secondary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
                                     <i class="fa-solid fa-ship"></i> 1. Lên đà trung gian
                                 </h4>
-                                <div class="grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                                    <div class="form-group" style="margin:0;"><label class="form-label">Chi phí (VNĐ)</label><input type="number" class="form-control" id="a-docking-int-cost" value="${config.dockingIntermediateCost || 0}"></div>
+                                <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 1fr 1.15fr; gap: 10px;">
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Chi phí ước tính (VNĐ)</label><input type="number" class="form-control" id="a-docking-int-cost" value="${config.dockingIntermediateCost || 0}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label" style="color: var(--accent);">Vật tư thực tế (VNĐ)</label><input type="text" class="form-control" readonly style="background:rgba(255,255,255,0.05); color:var(--accent); text-align:right; font-weight:bold;" value="${AppData.formatCurrency(actualDockingIntCost)}"></div>
                                     <div class="form-group" style="margin:0;"><label class="form-label">Năm phân bổ</label><input type="number" step="any" class="form-control" id="a-docking-int-years" value="${config.dockingIntermediateYears || 2.5}"></div>
                                     <div class="form-group" style="margin:0;"><label class="form-label">Ngày lên đà tiếp</label><input type="date" class="form-control" id="a-docking-int-date" value="${config.dockingIntermediateDate || ''}"></div>
                                 </div>
@@ -4156,8 +4323,9 @@ const Views = {
                                 <h4 style="margin: 0 0 0.75rem 0; color: var(--secondary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
                                     <i class="fa-solid fa-anchor"></i> 2. Lên đà định kỳ
                                 </h4>
-                                <div class="grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                                    <div class="form-group" style="margin:0;"><label class="form-label">Chi phí (VNĐ)</label><input type="number" class="form-control" id="a-docking-per-cost" value="${config.dockingPeriodicCost || 0}"></div>
+                                <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 1fr 1.15fr; gap: 10px;">
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Chi phí ước tính (VNĐ)</label><input type="number" class="form-control" id="a-docking-per-cost" value="${config.dockingPeriodicCost || 0}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label" style="color: var(--accent);">Vật tư thực tế (VNĐ)</label><input type="text" class="form-control" readonly style="background:rgba(255,255,255,0.05); color:var(--accent); text-align:right; font-weight:bold;" value="${AppData.formatCurrency(actualDockingPerCost)}"></div>
                                     <div class="form-group" style="margin:0;"><label class="form-label">Năm phân bổ</label><input type="number" step="any" class="form-control" id="a-docking-per-years" value="${config.dockingPeriodicYears || 5}"></div>
                                     <div class="form-group" style="margin:0;"><label class="form-label">Ngày lên đà tiếp</label><input type="date" class="form-control" id="a-docking-per-date" value="${config.dockingPeriodicDate || ''}"></div>
                                 </div>
@@ -4175,10 +4343,11 @@ const Views = {
                                 </div>
                             </div>
 
-                            <!-- Depreciation and Hull Insurance Section -->
-                            <div class="grid-2" style="margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                            <!-- Depreciation, Hull Insurance and Large Repair Section -->
+                            <div style="margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                                 <div class="form-group" style="margin:0;"><label class="form-label"><i class="fa-solid fa-chart-line-down"></i> 4. Khấu hao năm (VNĐ)</label><input type="number" class="form-control" id="a-depreciation-cost" value="${config.depreciationCost || 0}"></div>
                                 <div class="form-group" style="margin:0;"><label class="form-label"><i class="fa-solid fa-shield-halved"></i> 5. Bảo hiểm thân vỏ năm (VNĐ)</label><input type="number" class="form-control" id="a-hull-ins-cost" value="${config.hullInsuranceCost || 0}"></div>
+                                <div class="form-group" style="margin:0;"><label class="form-label" style="color:var(--accent);"><i class="fa-solid fa-screwdriver-wrench"></i> 6. Sửa chữa lớn thực tế (VNĐ)</label><input type="number" class="form-control" id="a-large-repair-cost" readonly style="background:rgba(255,255,255,0.05); color:var(--accent); font-weight:bold;" value="${config.largeRepairCost || 0}"></div>
                             </div>
 
                             <button type="submit" class="btn btn-primary" style="width: 100%; font-weight: 700; height: 42px;">
