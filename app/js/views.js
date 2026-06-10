@@ -3503,12 +3503,9 @@ const Views = {
                 // Transactions
                 const txs = (AppData.state.transactions || []).filter(t => t.vessel === fvm && t.date && t.date.substring(0, 7) === fmm);
 
-                // DO cost calculated from financial transactions (Quản lý tài chính)
-                const doCost = txs.filter(t => t.category && (
-                    t.category === '4.Dầu DO' ||
-                    t.category === '10.Nhiên Liệu DO' ||
-                    t.category.trim().toLowerCase().includes('dầu do')
-                )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+                // DO cost calculated from fuel supply orders (fuelVoyages) in the month
+                const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === fvm && AppData.parseYearMonth(v.fuelDate) === fmm)
+                    .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
 
                 // LO cost
                 const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === fvm && s.date && s.date.substring(0, 7) === fmm)

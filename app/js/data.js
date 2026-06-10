@@ -11626,6 +11626,38 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         this.state.customers = this.state.customers.filter(t => t.id !== id);
         this.save();
     },
+    parseYearMonth(dateStr) {
+        if (!dateStr) return '';
+        if (typeof dateStr !== 'string') return '';
+        
+        // Try standard YYYY-MM-DD
+        if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts[0].length === 4) {
+                return `${parts[0]}-${parts[1].padStart(2, '0')}`;
+            }
+        }
+        
+        // Try M/D/YYYY or D/M/YYYY
+        if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                const year = parts[2].trim();
+                const d = new Date(dateStr);
+                if (!isNaN(d.getTime())) {
+                    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                }
+                const month = parts[0].trim().padStart(2, '0');
+                return `${year}-${month}`;
+            }
+        }
+        
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        }
+        return '';
+    },
 
     // Logic Formulas
     calcDays(start, end) {

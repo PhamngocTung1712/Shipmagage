@@ -1598,20 +1598,9 @@ const app = {
         // 3. Costs
         const [year, month] = monthStr.split('-').map(Number);
         const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
-        const parseFuelMonth = (dateStr) => {
-            if (!dateStr) return '';
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return '';
-            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-        };
-
-        const doCost = overrides.doCost !== undefined ? Number(overrides.doCost) : txs
-            .filter(t => t.category && (
-                t.category === '4.Dầu DO' ||
-                t.category === '10.Nhiên Liệu DO' ||
-                t.category.trim().toLowerCase().includes('dầu do')
-            ))
-            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        const doCost = overrides.doCost !== undefined ? Number(overrides.doCost) : AppData.state.fuelVoyages
+            .filter(v => v.vesselId === vesselId && AppData.parseYearMonth(v.fuelDate) === monthStr)
+            .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
 
         const loCost = overrides.loCost !== undefined ? Number(overrides.loCost) : (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr)
             .reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
@@ -1822,12 +1811,9 @@ const app = {
         // Lấy tất cả giao dịch tài chính liên quan đến tàu này trong tháng
         const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
 
-        // Lấy chi phí dầu DO và LO từ giao dịch (Quản lý tài chính)
-        const doCost = txs.filter(t => t.category && (
-            t.category === '4.Dầu DO' ||
-            t.category === '10.Nhiên Liệu DO' ||
-            t.category.trim().toLowerCase().includes('dầu do')
-        )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        // Lấy chi phí dầu DO cấp trong tháng từ các đơn cấp dầu (fuelVoyages)
+        const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === vesselId && AppData.parseYearMonth(v.fuelDate) === monthStr)
+            .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
 
         const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr).reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
 
@@ -2483,11 +2469,8 @@ const app = {
         
         const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
         
-        const doCost = txs.filter(t => t.category && (
-            t.category === '4.Dầu DO' ||
-            t.category === '10.Nhiên Liệu DO' ||
-            t.category.trim().toLowerCase().includes('dầu do')
-        )).reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === vesselId && AppData.parseYearMonth(v.fuelDate) === monthStr)
+            .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
 
         const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr).reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
         
