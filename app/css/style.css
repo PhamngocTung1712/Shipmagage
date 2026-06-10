@@ -11,6 +11,7 @@
     --primary-light: #6366f1;
     --secondary: #10b981;    /* Emerald */
     --accent: #f43f5e;       /* Rose */
+    --rose-light: #fb7185;   /* Rose Light */
     --warning: #f59e0b;      /* Amber */
     --info: #0ea5e9;         /* Sky */
 
@@ -264,34 +265,67 @@ a:hover {
     z-index: 10;
 }
 
-.header-search {
+.header-company-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    max-width: 60%;
+}
+
+.header-company-info .company-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--primary-light);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    text-transform: uppercase;
+}
+
+.header-company-info .company-address {
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 0.5rem 1rem;
-    width: 300px;
-    transition: border-color var(--transition-fast);
-}
-
-.header-search:focus-within {
-    border-color: var(--primary-light);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
-}
-
-.header-search i {
+    gap: 4px;
+    font-size: 0.75rem;
     color: var(--text-muted);
-    margin-right: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.header-search input {
-    background: none;
-    border: none;
-    color: var(--text-main);
-    width: 100%;
-    outline: none;
-    font-family: inherit;
+.header-company-info .company-address i {
+    color: var(--secondary);
+    font-size: 0.7rem;
+}
+
+.header-company-info .company-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-company-info .detail-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.header-company-info .detail-item i {
+    color: var(--secondary);
+    font-size: 0.7rem;
+}
+
+.header-company-info .detail-divider {
+    color: var(--border-color);
+    font-size: 0.75rem;
+    user-select: none;
 }
 
 .header-actions {
@@ -445,6 +479,7 @@ a:hover {
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+.grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.5rem; }
 
 /* Tables */
 .table-container {
@@ -1012,13 +1047,13 @@ a:hover {
         justify-content: space-between;
     }
     
-    /* Shrink / hide search bar to avoid header clutter */
-    .header-search {
-        width: 160px;
-        padding: 0.35rem 0.65rem;
+    .header-company-info .company-address,
+    .header-company-info .company-meta {
+        display: none;
     }
-    .header-search input {
-        font-size: 0.85rem;
+    .header-company-info .company-name {
+        font-size: 0.8rem;
+        max-width: 150px;
     }
     
     /* Status indicators */
@@ -1083,8 +1118,8 @@ a:hover {
 
 /* Very Tiny Phones (<= 480px) */
 @media (max-width: 480px) {
-    .header-search {
-        display: none !important; /* Hide search entirely on micro screens */
+    .header-company-info {
+        display: none !important; /* Hide company info entirely on micro screens */
     }
     .login-card {
         padding: 1.5rem;
@@ -1129,4 +1164,379 @@ a:hover {
 
 .modal .table-container {
     max-height: 380px;
+}
+
+/* ==========================================================================
+   Print Styles for Reports
+   ========================================================================== */
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 1.2cm;
+    }
+    
+    /* Force background colors and colors to render in print */
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Inter', sans-serif !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .sidebar,
+    .top-header,
+    body:not(.printing-inline-report) .view-container,
+    .sidebar-overlay,
+    .modal-overlay:not(#report-modal),
+    #login-screen,
+    .report-container button,
+    .report-container .btn,
+    .no-print,
+    .report-container div[style*="margin-top: 2rem; text-align: center; border-top: 1px solid"] {
+        display: none !important;
+    }
+
+    /* Force App Container to display in normal document flow */
+    .app-container {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Force Modal Overlay to take up normal flow */
+    #report-modal.modal-overlay {
+        position: static !important;
+        display: block !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        background: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+
+    /* Redefine variables under the modal and body during print to ensure light theme and high contrast */
+    :root, body, #report-modal .modal, .report-container {
+        --bg-base: #ffffff !important;
+        --bg-surface: #ffffff !important;
+        --text-main: #000000 !important;
+        --text-muted: #475569 !important;
+        --border-color: #000000 !important;
+        
+        --primary: #1e1b4b !important;
+        --primary-light: #312e81 !important;
+        --secondary: #15803d !important;
+        --accent: #b91c1c !important;
+        --rose-light: #b91c1c !important;
+        --warning: #b45309 !important;
+        --info: #0369a1 !important;
+    }
+
+    /* Format Modal container to span the full page without rounded corners, shadows, or screen centering */
+    #report-modal .modal {
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        transform: none !important;
+    }
+
+    /* Reset the scrollable container layout */
+    .report-container {
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 1.5cm !important; /* Proper margin for standard A4 printing */
+        margin: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* Print-specific text overrides */
+    .report-container * {
+        color: #000000 !important;
+        text-shadow: none !important;
+        background-image: none !important;
+    }
+
+    /* Eliminate sticky header positioning during print to prevent cell overlapping at page breaks */
+    .report-container .table th {
+        position: static !important;
+        background: #cbd5e1 !important;
+        color: #000000 !important;
+        border-bottom: 2px solid #000000 !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+    }
+
+    /* Draw clear solid black borders on the table elements for paper layout (Kẻ bảng) */
+    .report-print-table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        margin-bottom: 1.5rem !important;
+        border: 2px solid #000000 !important;
+    }
+
+    .report-print-table th,
+    .report-print-table td {
+        border: 1px solid #000000 !important;
+        padding: 8px 10px !important;
+        font-size: 0.9rem !important;
+        color: #000000 !important;
+    }
+
+    /* Bôi đen/tô xám làm nổi bật doanh thu chi phí khi in */
+    .report-print-table thead tr,
+    .report-print-table tr.print-header-row {
+        background-color: #cbd5e1 !important;
+        font-weight: bold !important;
+    }
+
+    .report-print-table tr.print-bold-row {
+        background-color: #cbd5e1 !important;
+        font-weight: bold !important;
+    }
+
+    .report-print-table tr.print-sub-bold-row {
+        background-color: #f1f5f9 !important;
+        font-weight: bold !important;
+    }
+
+    .report-print-table tr.print-sub-row td:nth-child(2) {
+        padding-left: 20px !important;
+    }
+
+    /* Định dạng ô nhập số biến thành text thường khi in (ẩn viền ô nhập) */
+    .report-print-table input.print-input,
+    .report-print-table input.print-input-desc {
+        border: none !important;
+        background: transparent !important;
+        outline: none !important;
+        font-family: inherit !important;
+        font-size: inherit !important;
+        font-weight: inherit !important;
+        color: #000000 !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .report-print-table input.print-input {
+        text-align: right !important;
+    }
+    
+    /* Ẩn các nút thêm/xóa dòng chi phí khi in */
+    .report-print-table .print-action-cell {
+        display: none !important;
+    }
+    .report-print-table th.print-action-header {
+        display: none !important;
+    }
+
+    /* Highlight total profit block professionally */
+    .report-container div[style*="background: var(--primary-dark)"],
+    .report-container div[style*="background:var(--primary-dark)"] {
+        background: #cbd5e1 !important;
+        border: 2px solid #000000 !important;
+        border-radius: 0px !important;
+        padding: 1.25rem !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 2rem !important;
+    }
+
+    /* Adjust comparison block layouts with thick left-border indicator */
+    .report-container div[style*="border-left"] {
+        background: #f8fafc !important;
+        border: 1px solid #000000 !important;
+        border-left: 6px solid #000000 !important;
+        padding: 1.25rem !important;
+        border-radius: 0px !important;
+        margin-bottom: 1.25rem !important;
+    }
+
+    .report-container div[style*="border-left: 4px solid var(--warning)"] {
+        border-left-color: #000000 !important;
+    }
+    .report-container div[style*="border-left: 4px solid var(--primary)"] {
+        border-left-color: #000000 !important;
+    }
+    .report-container div[style*="border-left: 4px solid var(--info)"] {
+        border-left-color: #000000 !important;
+    }
+
+    /* High contrast color overrides for dynamic highlight tags */
+    .report-container span[style*="color:var(--rose-light)"] {
+        color: #000000 !important;
+        font-weight: bold !important;
+    }
+
+    .report-container span[style*="color:var(--secondary)"] {
+        color: #000000 !important;
+        font-weight: bold !important;
+    }
+
+    .report-container span[style*="color:var(--info)"] {
+        color: #000000 !important;
+        font-weight: bold !important;
+    }
+
+    /* === Inline Monthly Report print support === */
+    /* When printing from the 'Báo cáo Tháng' inline tab,
+       hide all UI except the report card */
+    body.printing-inline-report .sidebar,
+    body.printing-inline-report .top-header,
+    body.printing-inline-report .sidebar-overlay,
+    body.printing-inline-report #login-screen {
+        display: none !important;
+    }
+
+    /* Hide ALL view-container content except the inline report */
+    #monthly-report-inline .no-print,
+    #monthly-report-inline button,
+    .mi-custom-expense-row .no-print {
+        display: none !important;
+    }
+
+    /* Full-page print: hide sidebar, header, nav tabs, filter bar */
+    .sidebar,
+    .top-header,
+    .sidebar-overlay,
+    #login-screen,
+    .page-header,
+    .view-section > .glass-card:first-child,
+    div[style*="display:flex; gap:1rem; border-bottom"] {
+        display: none !important;
+    }
+
+    /* Show only the monthly report */
+    #monthly-report-inline {
+        display: block !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Override table colors for print (white background, black text) */
+    #monthly-report-inline table,
+    #monthly-report-inline th,
+    #monthly-report-inline td {
+        color: #000000 !important;
+        background: transparent !important;
+        border-color: #000000 !important;
+    }
+
+    #monthly-report-inline thead tr th {
+        background: #cbd5e1 !important;
+        font-weight: bold !important;
+    }
+
+    #monthly-report-inline tr[style*="rgba(148,163,184,0.1)"],
+    #monthly-report-inline tr[style*="rgba(148,163,184,0.15)"] {
+        background: #f1f5f9 !important;
+    }
+
+    #monthly-report-inline tr[style*="#2d3a4a"] {
+        background: #cbd5e1 !important;
+    }
+
+    #monthly-report-inline tr[style*="rgba(100,116,139"] {
+        background: #e2e8f0 !important;
+    }
+
+    /* Inputs look like text when printed */
+    #monthly-report-inline input {
+        border: none !important;
+        background: transparent !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+        outline: none !important;
+    }
+
+    /* Make view-container scroll properly */
+    .view-container {
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    .app-container {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    :root, body {
+        --bg-base: #ffffff !important;
+        --bg-surface: #ffffff !important;
+        --text-main: #000000 !important;
+        --text-muted: #475569 !important;
+        --border-color: #000000 !important;
+    }
+}
+
+/* Định dạng màn hình thường cho các ô nhập số trên bảng xem trước */
+.report-print-table input.print-input,
+.report-print-table input.print-input-desc {
+    border: 1px dashed var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+.report-print-table input.print-input {
+    width: 140px;
+    text-align: right;
+}
+.report-print-table input.print-input-desc {
+    width: 100%;
+}
+.report-print-table input.print-input:focus,
+.report-print-table input.print-input-desc:focus {
+    border-color: var(--primary-light);
+    background: var(--bg-base);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    outline: none;
+}
+.report-print-table .btn-delete-row {
+    padding: 0.2rem 0.4rem;
+    color: var(--accent);
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.report-print-table .btn-delete-row:hover {
+    background: var(--accent);
+    color: #ffffff;
 }

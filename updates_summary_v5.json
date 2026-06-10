@@ -1,0 +1,51 @@
+{
+  "project": "ShipManage V3",
+  "version": "5.0",
+  "date": "2026-06-02",
+  "author": "Antigravity Code Assistant",
+  "summary": {
+    "new_features": [
+      {
+        "title": "Quản lý Nhiên liệu Dầu LO (Lube Oil) & Giờ chạy tàu",
+        "details": [
+          "Tách biệt danh mục Quản lý nhiên liệu thành 2 phần độc lập: Dầu DO và Dầu LO.",
+          "Công thức tính chi phí LO tự động: Chi phí LO = Số giờ chạy * (11 phi / 800 giờ) * Đơn giá gần nhất.",
+          "Cho phép người dùng tùy chỉnh định mức cho từng tàu (giờ chạy chu kỳ, phi thay định kỳ, phi bổ sung).",
+          "Thống kê lũy kế dầu LO cho từng tàu từ chuyến đầu tiên (C1): Tổng giờ chạy, tổng lượng dầu cấp/dùng, khối lượng và giá trị tồn kho hiện tại."
+        ]
+      },
+      {
+        "title": "Thiết kế Giao diện Dashboard KPI Tinh gọn (3 Cột)",
+        "details": [
+          "Cột 1 (Màu xanh lá): Lượng dầu LO tồn kho thực tế và giá trị tồn kho (lượng tồn chuyến cuối * đơn giá gần nhất - lượng tồn trước chuyến 1 * đơn giá C1). Dòng tổng cộng 5 tàu.",
+          "Cột 2 (Màu đỏ): Tổng chi phí cố định đã phân bổ (lên đà định kỳ, lên đà trung gian, khấu hao tài sản, đăng kiểm hàng năm, bảo hiểm thân vỏ). Dòng tổng cộng 5 tàu.",
+          "Cột 3 (Màu xanh dương): Tổng số chuyến hàng đã thực hiện, kèm danh sách số chuyến khi di chuột vào (hover) và dòng tổng cộng hệ thống."
+        ]
+      }
+    ],
+    "bug_fixes": [
+      {
+        "title": "Sửa lỗi nhận diện dấu phân cách số (excel-input)",
+        "description": "Khắc phục lỗi khi nhập số có dấu chấm/phẩy ngăn cách hàng nghìn (ví dụ: 21.885 hoặc 27.000) bị hiểu nhầm là số thập phân (thành 22 hoặc 27). Cập nhật thuật toán nhận diện thông minh (ngăn cách hàng nghìn nếu đứng trước đúng 3 chữ số)."
+      },
+      {
+        "title": "Sửa lỗi Phân bổ Chi phí Cảng vào Chuyến hàng",
+        "description": "Khắc phục lỗi khi nhập giao dịch thuộc hạng mục '2.Chi Phí Cảng' phân bổ cho một chuyến đi nhưng báo cáo chuyến hàng tương ứng hiển thị bằng 0. Tự động cộng dồn tất cả các giao dịch này gán vào 'Đại lý 2 đầu cảng' (costs.agent) của chuyến hàng."
+      },
+      {
+        "title": "Sửa lỗi Đồng bộ Đám mây (Firebase Sync)",
+        "description": "Khắc phục lỗi khi tải dữ liệu từ Firebase Cloud về ghi đè làm mất dữ liệu tính toán cục bộ của Đại lý 2 đầu cảng (về 0). Tự động chạy lại bộ tính toán (recalculateAllShipments) ngay khi dữ liệu tải từ đám mây xuống."
+      },
+      {
+        "title": "Sửa lỗi cú pháp 'Script error. 0:0'",
+        "description": "Khắc phục lỗi trùng lặp khai báo biến originalSave trong tệp firebase.js gây lỗi cú pháp Javascript khi tải tệp tin cục bộ."
+      }
+    ],
+    "deployment": {
+      "hosting": "Firebase Hosting",
+      "project_id": "shipmanagev33333",
+      "hosting_url": "https://shipmanagev33333.web.app",
+      "version_tag": "v=5.0"
+    }
+  }
+}

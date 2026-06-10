@@ -189,6 +189,7 @@ function updateServerStatus(status, text) {
 function setupFirebaseSync() {
     if (!db) return;
     
+    const originalSave = AppData.save;
     docRef = db.ref('shipmanage/state');
     updateServerStatus('connecting', 'Đang kết nối Cloud...');
 
@@ -210,7 +211,19 @@ function setupFirebaseSync() {
             // Update AppData local state and localStorage
             if (cloudState && typeof cloudState === 'object' && Object.keys(cloudState).length > 0) {
                 AppData.state = cloudState;
-                localStorage.setItem(DB_KEY, JSON.stringify(cloudState));
+                
+                // Recalculate to ensure new calculation logic is applied, bypassing cloud write during sync load
+                const currentSave = AppData.save;
+                AppData.save = originalSave;
+                try {
+                    AppData.recalculateAllShipments();
+                } catch(e) {
+                    console.error("Recalculation error during Firebase sync load:", e);
+                } finally {
+                    AppData.save = currentSave;
+                }
+                
+                localStorage.setItem(DB_KEY, JSON.stringify(AppData.state));
                 
                 // Refresh active view if initialized
                 if (typeof app !== 'undefined' && app.currentView) {
@@ -235,7 +248,6 @@ function setupFirebaseSync() {
     });
 
     // 2. Intercept AppData.save() to automatically push changes to Realtime Database
-    const originalSave = AppData.save;
     AppData.save = function() {
         // Save locally first for speed
         originalSave.call(AppData);

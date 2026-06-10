@@ -9890,7 +9890,8 @@ const DEFAULT_STATE = {
             ]
         }
     ],
-    "timesheets": []
+    "timesheets": [],
+    "annualCosts": []
 };
 
 const DB_KEY = 'shipManageDB_v2';
@@ -10275,12 +10276,18 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                     localStorage.setItem('importedFuelReport20260526', 'true');
                     this.save();
                 }
-                if (!this.state.transactions) this.state.transactions = [];
-                if (!this.state.fuelLogs) this.state.fuelLogs = [];
-                if (!this.state.fuelVoyages) this.state.fuelVoyages = [];
-                if (!this.state.vesselExpenses) this.state.vesselExpenses = [];
-                if (!this.state.captainReports) this.state.captainReports = [];
                 if (!this.state.monthlyCosts) this.state.monthlyCosts = [];
+                if (!this.state.annualCosts) this.state.annualCosts = [];
+                if (!this.state.loSupplies) this.state.loSupplies = [];
+                
+                // Initialize LO configurations for vessels
+                if (this.state.vessels) {
+                    this.state.vessels.forEach(v => {
+                        if (v.loHours === undefined) v.loHours = 800;
+                        if (v.loReplacementQty === undefined) v.loReplacementQty = 8;
+                        if (v.loTopupQty === undefined) v.loTopupQty = 3;
+                    });
+                }
                 
                 // Initialize new allowance fields
                 if (this.state.employees) {
@@ -10534,6 +10541,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
             "VG36-C12": 0,
             "VG09-C7": 56448916
         };
+        this.agencyFees = agencyFees;
 
         if (this.state.shipments) {
             this.state.shipments.forEach(s => {
@@ -10544,7 +10552,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                 }
                 // Automatically update refundAmount based on the new calcRefund rates (e.g. 20% for HD25 & HD54)
                 if (s.revenueInvoice !== undefined && s.revenueReal !== undefined) {
-                    s.refundAmount = Math.round(this.calcRefund(s.revenueInvoice, s.revenueReal, s.contractNo));
+                    s.refundAmount = Math.round(this.calcRefund(s.revenueInvoice, s.revenueReal, s.contractNo, s.commissionRate));
                 }
                 // Force-fix HD18 (VG15-C4) customer to Bình Minh
                 if (s.contractNo === 'HD18' && s.vesselId === 'VG15' && s.voyageNo === 'C4') {
@@ -10591,6 +10599,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         if (this.state.shipments) {
             this.state.shipments.forEach(s => this.syncShipmentFuelFromLogs(s));
         }
+        this.recalculateAllShipments();
         this.save();
             } catch (e) {
                 console.error("Error in AppData.init:", e);
@@ -10878,6 +10887,78 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         this.state.employees = this.state.employees.filter(e => e.id !== id);
         this.save();
     },
+    getCustomerDebts() {
+        const shipments = this.getShipments();
+        const transactions = this.getTransactions();
+        
+        const normalizeName = (name) => {
+            if (!name) return 'KHÁC';
+            return name.trim().toUpperCase().replace(/\s+/g, ' ');
+        };
+
+        const matchCustomer = (t, custName) => {
+            if (!t.partner) return false;
+            return normalizeName(t.partner) === custName;
+        };
+
+        const customerNamesSet = new Set();
+        shipments.forEach(s => {
+            if (s.customer) {
+                customerNamesSet.add(normalizeName(s.customer));
+            }
+        });
+        if (this.state.company.customerOpeningDebts) {
+            Object.keys(this.state.company.customerOpeningDebts).forEach(name => {
+                customerNamesSet.add(normalizeName(name));
+            });
+        }
+
+        const customerNames = Array.from(customerNamesSet).sort();
+
+        let totalCustomerDebt = 0;
+        const list = customerNames.map(custName => {
+            const custShipments = shipments.filter(s => normalizeName(s.customer) === custName);
+            const custTrans = transactions.filter(t => matchCustomer(t, custName));
+
+            let totalInvoiceRevenue = 0;
+            let totalRealRevenue = 0;
+            let totalRefundAmount = 0;
+            custShipments.forEach(s => {
+                totalInvoiceRevenue += Number(s.revenueInvoice) || 0;
+                totalRealRevenue += Number(s.revenueReal) || 0;
+                totalRefundAmount += Number(s.refundAmount) || 0;
+            });
+
+            let totalPaid = 0;
+            let totalReturned = 0;
+            custTrans.forEach(t => {
+                if (t.category === 'CVC') {
+                    totalPaid += Number(t.thu) || 0;
+                    totalReturned += Number(t.chi) || 0;
+                }
+            });
+
+            const openingDebt = this.state.company.customerOpeningDebts ? (Number(this.state.company.customerOpeningDebts[custName]) || 0) : 0;
+            const invoiceDebt = openingDebt + totalInvoiceRevenue - totalPaid;
+            totalCustomerDebt += invoiceDebt;
+
+            return {
+                name: custName,
+                openingDebt,
+                totalInvoiceRevenue,
+                totalRealRevenue,
+                totalRefundAmount,
+                totalPaid,
+                totalReturned,
+                invoiceDebt
+            };
+        });
+
+        return {
+            list,
+            totalCustomerDebt
+        };
+    },
     getSupplierDebts() {
         const suppliers = {};
         
@@ -10949,10 +11030,47 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         
         return Object.values(suppliers).sort((a,b) => b.debt - a.debt);
     },
+    getAnnualCosts(year, vesselId) {
+        if (!this.state.annualCosts) this.state.annualCosts = [];
+        let config = this.state.annualCosts.find(c => c.year === Number(year) && c.vesselId === vesselId);
+        if (!config) {
+            const sameVessel = this.state.annualCosts.filter(c => c.vesselId === vesselId);
+            if (sameVessel.length > 0) {
+                sameVessel.sort((a, b) => Math.abs(a.year - year) - Math.abs(b.year - year));
+                config = sameVessel[0];
+            }
+        }
+        const res = config ? { ...config } : {
+            year: Number(year),
+            vesselId,
+            dockingIntermediateCost: 0,
+            dockingIntermediateYears: 2.5,
+            dockingIntermediateDate: '',
+            dockingPeriodicCost: 0,
+            dockingPeriodicYears: 5,
+            dockingPeriodicDate: '',
+            registryAnnualCost: 0,
+            registryAnnualYears: 1,
+            registryAnnualDate: '',
+            depreciationCost: 0,
+            hullInsuranceCost: 0,
+            largeRepairCost: 0
+        };
+        res.dockingIntermediateDaily = (Number(res.dockingIntermediateCost) || 0) / ((Number(res.dockingIntermediateYears) || 2.5) * 365);
+        res.dockingPeriodicDaily = (Number(res.dockingPeriodicCost) || 0) / ((Number(res.dockingPeriodicYears) || 5) * 365);
+        res.registryAnnualDaily = (Number(res.registryAnnualCost) || 0) / ((Number(res.registryAnnualYears) || 1) * 365);
+        res.depreciationDaily = (Number(res.depreciationCost) || 0) / 365;
+        res.hullInsuranceDaily = (Number(res.hullInsuranceCost) || 0) / 365;
+        res.largeRepairDaily = (Number(res.largeRepairCost) || 0) / 365;
+        return res;
+    },
     getMonthlyCosts(month, vesselId) { 
         let cost = this.state.monthlyCosts.find(c => c.month === month && c.vesselId === vesselId);
-        let result = cost ? { ...cost } : { month, vesselId, salary: 0, insurance: 0, food: 0, materialCompany: 0, materialVessel: 0, other: 0 };
+        let result = cost ? { ...cost } : { month, vesselId, salary: 0, insurance: 0, food: 0, materialCompany: 0, materialVessel: 0, loanInterest: 0, loanInterestExternal: 0, other: 0 };
         
+        if (result.loanInterest === undefined) result.loanInterest = 0;
+        if (result.loanInterestExternal === undefined) result.loanInterestExternal = 0;
+
         // Nếu chưa có lương và bảo hiểm (bằng 0), lấy từ tháng gần nhất trước đó
         if (!result.salary && !result.insurance) {
             const pastCosts = this.state.monthlyCosts
@@ -11117,17 +11235,20 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
             .filter(t => t.vessel === vesselId && t.category === '9.Vật Tư' && t.date && t.date.substring(0, 7) === monthStr)
             .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
-        // Tự động tính lãi vay (từ Giao dịch)
-        const loanInterest = (this.state.transactions || [])
-            .filter(t => t.vessel === vesselId && t.category === '6.Lãi Vay' && t.date && t.date.substring(0, 7) === monthStr)
-            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
-
         // 1. Update Monthly Costs
         const monthly = this.getMonthlyCosts(monthStr, vesselId);
         monthly.food = crewFood;
         monthly.materialVessel = materialVessel;
         monthly.materialCompany = materialCompany;
-        monthly.loanInterest = loanInterest;
+        
+        // Tự động tính lãi vay (từ Giao dịch) nếu không phải do người dùng tự nhập tay
+        if (!monthly.isManualLoanInterest) {
+            const loanInterest = (this.state.transactions || [])
+                .filter(t => t.vessel === vesselId && t.category === '6.Lãi Vay' && t.date && t.date.substring(0, 7) === monthStr)
+                .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+            monthly.loanInterest = loanInterest;
+        }
+        
         this.saveMonthlyCosts(monthly);
 
         // 2. Sync exact expenses from all captain reports across all months
@@ -11149,7 +11270,26 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                 s.costs.materialCompany = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'materialCompany');
                 s.costs.materialVessel = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'materialVessel');
                 s.costs.loanInterest = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'loanInterest');
+                s.costs.loanInterestExternal = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'loanInterestExternal');
                 s.costs.monthlyOther = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'other');
+
+                const annualAlloc = this.calcAnnualAllocation(s.dateStart, s.dateEnd, vesselId);
+                s.costs.dockingIntermediate = annualAlloc.dockingIntermediate;
+                s.costs.dockingPeriodic = annualAlloc.dockingPeriodic;
+                s.costs.registryAnnual = annualAlloc.registryAnnual;
+                s.costs.depreciation = annualAlloc.depreciation;
+                s.costs.hullInsurance = annualAlloc.hullInsurance;
+                s.costs.largeRepair = annualAlloc.largeRepair;
+
+                // Tự động tính chi phí Đại lý 2 đầu cảng từ các Giao dịch "2.Chi Phí Cảng" của chuyến này
+                const key = `${vesselId}-${s.voyageNo}`;
+                const portTxs = (this.state.transactions || [])
+                    .filter(t => t.vessel === vesselId && t.voyageNo === s.voyageNo && t.category === '2.Chi Phí Cảng');
+                if (portTxs.length > 0) {
+                    s.costs.agent = portTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+                } else {
+                    s.costs.agent = (this.agencyFees && this.agencyFees[key] !== undefined) ? this.agencyFees[key] : (s.costs.agent || 0);
+                }
             }
         });
         this.save();
@@ -11220,7 +11360,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         const logs = this.getFuelLogs(voyageId);
         const voyage = this.getFuelVoyage(voyageId);
         const totalHours = logs.reduce((sum, l) => sum + Number(l.hours || 0), 0);
-        const totalFuel = logs.reduce((sum, l) => sum + (Number(l.hours) * Number(l.fuelRate)), 0);
+        const totalFuel = logs.reduce((sum, l) => sum + (Number(l.hours || 0) * Number(l.fuelRate || 0)), 0);
         return { totalHours, totalFuel, fuelPrice: voyage ? voyage.fuelUnitPrice : 0 };
     },
 
@@ -11292,6 +11432,9 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                 this.recalculateVesselAllocations(oldTx.vessel, oldTx.date.substring(0, 7));
             }
         }
+        if (t.category === '2.Chi Phí Cảng' || (oldTx && oldTx.category === '2.Chi Phí Cảng')) {
+            this.recalculateAllShipments();
+        }
     },
     deleteTransaction(id) {
         const t = this.state.transactions.find(x => x.id === id);
@@ -11300,6 +11443,9 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         if (t && t.vessel && t.vessel !== 'VP' && t.date && (t.category === '9.Vật Tư' || t.category === '6.Lãi Vay')) {
             this.recalculateVesselAllocations(t.vessel, t.date.substring(0, 7));
         }
+        if (t && t.category === '2.Chi Phí Cảng') {
+            this.recalculateAllShipments();
+        }
     },
 
     saveMonthlyCosts(data) {
@@ -11307,6 +11453,15 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         if (idx >= 0) this.state.monthlyCosts[idx] = data;
         else this.state.monthlyCosts.push(data);
         this.save();
+    },
+    saveAnnualCosts(data) {
+        if (!this.state.annualCosts) this.state.annualCosts = [];
+        data.year = Number(data.year);
+        const idx = this.state.annualCosts.findIndex(c => c.year === data.year && c.vesselId === data.vesselId);
+        if (idx >= 0) this.state.annualCosts[idx] = data;
+        else this.state.annualCosts.push(data);
+        this.save();
+        this.recalculateAllShipments();
     },
 
     addFuelVoyage(v) {
@@ -11333,6 +11488,39 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
     deleteFuelLog(id) {
         this.state.fuelLogs = this.state.fuelLogs.filter(t => t.id !== id);
         this.save();
+    },
+
+    getLOSupplies(vesselId) {
+        if (!this.state.loSupplies) this.state.loSupplies = [];
+        let list = vesselId ? this.state.loSupplies.filter(s => s.vesselId === vesselId) : [...this.state.loSupplies];
+        return list.sort((a,b) => new Date(b.date) - new Date(a.date));
+    },
+    addLOSupply(supply) {
+        if (!this.state.loSupplies) this.state.loSupplies = [];
+        supply.id = supply.id || ('LOS-' + Date.now());
+        const idx = this.state.loSupplies.findIndex(x => x.id === supply.id);
+        if (idx >= 0) this.state.loSupplies[idx] = supply;
+        else this.state.loSupplies.push(supply);
+        this.save();
+        return supply.id;
+    },
+    deleteLOSupply(id) {
+        if (!this.state.loSupplies) return;
+        this.state.loSupplies = this.state.loSupplies.filter(s => s.id !== id);
+        this.save();
+    },
+    getLastLOPrice(vesselId, date) {
+        if (!this.state.loSupplies) this.state.loSupplies = [];
+        let list = this.state.loSupplies.filter(s => s.vesselId === vesselId);
+        if (list.length === 0) return 15000000;
+        
+        list.sort((a,b) => new Date(b.date) - new Date(a.date));
+        
+        if (date) {
+            const match = list.find(s => s.date <= date);
+            if (match) return Number(match.price) || 15000000;
+        }
+        return Number(list[0].price) || 15000000;
     },
 
     addShipment(s) {
@@ -11413,15 +11601,114 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         return Math.round(totalCost);
     },
 
-    calcRefund(invoiceRev, realRev, contractNo) {
+    calcAnnualAllocation(startStr, endStr, vesselId) {
+        if (!startStr || !endStr) return { dockingIntermediate: 0, dockingPeriodic: 0, registryAnnual: 0, depreciation: 0, hullInsurance: 0, largeRepair: 0 };
+        const d1 = new Date(startStr);
+        const d2 = new Date(endStr);
+        let totals = { dockingIntermediate: 0, dockingPeriodic: 0, registryAnnual: 0, depreciation: 0, hullInsurance: 0, largeRepair: 0 };
+        
+        if (d2 <= d1) {
+            const year = d1.getFullYear();
+            const config = this.getAnnualCosts(year, vesselId);
+            totals.dockingIntermediate = Math.round(config.dockingIntermediateDaily);
+            totals.dockingPeriodic = Math.round(config.dockingPeriodicDaily);
+            totals.registryAnnual = Math.round(config.registryAnnualDaily);
+            totals.depreciation = Math.round(config.depreciationDaily);
+            totals.hullInsurance = Math.round(config.hullInsuranceDaily);
+            totals.largeRepair = Math.round(config.largeRepairDaily || 0);
+            return totals;
+        }
+        
+        let current = new Date(d1);
+        while (current < d2) {
+            let next = new Date(current);
+            next.setDate(current.getDate() + 1);
+            if (next > d2) next = new Date(d2);
+            
+            const year = current.getFullYear();
+            const config = this.getAnnualCosts(year, vesselId);
+            const fraction = (next - current) / (1000 * 60 * 60 * 24);
+            
+            totals.dockingIntermediate += config.dockingIntermediateDaily * fraction;
+            totals.dockingPeriodic += config.dockingPeriodicDaily * fraction;
+            totals.registryAnnual += config.registryAnnualDaily * fraction;
+            totals.depreciation += config.depreciationDaily * fraction;
+            totals.hullInsurance += config.hullInsuranceDaily * fraction;
+            totals.largeRepair += (config.largeRepairDaily || 0) * fraction;
+            
+            current = next;
+        }
+        
+        totals.dockingIntermediate = Math.round(totals.dockingIntermediate);
+        totals.dockingPeriodic = Math.round(totals.dockingPeriodic);
+        totals.registryAnnual = Math.round(totals.registryAnnual);
+        totals.depreciation = Math.round(totals.depreciation);
+        totals.hullInsurance = Math.round(totals.hullInsurance);
+        totals.largeRepair = Math.round(totals.largeRepair);
+        return totals;
+    },
+
+    recalculateAllShipments() {
+        if (!this.state.shipments) this.state.shipments = [];
+        this.state.shipments.forEach(s => {
+            if (!s.costs) s.costs = {};
+            const vesselId = s.vesselId;
+            s.costs.crewSalary = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'salary');
+            s.costs.crewFood = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'food');
+            s.costs.crewInsurance = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'insurance');
+            s.costs.materialCompany = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'materialCompany');
+            s.costs.materialVessel = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'materialVessel');
+            s.costs.loanInterest = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'loanInterest');
+            s.costs.loanInterestExternal = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'loanInterestExternal');
+            s.costs.monthlyOther = this.calcExactAllocation(s.dateStart, s.dateEnd, vesselId, 'other');
+
+            const annualAlloc = this.calcAnnualAllocation(s.dateStart, s.dateEnd, vesselId);
+            s.costs.dockingIntermediate = annualAlloc.dockingIntermediate;
+            s.costs.dockingPeriodic = annualAlloc.dockingPeriodic;
+            s.costs.registryAnnual = annualAlloc.registryAnnual;
+            s.costs.depreciation = annualAlloc.depreciation;
+            s.costs.hullInsurance = annualAlloc.hullInsurance;
+            s.costs.largeRepair = annualAlloc.largeRepair;
+
+            // Tự động tính chi phí Đại lý 2 đầu cảng từ các Giao dịch "2.Chi Phí Cảng" của chuyến này
+            const key = `${vesselId}-${s.voyageNo}`;
+            const portTxs = (this.state.transactions || [])
+                .filter(t => t.vessel === vesselId && t.voyageNo === s.voyageNo && t.category === '2.Chi Phí Cảng');
+            if (portTxs.length > 0) {
+                s.costs.agent = portTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+            } else {
+                s.costs.agent = (this.agencyFees && this.agencyFees[key] !== undefined) ? this.agencyFees[key] : (s.costs.agent || 0);
+            }
+
+            // Recalculate LO oil cost if vessel config exists
+            const vessel = this.getVessel(vesselId);
+            if (vessel) {
+                const loHours = Number(vessel.loHours) || 800;
+                const loRepl = Number(vessel.loReplacementQty) || 8;
+                const loTopup = Number(vessel.loTopupQty) || 3;
+                const hourlyRate = loHours > 0 ? ((loRepl + loTopup) / loHours) : 0;
+                const loPrice = this.getLastLOPrice(vesselId, s.dateStart);
+                const fuelHours = Number(s.fuelHours) || 0;
+                s.costs.fuelLO = Math.round(fuelHours * hourlyRate * loPrice);
+            }
+        });
+        this.save();
+    },
+
+    calcRefund(invoiceRev, realRev, contractNo, customRate) {
         const diff = invoiceRev - realRev;
-        const rate = (contractNo === 'HD25' || contractNo === 'HD54') ? 0.20 : 0.28;
+        let rate = 0.28;
+        if (customRate !== undefined && customRate !== null && !isNaN(customRate)) {
+            rate = Number(customRate) / 100;
+        } else {
+            rate = (contractNo === 'HD25' || contractNo === 'HD54') ? 0.20 : 0.28;
+        }
         // Formula: (Diff) - (Diff / 1.08 * rate)
         return diff - (diff / 1.08 * rate);
     },
 
     formatCurrency(amount) {
-        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
+        return new Intl.NumberFormat('vi-VN').format(Math.round(Number(amount) || 0));
     }
 };
 

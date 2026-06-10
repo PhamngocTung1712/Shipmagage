@@ -11,7 +11,7 @@
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="css/style.css?v=3.3">
+    <link rel="stylesheet" href="css/style.css?v=4.0">
 </head>
 <body class="dark-theme">
     <!-- Premium Glassmorphic Login Screen -->
@@ -61,7 +61,7 @@
             <nav class="sidebar-nav">
                 <a href="#" class="nav-item active" data-view="dashboard">
                     <i class="fa-solid fa-chart-pie"></i>
-                    <span>Bảng điều khiển</span>
+                    <span>Tổng quan</span>
                 </a>
                 <a href="#" class="nav-item" data-view="financials">
                     <i class="fa-solid fa-money-bill-transfer"></i>
@@ -90,6 +90,10 @@
                 <a href="#" class="nav-item" data-view="monthly-costs">
                     <i class="fa-solid fa-calendar-days"></i>
                     <span>Chi phí theo Tháng</span>
+                </a>
+                <a href="#" class="nav-item" data-view="annual-costs">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>Chi phí Hàng năm</span>
                 </a>
                 <a href="#" class="nav-item" data-view="hr">
                     <i class="fa-solid fa-users"></i>
@@ -127,17 +131,19 @@
             <!-- Header -->
             <header class="top-header glass-panel">
                 <button class="icon-btn sidebar-toggle-btn" id="sidebar-toggle-btn" title="Mở danh mục menu"><i class="fa-solid fa-bars"></i></button>
-                <div class="header-search">
-                    <i class="fa-solid fa-search"></i>
-                    <input type="text" placeholder="Tìm kiếm dữ liệu...">
-                </div>
+                <div class="header-company-info" id="header-company-info"></div>
                 <div class="header-actions">
-                    <div style="display: flex; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button class="icon-btn" onclick="app.exportJsonBackup()" title="Sao lưu Dữ liệu & UI/UX (JSON)" style="color: #38bdf8; background: rgba(56, 189, 248, 0.1); margin-right: 4px;"><i class="fa-solid fa-file-arrow-down"></i></button>
+                        <button class="icon-btn" onclick="document.getElementById('import-json-file').click()" title="Khôi phục Dữ liệu & UI/UX (JSON)" style="color: #fb923c; background: rgba(251, 146, 60, 0.1); margin-right: 12px;"><i class="fa-solid fa-file-arrow-up"></i></button>
+                        <input type="file" id="import-json-file" style="display: none;" accept=".json" onchange="app.importJsonBackup(event)">
+                        
                         <div class="server-status">
                             <span class="status-dot" style="background-color: #10b981; box-shadow: 0 0 10px #10b981; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle;"></span> <span style="font-size: 0.85rem; font-weight: 500;">Offline (Local Mode)</span>
                         </div>
                     </div>
                     <button class="icon-btn theme-toggle" title="Thay đổi giao diện sáng/tối"><i class="fa-regular fa-moon"></i></button>
+                    <button class="icon-btn" onclick="app.exportSystemBackup()" title="Tải File Sao lưu Hệ thống (Excel)"><i class="fa-solid fa-file-excel" style="color: #10b981;"></i></button>
                     <button class="icon-btn" onclick="forceSyncToCloud()" title="Ép đồng bộ dữ liệu lên Đám mây"><i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary-light);"></i></button>
                     <button class="icon-btn"><i class="fa-solid fa-gear"></i></button>
                 </div>
@@ -198,9 +204,10 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
-    <script src="js/data.js?v=3.3"></script>
-    <script src="js/views.js?v=3.3"></script>
-    <script src="js/firebase.js?v=3.3"></script>
-    <script src="js/app.js?v=3.3"></script>
+    <script src="js/data.js?v=5.1"></script>
+    <script src="js/excel-input.js?v=5.1"></script>
+    <script src="js/views.js?v=5.1"></script>
+    <script src="js/firebase.js?v=5.1"></script>
+    <script src="js/app.js?v=5.1"></script>
 </body>
 </html>

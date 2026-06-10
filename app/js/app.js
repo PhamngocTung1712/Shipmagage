@@ -5,6 +5,13 @@
 const app = {
     currentView: 'dashboard',
     selectedDebtCustomer: '',
+    excludeDockingDepreciation: localStorage.getItem('exclude_docking_depreciation') === 'true',
+
+    toggleExcludeDockingDepreciation(checked) {
+        this.excludeDockingDepreciation = checked;
+        localStorage.setItem('exclude_docking_depreciation', checked ? 'true' : 'false');
+        this.navigate(this.currentView, ...this.currentViewArgs || []);
+    },
     
     exportFuelReport() {
         if (typeof XLSX === 'undefined') return alert('Chưa tải xong thư viện xuất Excel!');
@@ -250,7 +257,9 @@ const app = {
             'Tiền Ăn (VNĐ)', 'Bảo Hiểm (VNĐ)', 'Vật Tư Cty Cấp (VNĐ)', 'Vật Tư Tàu Chi (VNĐ)', 
             'CP Khác Cty Cấp (VNĐ)', 'Đại Lý 2 Đầu Cảng (VNĐ)', 'Tàu Chi 2 Đầu Cảng (VNĐ)', 
             'Tiền Bông (VNĐ)', 'Thuế VAT (VNĐ)', 'Hoa Tiêu, Tàu Lai, Phí Cảng (VNĐ)', 
-            'Chi Phí Khác Tàu Chi (VNĐ)', 'Tổng Chi Phí (VNĐ)', 'Lợi Nhuận/Hiệu Quả (VNĐ)'
+            'Chi Phí Khác Tàu Chi (VNĐ)', 'Lãi Vay Ngân Hàng (VNĐ)', 'Lãi Vay Ngoài (VNĐ)', 'Lên Đà Trung Gian (VNĐ)', 'Lên Đà Định Kỳ (VNĐ)', 
+            'Đăng Kiểm Hàng Năm (VNĐ)', 'Khấu Hao (VNĐ)', 'Bảo Hiểm Thân Vỏ (VNĐ)', 
+            'Tổng Chi Phí (VNĐ)', 'Lợi Nhuận/Hiệu Quả (VNĐ)'
         ]);
         const ships = AppData.state.shipments || [];
         ships.forEach(s => {
@@ -277,20 +286,31 @@ const app = {
             const vat = Number(costs.vat || 0);
             const portFees = Number(costs.portFees || 0);
             const others = Number(costs.others || 0);
+            const dockingIntermediate = this.excludeDockingDepreciation ? 0 : Number(costs.dockingIntermediate || 0);
+            const dockingPeriodic = this.excludeDockingDepreciation ? 0 : Number(costs.dockingPeriodic || 0);
+            const registryAnnual = Number(costs.registryAnnual || 0);
+            const depreciation = this.excludeDockingDepreciation ? 0 : Number(costs.depreciation || 0);
+            const hullInsurance = Number(costs.hullInsurance || 0);
+            
             const totalExpenses = fuelDO + fuelLO + crewSalary + crewFood + crewInsurance + 
                                   materialCompany + materialVessel + monthlyOther + agent + 
-                                  vessel2ends + brokerage + vat + portFees + others;
+                                  vessel2ends + brokerage + vat + portFees + others +
+                                  (costs.loanInterest || 0) + (costs.loanInterestExternal || 0) +
+                                  dockingIntermediate + dockingPeriodic + registryAnnual + depreciation + hullInsurance;
             const profit = revenueReal - totalExpenses;
             shipmentsRows.push([
                 s.id || '', s.contractNo || '', s.voyageNo || '', s.vesselId || '', s.customer || '', s.cargo || '',
                 s.portLoad || '', s.portDischarge || '', s.dateStart || '', s.dateEnd || '', s.reportMonth || '',
                 qty, rate, markup, fuelPrice, fuelHours, revenueReal, revenueInvoice, refund,
                 fuelDO, fuelLO, crewSalary, crewFood, crewInsurance, materialCompany, materialVessel,
-                monthlyOther, agent, vessel2ends, brokerage, vat, portFees, others, totalExpenses, profit
+                monthlyOther, agent, vessel2ends, brokerage, vat, portFees, others,
+                costs.loanInterest || 0, costs.loanInterestExternal || 0,
+                dockingIntermediate, dockingPeriodic, registryAnnual, depreciation, hullInsurance,
+                totalExpenses, profit
             ]);
         });
         const wsShipments = XLSX.utils.aoa_to_sheet(shipmentsRows);
-        wsShipments['!cols'] = Array(35).fill({wch: 15});
+        wsShipments['!cols'] = Array(40).fill({wch: 15});
         XLSX.utils.book_append_sheet(wb, wsShipments, 'Quản lý chuyến hàng');
 
         // 2. Quản lý nhiên liệu
@@ -471,17 +491,17 @@ const app = {
         mCostsRows.push([]);
         mCostsRows.push([
             'Tháng', 'Mã Tàu', 'Lương (VNĐ)', 'Bảo Hiểm (VNĐ)', 'Tiền Ăn (VNĐ)',
-            'Vật Tư Công Ty Cấp (VNĐ)', 'Vật Tư Tàu Chi (VNĐ)', 'Chi Phí Khác (VNĐ)', 'Lãi Vay (VNĐ)'
+            'Vật Tư Công Ty Cấp (VNĐ)', 'Vật Tư Tàu Chi (VNĐ)', 'Chi Phí Khác (VNĐ)', 'Lãi Vay Ngân Hàng (VNĐ)', 'Lãi Vay Ngoài (VNĐ)'
         ]);
         const mCosts = AppData.state.monthlyCosts || [];
         mCosts.forEach(c => {
             mCostsRows.push([
                 c.month || '', c.vesselId || '', Number(c.salary) || 0, Number(c.insurance) || 0, Number(c.food) || 0,
-                Number(c.materialCompany) || 0, Number(c.materialVessel) || 0, Number(c.other) || 0, Number(c.loanInterest) || 0
+                Number(c.materialCompany) || 0, Number(c.materialVessel) || 0, Number(c.other) || 0, Number(c.loanInterest) || 0, Number(c.loanInterestExternal) || 0
             ]);
         });
         const wsMcosts = XLSX.utils.aoa_to_sheet(mCostsRows);
-        wsMcosts['!cols'] = Array(9).fill({wch: 15});
+        wsMcosts['!cols'] = Array(10).fill({wch: 15});
         XLSX.utils.book_append_sheet(wb, wsMcosts, 'Chi phí theo tháng');
 
         // 8. Đối tác
@@ -533,6 +553,40 @@ const app = {
         const wsComp = XLSX.utils.aoa_to_sheet(compRows);
         wsComp['!cols'] = Array(8).fill({wch: 15});
         XLSX.utils.book_append_sheet(wb, wsComp, 'Thông tin công ty');
+
+        // 11. Chi phí hàng năm
+        const annualRows = [];
+        annualRows.push(['DANH SÁCH CHI PHÍ HÀNG NĂM CỦA TỪNG TÀU']);
+        annualRows.push([]);
+        annualRows.push([
+            'Năm', 'Mã Tàu', 
+            'Lên Đà Trung Gian (VNĐ)', 'Số Năm Phân Bổ (Trung Gian)', 'Lịch Lên Đà TG (YYYY-MM-DD)', 
+            'Lên Đà Định Kỳ (VNĐ)', 'Số Năm Phân Bổ (Định Kỳ)', 'Lịch Lên Đà ĐK (YYYY-MM-DD)', 
+            'Đăng Kiểm Hàng Năm (VNĐ)', 'Số Năm Phân Bổ (Đăng Kiểm)', 'Lịch Đăng Kiểm (YYYY-MM-DD)', 
+            'Khấu Hao (VNĐ)', 'Bảo Hiểm Thân Vỏ (VNĐ)', 'Sửa Chữa Lớn (VNĐ)'
+        ]);
+        const annualCosts = AppData.state.annualCosts || [];
+        annualCosts.forEach(c => {
+            annualRows.push([
+                c.year,
+                c.vesselId,
+                c.dockingIntermediateCost || 0,
+                c.dockingIntermediateYears || 2.5,
+                c.dockingIntermediateDate || '',
+                c.dockingPeriodicCost || 0,
+                c.dockingPeriodicYears || 5,
+                c.dockingPeriodicDate || '',
+                c.registryAnnualCost || 0,
+                c.registryAnnualYears || 1,
+                c.registryAnnualDate || '',
+                c.depreciationCost || 0,
+                c.hullInsuranceCost || 0,
+                c.largeRepairCost || 0
+            ]);
+        });
+        const wsAnnual = XLSX.utils.aoa_to_sheet(annualRows);
+        wsAnnual['!cols'] = Array(14).fill({wch: 18});
+        XLSX.utils.book_append_sheet(wb, wsAnnual, 'Chi phí hàng năm');
 
         // Save Workbook
         const filename = 'Bao_Cao_Sao_Luu_He_Thong_' + new Date().toISOString().slice(0, 10) + '.xlsx';
@@ -631,7 +685,14 @@ const app = {
                             brokerage: colIdx('Tiền Bông (VNĐ)'),
                             vat: colIdx('Thuế VAT (VNĐ)'),
                             portFees: colIdx('Hoa Tiêu, Tàu Lai, Phí Cảng (VNĐ)'),
-                            others: colIdx('Chi Phí Khác Tàu Chi (VNĐ)')
+                            others: colIdx('Chi Phí Khác Tàu Chi (VNĐ)'),
+                            loanInterest: colIdx('Lãi Vay Ngân Hàng (VNĐ)') !== -1 ? colIdx('Lãi Vay Ngân Hàng (VNĐ)') : colIdx('Lãi Vay (VNĐ)'),
+                            loanInterestExternal: colIdx('Lãi Vay Ngoài (VNĐ)'),
+                            dockingIntermediate: colIdx('Lên Đà Trung Gian (VNĐ)'),
+                            dockingPeriodic: colIdx('Lên Đà Định Kỳ (VNĐ)'),
+                            registryAnnual: colIdx('Đăng Kiểm Hàng Năm (VNĐ)'),
+                            depreciation: colIdx('Khấu Hao (VNĐ)'),
+                            hullInsurance: colIdx('Bảo Hiểm Thân Vỏ (VNĐ)')
                         };
 
                         dataRows.forEach(row => {
@@ -1027,7 +1088,9 @@ const app = {
                         const matCIdx = colIdx('Vật Tư Công Ty Cấp (VNĐ)');
                         const matVIdx = colIdx('Vật Tư Tàu Chi (VNĐ)');
                         const otherIdx = colIdx('Chi Phí Khác (VNĐ)');
-                        const loanIdx = colIdx('Lãi Vay (VNĐ)');
+                        const loanIdx = colIdx('Lãi Vay Ngân Hàng (VNĐ)');
+                        const loanExtIdx = colIdx('Lãi Vay Ngoài (VNĐ)');
+                        const oldLoanIdx = colIdx('Lãi Vay (VNĐ)'); // Fallback
                         
                         dataRows.forEach(row => {
                             if (row.length === 0 || !row[monthIdx] || !row[vesselIdx]) return;
@@ -1042,7 +1105,8 @@ const app = {
                                 materialCompany: Number(row[matCIdx]) || 0,
                                 materialVessel: Number(row[matVIdx]) || 0,
                                 other: Number(row[otherIdx]) || 0,
-                                loanInterest: Number(row[loanIdx]) || 0
+                                loanInterest: Number(row[loanIdx !== -1 ? loanIdx : oldLoanIdx]) || 0,
+                                loanInterestExternal: Number(row[loanExtIdx]) || 0
                             };
                             const existingIdx = AppData.state.monthlyCosts.findIndex(x => x.month === month && x.vesselId === vesselId);
                             if (existingIdx >= 0) AppData.state.monthlyCosts[existingIdx] = c;
@@ -1165,11 +1229,67 @@ const app = {
                     }
                 }
 
+                // 11. Chi phí hàng năm
+                const wsAnnual = workbook.Sheets['Chi phí hàng năm'];
+                if (wsAnnual) {
+                    const rows = XLSX.utils.sheet_to_json(wsAnnual, { header: 1 });
+                    if (rows.length >= 3) {
+                        const headers = rows[2];
+                        const dataRows = rows.slice(3);
+                        const colIdx = (name) => headers.indexOf(name);
+                        const yearIdx = colIdx('Năm');
+                        const vesselIdx = colIdx('Mã Tàu');
+                        const dockingIntCostIdx = colIdx('Lên Đà Trung Gian (VNĐ)');
+                        const dockingIntYearsIdx = colIdx('Số Năm Phân Bổ (Trung Gian)');
+                        const dockingIntDateIdx = colIdx('Lịch Lên Đà TG (YYYY-MM-DD)');
+                        const dockingPerCostIdx = colIdx('Lên Đà Định Kỳ (VNĐ)');
+                        const dockingPerYearsIdx = colIdx('Số Năm Phân Bổ (Định Kỳ)');
+                        const dockingPerDateIdx = colIdx('Lịch Lên Đà ĐK (YYYY-MM-DD)');
+                        const registryCostIdx = colIdx('Đăng Kiểm Hàng Năm (VNĐ)');
+                        const registryYearsIdx = colIdx('Số Năm Phân Bổ (Đăng Kiểm)');
+                        const registryDateIdx = colIdx('Lịch Đăng Kiểm (YYYY-MM-DD)');
+                        const depreciationIdx = colIdx('Khấu Hao (VNĐ)');
+                        const hullInsuranceIdx = colIdx('Bảo Hiểm Thân Vỏ (VNĐ)');
+                        const largeRepairIdx = colIdx('Sửa Chữa Lớn (VNĐ)');
+                        
+                        if (!AppData.state.annualCosts) AppData.state.annualCosts = [];
+
+                        dataRows.forEach(row => {
+                            if (row.length === 0 || !row[yearIdx] || !row[vesselIdx]) return;
+                            const year = Number(row[yearIdx]);
+                            const vesselId = String(row[vesselIdx]).trim();
+                            const c = {
+                                year,
+                                vesselId,
+                                dockingIntermediateCost: Number(row[dockingIntCostIdx]) || 0,
+                                dockingIntermediateYears: Number(row[dockingIntYearsIdx]) || 2.5,
+                                dockingIntermediateDate: row[dockingIntDateIdx] ? String(row[dockingIntDateIdx]).trim() : '',
+                                dockingPeriodicCost: Number(row[dockingPerCostIdx]) || 0,
+                                dockingPeriodicYears: Number(row[dockingPerYearsIdx]) || 5,
+                                dockingPeriodicDate: row[dockingPerDateIdx] ? String(row[dockingPerDateIdx]).trim() : '',
+                                registryAnnualCost: Number(row[registryCostIdx]) || 0,
+                                registryAnnualYears: Number(row[registryYearsIdx]) || 1,
+                                registryAnnualDate: row[registryDateIdx] ? String(row[registryDateIdx]).trim() : '',
+                                depreciationCost: Number(row[depreciationIdx]) || 0,
+                                hullInsuranceCost: Number(row[hullInsuranceIdx]) || 0,
+                                largeRepairCost: largeRepairIdx >= 0 ? (Number(row[largeRepairIdx]) || 0) : 0
+                            };
+                            const existingIdx = AppData.state.annualCosts.findIndex(x => x.year === year && x.vesselId === vesselId);
+                            if (existingIdx >= 0) AppData.state.annualCosts[existingIdx] = c;
+                            else AppData.state.annualCosts.push(c);
+                        });
+                        restoredSheets.push('Chi phí hàng năm');
+                    }
+                }
+
                 // Recalculate allocations for all modified vessel-months
                 affectedAllocations.forEach(key => {
                     const [vesselId, monthStr] = key.split('_');
                     AppData.recalculateVesselAllocations(vesselId, monthStr);
                 });
+
+                // Run full system recalculation to apply all loaded annual and monthly costs
+                AppData.recalculateAllShipments();
 
                 if (restoredSheets.length === 0) {
                     alert('Không tìm thấy sheet hợp lệ nào để khôi phục!');
@@ -1228,17 +1348,40 @@ const app = {
             'Thuế VAT (VNĐ)',
             'Hoa Tiêu, Tàu Lai, Phí Cảng (VNĐ)',
             'Chi Phí Khác Tàu Chi (VNĐ)',
+            'Lên Đà Trung Gian (VNĐ)',
+            'Lên Đà Định Kỳ (VNĐ)',
+            'Đăng Kiểm Hàng Năm (VNĐ)',
+            'Khấu Hao (VNĐ)',
+            'Bảo Hiểm Thân Vỏ (VNĐ)',
             'Tổng Chi Phí (VNĐ)',
             'Lợi Nhuận/Hiệu Quả (VNĐ)'
         ]);
         
-        const ships = AppData.getShipments()
-            .slice()
-            .sort((a, b) => {
-                const numA = parseInt((a.contractNo || '').replace(/\D/g, '')) || 0;
-                const numB = parseInt((b.contractNo || '').replace(/\D/g, '')) || 0;
-                return numB - numA; // Descending by HD number
+        let ships = AppData.getShipments();
+        
+        // Filter shipments based on active UI filters
+        const filterMonth = this.lastShipmentsMonth || '';
+        const filterVessel = this.lastShipmentsVessel || '';
+        const filterCustomer = this.lastShipmentsCustomer || '';
+        
+        if (filterMonth) {
+            ships = ships.filter(s => {
+                const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                return m === filterMonth;
             });
+        }
+        if (filterVessel) {
+            ships = ships.filter(s => s.vesselId === filterVessel);
+        }
+        if (filterCustomer) {
+            ships = ships.filter(s => s.customer === filterCustomer);
+        }
+        
+        ships = ships.slice().sort((a, b) => {
+            const numA = parseInt((a.contractNo || '').replace(/\D/g, '')) || 0;
+            const numB = parseInt((b.contractNo || '').replace(/\D/g, '')) || 0;
+            return numB - numA; // Descending by HD number
+        });
             
         ships.forEach(s => {
             const qty = Number(s.qty || 0);
@@ -1265,10 +1408,16 @@ const app = {
             const vat = Number(costs.vat || 0);
             const portFees = Number(costs.portFees || 0);
             const others = Number(costs.others || 0);
+            const dockingIntermediate = this.excludeDockingDepreciation ? 0 : Number(costs.dockingIntermediate || 0);
+            const dockingPeriodic = this.excludeDockingDepreciation ? 0 : Number(costs.dockingPeriodic || 0);
+            const registryAnnual = Number(costs.registryAnnual || 0);
+            const depreciation = this.excludeDockingDepreciation ? 0 : Number(costs.depreciation || 0);
+            const hullInsurance = Number(costs.hullInsurance || 0);
             
             const totalExpenses = fuelDO + fuelLO + crewSalary + crewFood + crewInsurance + 
                                   materialCompany + materialVessel + monthlyOther + agent + 
-                                  vessel2ends + brokerage + vat + portFees + others;
+                                  vessel2ends + brokerage + vat + portFees + others +
+                                  dockingIntermediate + dockingPeriodic + registryAnnual + depreciation + hullInsurance;
             const profit = revenueReal - totalExpenses;
             
             rows.push([
@@ -1305,6 +1454,11 @@ const app = {
                 vat,
                 portFees,
                 others,
+                dockingIntermediate,
+                dockingPeriodic,
+                registryAnnual,
+                depreciation,
+                hullInsurance,
                 totalExpenses,
                 profit
             ]);
@@ -1318,13 +1472,1271 @@ const app = {
             {wch: 15}, {wch: 22}, {wch: 22}, {wch: 20}, {wch: 18}, 
             {wch: 18}, {wch: 18}, {wch: 15}, {wch: 15}, {wch: 18}, 
             {wch: 18}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 15}, 
-            {wch: 15}, {wch: 20}, {wch: 18}, {wch: 20}, {wch: 22}
+            {wch: 15}, {wch: 20}, {wch: 18}, 
+            {wch: 18}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 18}, // 5 new cols
+            {wch: 20}, {wch: 22}
         ];
         XLSX.utils.book_append_sheet(wb, ws, 'Chuyen_Hang');
         XLSX.writeFile(wb, 'Bao_Cao_Chuyen_Hang_' + new Date().toISOString().slice(0,10) + '.xlsx');
     },
 
+    getMonthlyVesselReportInputs(vesselId, monthStr) {
+        const key = `monthly_vessel_report_inputs_${vesselId}_${monthStr}`;
+        const stored = localStorage.getItem(key);
+        let inputs = null;
+        if (stored) {
+            try {
+                inputs = JSON.parse(stored);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        if (!inputs) {
+            inputs = {
+                openingBalance: 0,
+                customExpenses: [
+                    { desc: 'Thuế TNDN 2025 tạm nộp', amount: 25000000 },
+                    { desc: 'Chi phí VP', amount: 27482000 }
+                ],
+                overrides: {}
+            };
+        }
+        if (!inputs.isManualOpening) {
+            const prevMonthStr = this.getPreviousMonthStr(monthStr);
+            inputs.openingBalance = this.calculateMonthlyClosingBalance(vesselId, prevMonthStr);
+        }
+        return inputs;
+    },
+
+    getPreviousMonthStr(monthStr) {
+        if (!monthStr) return '';
+        const [year, month] = monthStr.split('-').map(Number);
+        let prevYear = year;
+        let prevMonth = month - 1;
+        if (prevMonth === 0) {
+            prevMonth = 12;
+            prevYear = year - 1;
+        }
+        return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    },
+
+    calculateMonthlyClosingBalance(vesselId, monthStr) {
+        if (!monthStr) return 0;
+        return this.doCalculateMonthlyClosingBalance(vesselId, monthStr, new Set());
+    },
+
+    doCalculateMonthlyClosingBalance(vesselId, monthStr, visitedMonths) {
+        if (!monthStr || visitedMonths.has(monthStr) || visitedMonths.size > 24) {
+            return 0; // Prevent infinite loop
+        }
+        visitedMonths.add(monthStr);
+
+        const key = `monthly_vessel_report_inputs_${vesselId}_${monthStr}`;
+        const stored = localStorage.getItem(key);
+        let manualOpening = null;
+        let customTotal = 0;
+        let overrides = {};
+
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (parsed.isManualOpening) {
+                    manualOpening = Number(parsed.openingBalance) || 0;
+                }
+                if (parsed.customExpenses) {
+                    parsed.customExpenses.forEach(exp => {
+                        customTotal += Number(exp.amount) || 0;
+                    });
+                }
+                if (parsed.overrides) {
+                    overrides = parsed.overrides;
+                }
+            } catch(e) {}
+        }
+
+        // 1. Opening balance
+        let openingBalance = 0;
+        if (manualOpening !== null) {
+            openingBalance = manualOpening;
+        } else {
+            const prevMonthStr = this.getPreviousMonthStr(monthStr);
+            openingBalance = this.doCalculateMonthlyClosingBalance(vesselId, prevMonthStr, visitedMonths);
+        }
+
+        // 2. Revenue
+        const ships = AppData.getShipments();
+        const shipments = ships.filter(s => {
+            const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+            return s.vesselId === vesselId && m === monthStr;
+        });
+        const totalRevenueSum = shipments.reduce((sum, s) => {
+            let sTotal = Number(s.revenueReal || 0);
+            if (s.revenueInvoice > s.revenueReal) {
+                const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+                sTotal += Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
+            }
+            return sum + sTotal;
+        }, 0);
+
+        // 3. Costs
+        const [year, month] = monthStr.split('-').map(Number);
+        const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
+        const parseFuelMonth = (dateStr) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        };
+
+        const doCost = overrides.doCost !== undefined ? Number(overrides.doCost) : AppData.state.fuelVoyages
+            .filter(v => v.vesselId === vesselId && parseFuelMonth(v.fuelDate) === monthStr)
+            .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+
+        const loCost = overrides.loCost !== undefined ? Number(overrides.loCost) : (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr)
+            .reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
+
+        const vesselAdvances = overrides.advances !== undefined ? Number(overrides.advances) : txs.filter(t => t.category && t.category.toLowerCase() === '1.tàu ứng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        const monthlyCost = AppData.getMonthlyCosts(monthStr, vesselId);
+        const crewSalary = overrides.salary !== undefined ? Number(overrides.salary) : (monthlyCost.salary || 0);
+
+        const totalInterest = overrides.interest !== undefined ? Number(overrides.interest) : txs.filter(t => t.category === '6.Lãi Vay' || t.category === '6.Lại Vay').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        const totalAgent = overrides.agent !== undefined ? Number(overrides.agent) : txs.filter(t => t.category === '2.Chi Phí Cảng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        const totalMaterial = overrides.material !== undefined ? Number(overrides.material) : txs.filter(t => t.category === '9.Vật Tư').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const annualConfig = AppData.getAnnualCosts(year, vesselId);
+        const hullInsurance = Math.round(daysInMonth * (annualConfig.hullInsuranceDaily || 0));
+        const socialInsurance = monthlyCost.insurance || 0;
+        const totalInsurance = overrides.insurance !== undefined ? Number(overrides.insurance) : (hullInsurance + socialInsurance);
+
+        const autoVat = shipments.reduce((sum, s) => sum + (Number(s.costs?.vat) || 0), 0);
+        const useVat = overrides.vat !== undefined ? Number(overrides.vat) : autoVat;
+
+        const totalCostSum = doCost + loCost + vesselAdvances + crewSalary + totalInterest + totalAgent + totalMaterial + totalInsurance + useVat + customTotal;
+
+        return openingBalance + totalRevenueSum - totalCostSum;
+    },
+
+    saveMonthlyVesselReportInputs(vesselId, monthStr, data) {
+        const key = `monthly_vessel_report_inputs_${vesselId}_${monthStr}`;
+        localStorage.setItem(key, JSON.stringify(data));
+    },
+
+    printShipmentReportDirectly(shipmentId) {
+        const s = AppData.getShipment(shipmentId);
+        if (!s) return alert('Không tìm thấy chuyến hàng!');
+        
+        const vessel = AppData.getVessel(s.vesselId);
+        const vesselName = vessel ? vessel.name : s.vesselId;
+
+        const rev = Number(s.revenueReal || 0);
+        
+        // Calculate VAT
+        let vat = 0;
+        if (s.revenueInvoice > s.revenueReal) {
+            const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+            vat = Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
+        }
+
+        const fuelDO = Number(s.costs?.fuelDO || 0);
+        const fuelLO = Number(s.costs?.fuelLO || 0);
+        const crewSalary = Number(s.costs?.crewSalary || 0);
+        const crewFood = Number(s.costs?.crewFood || 0);
+        const crewInsurance = Number(s.costs?.crewInsurance || 0);
+        const materialCompany = Number(s.costs?.materialCompany || 0);
+        const materialVessel = Number(s.costs?.materialVessel || 0);
+        const monthlyOther = Number(s.costs?.monthlyOther || 0);
+        const agent = Number(s.costs?.agent || 0);
+        const vessel2ends = Number(s.costs?.vessel2ends || 0);
+        const brokerage = Number(s.costs?.brokerage || 0);
+        const actualVat = Number(s.costs?.vat || 0);
+        const portFees = Number(s.costs?.portFees || 0);
+        const others = Number(s.costs?.others || 0);
+
+        const vesselAdvances = (AppData.state.transactions || []).filter(t => t.vessel === s.vesselId && t.voyageNo === s.voyageNo && t.category && t.category.toLowerCase() === '1.tàu ứng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        const dockingIntermediate = this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingIntermediate || 0);
+        const dockingPeriodic = this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingPeriodic || 0);
+        const registryAnnual = Number(s.costs?.registryAnnual || 0);
+        const depreciation = this.excludeDockingDepreciation ? 0 : Number(s.costs?.depreciation || 0);
+        const hullInsurance = Number(s.costs?.hullInsurance || 0);
+        const largeRepair = Number(s.costs?.largeRepair || 0);
+
+        const loanInterest = Number(s.costs?.loanInterest || 0);
+        const loanInterestExternal = Number(s.costs?.loanInterestExternal || 0);
+
+        const totalExpenses = fuelDO + fuelLO + crewSalary + crewFood + crewInsurance + 
+                              materialCompany + materialVessel + monthlyOther + agent + 
+                              vessel2ends + brokerage + actualVat + portFees + others +
+                              dockingIntermediate + dockingPeriodic + registryAnnual + depreciation + hullInsurance + largeRepair +
+                              loanInterest + loanInterestExternal;
+
+        const profit = rev - totalExpenses;
+
+        const html = `
+            <div class="print-container">
+                <div class="print-actions no-print" style="margin-bottom: 1.5rem; text-align: right;">
+                    <button class="btn btn-outline" onclick="app.closeModal('report-modal')" style="margin-right: 8px;">Đóng</button>
+                    <button class="btn btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> In Báo Cáo</button>
+                </div>
+                <div class="print-header">
+                    <h2>BÁO CÁO HẠNG MỤC CHI TIẾT CHUYẾN HÀNG</h2>
+                    <p>Mã Hợp Đồng: <strong>${s.contractNo || '---'}</strong> | Số Chuyến: <strong>${s.voyageNo || '---'}</strong></p>
+                </div>
+                
+                <table class="report-print-table" style="width: 100%; border-collapse: collapse; margin-top: 1rem; border: 1px solid #000;">
+                    <thead>
+                        <tr style="background: #cbd5e1; font-weight: bold; border: 1px solid #000;">
+                            <th style="border: 1px solid #000; padding: 8px; text-align: left;">Hạng mục</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 250px;">Số tiền (VNĐ)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="print-bold-row" style="background: #e2e8f0; font-weight: bold; border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px;">Doanh thu thực tế phát sinh trong tháng (1)</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #16a34a;">${AppData.formatCurrency(rev)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Doanh thu hóa đơn</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;">${AppData.formatCurrency(s.revenueInvoice || 0)}</td>
+                        </tr>
+                        <tr class="print-bold-row" style="background: #e2e8f0; font-weight: bold; border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px;">Thuế VAT tính thêm (2) = (Doanh thu HĐ - Thực tế)/1.08 * ${s.commissionRate !== undefined ? s.commissionRate : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 20 : 28)}%</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #16a34a;">${AppData.formatCurrency(vat)}</td>
+                        </tr>
+                        <tr class="print-bold-row" style="background: #cbd5e1; font-weight: bold; border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px;">TỔNG DOANH THU THU VỀ (3) = (1) + (2)</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #16a34a;">${AppData.formatCurrency(rev + vat)}</td>
+                        </tr>
+                        
+                        <tr style="border: 1px solid #000; background: #f8fafc; font-weight: bold;">
+                            <td style="border: 1px solid #000; padding: 8px;" colspan="2">CHI PHÍ CHUYẾN HÀNG</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Dầu DO cấp trong tháng</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(fuelDO)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Dầu LO cấp trong tháng</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(fuelLO)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Tàu chi (Tiền ứng 2 đầu cảng)</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(vesselAdvances + vessel2ends + monthlyOther + others)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Chi phí lương trong tháng</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(crewSalary)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Chi phí Cảng (Đại lý, lai dắt, hoa tiêu...)</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(agent + portFees)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Vật tư cấp tàu</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(materialCompany + materialVessel)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Bảo hiểm phân bổ (Tàu & BHXH)</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(crewInsurance + hullInsurance)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Tiền VAT thực tế nhập chuyến</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(actualVat)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Lại vay phân bổ chuyến (NH & Ngoài)</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(loanInterest + loanInterestExternal)}</td>
+                        </tr>
+                        <tr style="border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px; padding-left: 20px;">Chi phí lên đà, Đăng kiểm & Sửa chữa lớn phân bổ</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(dockingIntermediate + dockingPeriodic + registryAnnual + depreciation + largeRepair)}</td>
+                        </tr>
+                        <tr class="print-bold-row" style="background: #cbd5e1; font-weight: bold; border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px;">TỔNG CHI PHÍ CHUYẾN</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #dc2626;">${AppData.formatCurrency(totalExpenses)}</td>
+                        </tr>
+                        
+                        <tr class="print-bold-row" style="background: #b91c1c; color: #fff; font-weight: bold; border: 1px solid #000;">
+                            <td style="border: 1px solid #000; padding: 8px;">LỢI NHUẬN RÒNG THỰC TẾ</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;">${AppData.formatCurrency(profit)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div style="margin-top: 3rem; text-align: right; font-style: italic; font-size: 0.95rem;">
+                    Báo cáo kết xuất tự động ngày ${String(new Date().getDate()).padStart(2, '0')}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}
+                </div>
+            </div>
+        `;
+        document.getElementById('report-content').innerHTML = html;
+        this.openModal('report-modal');
+    },
+
+    openShipmentReport(shipmentId) {
+        this.printShipmentReportDirectly(shipmentId);
+    },
+
+    printMonthlyVesselReport(vesselId, monthStr, shouldPrint = false) {
+        const vessel = AppData.getVessel(vesselId);
+        const vesselName = vessel ? vessel.name : vesselId;
+        const [year, month] = monthStr.split('-').map(Number);
+
+        // Lấy danh sách chuyến của tàu trong tháng
+        const shipments = AppData.getShipments().filter(s => {
+            const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+            return s.vesselId === vesselId && m === monthStr;
+        });
+
+        // Sắp xếp theo số chuyến tăng dần
+        const sortedShipments = shipments.slice().sort((a, b) => (a.voyageNo || '').localeCompare(b.voyageNo || ''));
+
+        // Lấy tất cả giao dịch tài chính liên quan đến tàu này trong tháng
+        const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
+
+        // Lấy chi phí dầu DO và LO
+        const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === vesselId && v.fuelDate && v.fuelDate.substring(0, 7) === monthStr).reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+        const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr).reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
+
+        // Tàu chi
+        const vesselAdvances = txs.filter(t => t.category === '1.Tàu ứng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        // Lương
+        const monthlyCost = AppData.getMonthlyCosts(monthStr, vesselId);
+        const crewSalary = monthlyCost.salary || 0;
+
+        // Lãi vay
+        const interestTxs = txs.filter(t => t.category === '6.Lãi Vay');
+        const totalInterest = interestTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        // Chi phí cảng
+        const agentTxs = txs.filter(t => t.category === '2.Chi Phí Cảng');
+        const totalAgent = agentTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        // Vật tư
+        const materialTxs = txs.filter(t => t.category === '9.Vật Tư');
+        const totalMaterial = materialTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+        // Bảo hiểm
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const annualConfig = AppData.getAnnualCosts(year, vesselId);
+        const hullInsurance = Math.round(daysInMonth * (annualConfig.hullInsuranceDaily || 0));
+        const socialInsurance = monthlyCost.insurance || 0;
+        const totalInsurance = hullInsurance + socialInsurance;
+
+        // VAT chuyến
+        const totalVat = shipments.reduce((sum, s) => sum + (Number(s.costs?.vat) || 0), 0);
+
+        // Dữ liệu tùy biến lưu ở localStorage
+        const inputs = this.getMonthlyVesselReportInputs(vesselId, monthStr);
+        this.activeReportVessel = vesselId;
+        this.activeReportMonth = monthStr;
+
+        let customTotal = 0;
+        inputs.customExpenses.forEach(exp => {
+            customTotal += Number(exp.amount) || 0;
+        });
+
+        // Tính doanh thu thực tế và tổng doanh thu sau VAT
+        const totalRevenueSum = shipments.reduce((sum, s) => {
+            let sTotal = Number(s.revenueReal || 0);
+            if (s.revenueInvoice > s.revenueReal) {
+                const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+                sTotal += Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
+            }
+            return sum + sTotal;
+        }, 0);
+
+        const totalCostSum = doCost + loCost + vesselAdvances + crewSalary + totalInterest + totalAgent + totalMaterial + totalInsurance + totalVat + customTotal;
+        const finalBalance = (Number(inputs.openingBalance) || 0) + totalRevenueSum - totalCostSum;
+
+        let html = `
+            <div class="print-container" id="report-data-holder" 
+                 data-do-cost="${doCost}" 
+                 data-lo-cost="${loCost}" 
+                 data-advances="${vesselAdvances}" 
+                 data-salary="${crewSalary}" 
+                 data-interest="${totalInterest}" 
+                 data-agent="${totalAgent}" 
+                 data-material="${totalMaterial}" 
+                 data-insurance="${totalInsurance}" 
+                 data-vat="${totalVat}" 
+                 data-revenue="${totalRevenueSum}">
+                 
+                <div class="print-actions no-print" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+                    <div>
+                        <strong style="color: var(--primary-light);">Bảng Xem Trước & Điều Chỉnh Số Liệu</strong>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" style="border-color: #10b981; color: #10b981;" onclick="app.exportMonthlyVesselReport('${vesselId}', '${monthStr}')">
+                            <i class="fa-solid fa-file-excel"></i> Xuất Excel Báo Cáo Tháng
+                        </button>
+                        <button class="btn btn-outline" onclick="app.closeModal('report-modal')">Đóng</button>
+                        <button class="btn btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> In A4</button>
+                    </div>
+                </div>
+                
+                <div class="print-header">
+                    <h2>BẢNG THEO DÕI DOANH THU - CHI PHÍ TÀU ${vesselName.toUpperCase()}</h2>
+                    <h3>THÁNG ${month}/${year}</h3>
+                </div>
+                
+                <table class="report-print-table" style="width: 100%; border-collapse: collapse; margin-top: 1.5rem;">
+                    <thead>
+                        <tr style="background: #cbd5e1; font-weight: bold;">
+                            <th class="print-action-cell" style="width: 40px;">Xóa</th>
+                            <th style="width: 60px; text-align: center;">STT</th>
+                            <th>CHI TIẾT HẠNG MỤC</th>
+                            <th style="text-align: right; width: 140px;">DƯ ĐẦU THÁNG</th>
+                            <th style="text-align: right; width: 140px;">DOANH THU</th>
+                            <th style="text-align: right; width: 140px;">CHI PHÍ</th>
+                            <th style="text-align: right; width: 140px;">TỒN CUỐI THÁNG</th>
+                            <th style="width: 100px; text-align: center;">GHI CHÚ</th>
+                        </tr>
+                    </thead>
+                    
+                    <tbody>
+                        <!-- Dư đầu tháng -->
+                        <tr class="print-bold-row" style="background: #e2e8f0; font-weight: bold;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Tồn tháng trước chuyển sang</td>
+                            <td style="text-align: right;">
+                                <input type="number" id="rep-input-opening" class="print-input print-input-amount" value="${inputs.openingBalance}" oninput="app.recalcMonthlyVesselReport()" style="font-weight: bold; text-align: right;">
+                            </td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        
+                        <!-- Doanh thu chuyến -->
+                        ${sortedShipments.map(s => {
+                            const qtyStr = Math.round(s.qty).toLocaleString('en-US');
+                            const rateStr = Math.round(s.rate).toLocaleString('en-US');
+                            const details = `HĐ ${s.contractNo || ''} ${vesselName} ${s.portLoad || ''} - ${s.portDischarge || ''} (${s.customer || ''}) ${qtyStr} * ${rateStr}`;
+                            
+                            let vatRow = '';
+                            if (s.revenueInvoice > s.revenueReal) {
+                                const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+                                const vatAmt = Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
+                                vatRow = `
+                                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                                        <td class="print-action-cell"></td>
+                                        <td style="text-align: center;"></td>
+                                        <td style="padding-left: 20px; color: #475569;">VAT tính thêm chuyến này (${s.markup ? Math.round(s.markup) : ''})</td>
+                                        <td></td>
+                                        <td style="text-align: right; color: #15803d; font-weight: 500;">${AppData.formatCurrency(vatAmt)}</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                `;
+                            }
+                            
+                            return `
+                                <tr style="border-bottom: 1px solid #e2e8f0;">
+                                    <td class="print-action-cell"></td>
+                                    <td style="text-align: center;"><strong>${s.voyageNo || ''}</strong></td>
+                                    <td style="font-weight: 500;">${details}</td>
+                                    <td></td>
+                                    <td style="text-align: right; color: #15803d; font-weight: bold;">${AppData.formatCurrency(s.revenueReal)}</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                                ${vatRow}
+                            `;
+                        }).join('')}
+                        
+                        <!-- Dầu DO & LO -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Nhiên liệu (Dầu DO & LO)</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(doCost + loCost)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr class="print-sub-row" style="border-bottom: 1px solid #f1f5f9;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td style="padding-left: 20px; color: #475569;">Dầu DO cấp trong tháng</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right;">${AppData.formatCurrency(doCost)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr class="print-sub-row" style="border-bottom: 1px solid #f1f5f9;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td style="padding-left: 20px; color: #475569;">Dầu LO cấp trong tháng</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right;">${AppData.formatCurrency(loCost)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        
+                        <!-- Tàu ứng -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold; border-bottom: 1px solid #cbd5e1;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Tàu ứng chi phí trong tháng</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(vesselAdvances)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        
+                        <!-- Lương -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold; border-bottom: 1px solid #cbd5e1;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Chi phí lương thủy thủ</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(crewSalary)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        
+                        <!-- Lãi vay -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Lãi vay phân bổ (Trong và ngoài ngân hàng)</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalInterest)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        ${interestTxs.map(t => `
+                            <tr class="print-sub-row" style="border-bottom: 1px solid #f1f5f9;">
+                                <td class="print-action-cell"></td>
+                                <td style="text-align: center;"></td>
+                                <td style="padding-left: 20px; color: #475569;">${t.content || 'Lãi vay'}</td>
+                                <td></td>
+                                <td></td>
+                                <td style="text-align: right;">${AppData.formatCurrency(t.chi)}</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        `).join('')}
+                        
+                        <!-- Chi phí Cảng -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Chi phí Cảng phát sinh</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalAgent)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        ${agentTxs.map(t => `
+                            <tr class="print-sub-row" style="border-bottom: 1px solid #f1f5f9;">
+                                <td class="print-action-cell"></td>
+                                <td style="text-align: center;"></td>
+                                <td style="padding-left: 20px; color: #475569;">+ ${t.content || 'Chi phí cảng'}</td>
+                                <td></td>
+                                <td></td>
+                                <td style="text-align: right;">${AppData.formatCurrency(t.chi)}</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        `).join('')}
+                        
+                        <!-- Vật tư -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Vật tư mua cấp tàu</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalMaterial)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        ${materialTxs.map(t => `
+                            <tr class="print-sub-row" style="border-bottom: 1px solid #f1f5f9;">
+                                <td class="print-action-cell"></td>
+                                <td style="text-align: center;"></td>
+                                <td style="padding-left: 20px; color: #475569;">${t.content || 'Vật tư mua'}</td>
+                                <td></td>
+                                <td></td>
+                                <td style="text-align: right;">${AppData.formatCurrency(t.chi)}</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        `).join('')}
+                        
+                        <!-- Bảo hiểm -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Bảo hiểm (Phân bổ bảo hiểm tàu & BHXH)</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalInsurance)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr class="print-sub-row" style="border-bottom: 1px solid #f1f5f9;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td style="padding-left: 20px; color: #475569;">Bảo hiểm thân vỏ phân bổ tháng (${daysInMonth} ngày)</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right;">${AppData.formatCurrency(hullInsurance)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr class="print-sub-row" style="border-bottom: 1px solid #f1f5f9;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td style="padding-left: 20px; color: #475569;">Bảo hiểm xã hội tháng</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right;">${AppData.formatCurrency(socialInsurance)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        
+                        <!-- VAT chuyến -->
+                        <tr class="print-bold-row" style="background: #f1f5f9; font-weight: bold; border-bottom: 1px solid #cbd5e1;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td>Thuế VAT phát sinh chuyến trong tháng</td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalVat)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                    
+                    <!-- Chi phí tự chọn thêm -->
+                    <tbody id="rep-custom-expenses-body">
+                        <tr style="background: #f8fafc; border-top: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8;">
+                            <td class="print-action-cell"></td>
+                            <td colspan="7" style="font-weight: bold; padding: 6px;">Chi phí văn phòng, Thuế và các chi phí tự chọn khác:</td>
+                        </tr>
+                        ${inputs.customExpenses.map((exp, expIdx) => `
+                            <tr class="custom-expense-row print-sub-row" style="border-bottom: 1px solid #e2e8f0;">
+                                <td class="print-action-cell" style="text-align: center; width: 40px;">
+                                    <button class="btn-delete-row" onclick="app.deleteReportCustomExpenseRow(this)"><i class="fa-solid fa-trash"></i></button>
+                                </td>
+                                <td style="text-align: center;"></td>
+                                <td style="padding-left: 20px; color: #475569;">
+                                    <input type="text" class="print-input-desc" value="${exp.desc || ''}" placeholder="Nhập tên chi phí tự chọn..." oninput="app.recalcMonthlyVesselReport()">
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td style="text-align: right; color: #b91c1c;">
+                                    <input type="number" class="print-input print-input-amount" value="${exp.amount || 0}" oninput="app.recalcMonthlyVesselReport()" style="font-weight: bold; color: #b91c1c;">
+                                </td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    
+                    <tbody>
+                        <tr class="no-print">
+                            <td class="print-action-cell" style="border: none;"></td>
+                            <td colspan="7" style="border: 1px solid #000000; padding: 8px; text-align: left; background: rgba(0,0,0,0.02);">
+                                <button class="btn btn-outline" style="padding: 0.3rem 0.6rem; font-size: 0.85rem;" onclick="app.addReportCustomExpenseRow()">
+                                    <i class="fa-solid fa-plus"></i> Thêm chi phí tự nhập khác (VP, Thuế...)
+                                </button>
+                            </td>
+                        </tr>
+
+                        <tr class="print-bold-row" style="background: #cbd5e1; border-top: 2px solid #000000;">
+                            <td class="print-action-cell"></td>
+                            <td style="text-align: center;"></td>
+                            <td style="text-align: center; color: #1e3a8a; font-weight: bold; font-size: 1.05rem;">Cộng</td>
+                            <td style="text-align: right; color: #1e3a8a; font-weight: bold;" id="rep-total-opening">${AppData.formatCurrency(inputs.openingBalance)}</td>
+                            <td style="text-align: right; color: #15803d; font-weight: bold;" id="rep-total-revenue">${AppData.formatCurrency(totalRevenueSum)}</td>
+                            <td style="text-align: right; color: #b91c1c; font-weight: bold;" id="rep-total-cost">${AppData.formatCurrency(totalCostSum)}</td>
+                            <td style="text-align: right; color: #15803d; font-weight: bold; font-size: 1.1rem;" id="rep-total-balance">${AppData.formatCurrency(finalBalance)}</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div style="margin-top: 3rem; text-align: right; font-style: italic; font-size: 0.95rem;">
+                    Lập ngày ${String(new Date().getDate()).padStart(2, '0')}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}
+                </div>
+                
+                <div class="no-print" style="margin-top: 2rem; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 1.5rem;">
+                    <button class="btn btn-outline" onclick="app.closeModal('report-modal')" style="margin-right: 10px;">Đóng Báo Cáo</button>
+                    <button class="btn btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> In Báo Cáo</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('report-content').innerHTML = html;
+        this.openModal('report-modal');
+        if (shouldPrint) {
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        }
+    },
+
+    recalcMonthlyVesselReport() {
+        const holder = document.getElementById('report-data-holder');
+        if (!holder) return;
+
+        const vesselId = this.activeReportVessel;
+        const monthStr = this.activeReportMonth;
+        if (!vesselId || !monthStr) return;
+
+        const opening = Number(document.getElementById('rep-input-opening').value) || 0;
+        
+        const rows = document.querySelectorAll('.custom-expense-row');
+        let customTotal = 0;
+        const customExpenses = [];
+        rows.forEach(row => {
+            const desc = row.querySelector('.print-input-desc').value.trim();
+            const amount = Number(row.querySelector('.print-input-amount').value) || 0;
+            customTotal += amount;
+            if (desc) {
+                customExpenses.push({ desc, amount });
+            }
+        });
+
+        const data = {
+            openingBalance: opening,
+            customExpenses: customExpenses
+        };
+        this.saveMonthlyVesselReportInputs(vesselId, monthStr, data);
+
+        const doCost = Number(holder.dataset.doCost) || 0;
+        const loCost = Number(holder.dataset.loCost) || 0;
+        const vesselAdvances = Number(holder.dataset.advances) || 0;
+        const crewSalary = Number(holder.dataset.salary) || 0;
+        const totalInterest = Number(holder.dataset.interest) || 0;
+        const totalAgent = Number(holder.dataset.agent) || 0;
+        const totalMaterial = Number(holder.dataset.material) || 0;
+        const totalInsurance = Number(holder.dataset.insurance) || 0;
+        const totalVat = Number(holder.dataset.vat) || 0;
+        const totalRevenueSum = Number(holder.dataset.revenue) || 0;
+
+        const totalCostSum = doCost + loCost + vesselAdvances + crewSalary + totalInterest + totalAgent + totalMaterial + totalInsurance + totalVat + customTotal;
+        const finalBalance = opening + totalRevenueSum - totalCostSum;
+
+        document.getElementById('rep-total-opening').innerText = AppData.formatCurrency(opening);
+        document.getElementById('rep-total-cost').innerText = AppData.formatCurrency(totalCostSum);
+        document.getElementById('rep-total-balance').innerText = AppData.formatCurrency(finalBalance);
+    },
+
+    addReportCustomExpenseRow() {
+        const tbody = document.getElementById('rep-custom-expenses-body');
+        if (tbody) {
+            const tr = document.createElement('tr');
+            tr.className = 'custom-expense-row print-sub-row';
+            tr.innerHTML = `
+                <td class="print-action-cell" style="text-align: center; width: 40px; border: 1px solid #000000;">
+                    <button class="btn-delete-row" onclick="app.deleteReportCustomExpenseRow(this)"><i class="fa-solid fa-trash"></i></button>
+                </td>
+                <td style="text-align: center;"></td>
+                <td style="padding-left: 20px; color: #475569;">
+                    <input type="text" class="print-input-desc" value="" placeholder="Nhập tên chi phí tự chọn..." oninput="app.recalcMonthlyVesselReport()">
+                </td>
+                <td></td>
+                <td></td>
+                <td style="text-align: right; color: #b91c1c;">
+                    <input type="number" class="print-input print-input-amount" value="0" oninput="app.recalcMonthlyVesselReport()" style="font-weight: bold; color: #b91c1c;">
+                </td>
+                <td></td>
+                <td></td>
+            `;
+            tbody.appendChild(tr);
+            this.recalcMonthlyVesselReport();
+        }
+    },
+
+    deleteReportCustomExpenseRow(btn) {
+        const tr = btn.closest('tr');
+        if (tr) {
+            tr.remove();
+            this.recalcMonthlyVesselReport();
+        }
+    },
+
+    // === Inline Monthly Report (Báo cáo Tháng tab) helpers ===
+    recalcInlineMonthlyReport() {
+        const dataDiv = document.getElementById('monthly-report-data');
+        if (!dataDiv) return;
+
+        const doCost = Number(dataDiv.dataset.doCost) || 0;
+        const loCost = Number(dataDiv.dataset.loCost) || 0;
+        const vesselAdvances = Number(dataDiv.dataset.advances) || 0;
+        const crewSalary = Number(dataDiv.dataset.salary) || 0;
+        const totalInterest = Number(dataDiv.dataset.interest) || 0;
+        const totalAgent = Number(dataDiv.dataset.agent) || 0;
+        const totalMaterial = Number(dataDiv.dataset.material) || 0;
+        const totalInsurance = Number(dataDiv.dataset.insurance) || 0;
+        const vatForCost = Number(dataDiv.dataset.vat) || 0;
+        const totalRevenueSum = Number(dataDiv.dataset.revenue) || 0;
+
+        // Read cost inputs overrides
+        const costInputs = document.querySelectorAll('.mi-cost-input');
+        const overrides = {};
+        costInputs.forEach(input => {
+            const field = input.getAttribute('data-field');
+            const autoVal = Number(input.getAttribute('data-auto')) || 0;
+            const currentVal = Number(input.value) || 0;
+            
+            const button = input.previousElementSibling; // The reset button
+            if (currentVal !== autoVal) {
+                overrides[field] = currentVal;
+                input.style.color = '#fbbf24'; // yellow
+                if (button) button.style.color = '#fbbf24';
+            } else {
+                input.style.color = '#f87171'; // light red
+                if (button) button.style.color = '#64748b';
+            }
+        });
+
+        const doCostVal = overrides.doCost !== undefined ? overrides.doCost : doCost;
+        const loCostVal = overrides.loCost !== undefined ? overrides.loCost : loCost;
+        const advancesVal = overrides.advances !== undefined ? overrides.advances : vesselAdvances;
+        const salaryVal = overrides.salary !== undefined ? overrides.salary : crewSalary;
+        const interestVal = overrides.interest !== undefined ? overrides.interest : totalInterest;
+        const agentVal = overrides.agent !== undefined ? overrides.agent : totalAgent;
+        const materialVal = overrides.material !== undefined ? overrides.material : totalMaterial;
+        const insuranceVal = overrides.insurance !== undefined ? overrides.insurance : totalInsurance;
+        const vatVal = overrides.vat !== undefined ? overrides.vat : vatForCost;
+
+        const openingInput = document.getElementById('mi-rep-opening');
+        const opening = openingInput ? (Number(openingInput.value) || 0) : 0;
+
+        let isManualOpening = false;
+        if (this.activeReportVessel && this.activeReportMonth) {
+            const prevMonthStr = this.getPreviousMonthStr(this.activeReportMonth);
+            const autoOpening = this.calculateMonthlyClosingBalance(this.activeReportVessel, prevMonthStr);
+            const button = openingInput ? openingInput.previousElementSibling : null;
+            if (Math.abs(opening - autoOpening) > 0.01) {
+                isManualOpening = true;
+                if (openingInput) openingInput.style.color = '#fbbf24'; // yellow
+                if (button) button.style.color = '#fbbf24';
+            } else {
+                if (openingInput) openingInput.style.color = ''; // inherit
+                if (button) button.style.color = '#64748b';
+            }
+        }
+
+        const rows = document.querySelectorAll('.mi-custom-expense-row');
+        let customTotal = 0;
+        const customExpenses = [];
+        rows.forEach(row => {
+            const descEl = row.querySelector('.mi-custom-desc');
+            const amtEl = row.querySelector('.mi-custom-amount');
+            const desc = descEl ? descEl.value.trim() : '';
+            const amount = amtEl ? (Number(amtEl.value) || 0) : 0;
+            customTotal += amount;
+            customExpenses.push({ desc, amount });
+        });
+
+        // Save for persistence
+        if (this.activeReportVessel && this.activeReportMonth) {
+            this.saveMonthlyVesselReportInputs(this.activeReportVessel, this.activeReportMonth, {
+                openingBalance: opening,
+                customExpenses,
+                overrides,
+                isManualOpening
+            });
+        }
+
+        const totalCostSum = doCostVal + loCostVal + advancesVal + salaryVal + interestVal + agentVal + materialVal + insuranceVal + vatVal + customTotal;
+        const finalBalance = opening + totalRevenueSum - totalCostSum;
+
+        const elOpening = document.getElementById('mi-rep-total-opening');
+        const elCost = document.getElementById('mi-rep-total-cost');
+        const elBalance = document.getElementById('mi-rep-total-balance');
+        if (elOpening) elOpening.innerText = AppData.formatCurrency(opening);
+        if (elCost) elCost.innerText = AppData.formatCurrency(totalCostSum);
+        if (elBalance) elBalance.innerText = AppData.formatCurrency(finalBalance);
+    },
+
+    resetMICostField(fieldId, autoVal) {
+        const input = document.getElementById(`mi-cost-${fieldId}`);
+        if (input) {
+            input.value = autoVal;
+            if (this.activeReportVessel && this.activeReportMonth) {
+                const inputs = this.getMonthlyVesselReportInputs(this.activeReportVessel, this.activeReportMonth);
+                if (inputs.overrides) {
+                    delete inputs.overrides[fieldId];
+                    this.saveMonthlyVesselReportInputs(this.activeReportVessel, this.activeReportMonth, inputs);
+                }
+            }
+            this.recalcInlineMonthlyReport();
+        }
+    },
+
+    resetMIOpeningField() {
+        if (this.activeReportVessel && this.activeReportMonth) {
+            const inputs = this.getMonthlyVesselReportInputs(this.activeReportVessel, this.activeReportMonth);
+            delete inputs.isManualOpening;
+            this.saveMonthlyVesselReportInputs(this.activeReportVessel, this.activeReportMonth, inputs);
+            
+            const prevMonthStr = this.getPreviousMonthStr(this.activeReportMonth);
+            const autoOpening = this.calculateMonthlyClosingBalance(this.activeReportVessel, prevMonthStr);
+            const input = document.getElementById('mi-rep-opening');
+            if (input) {
+                input.value = autoOpening;
+                input.style.color = '';
+            }
+            this.recalcInlineMonthlyReport();
+        }
+    },
+
+    addMICustomRow() {
+        const tbody = document.getElementById('mi-rep-custom-body');
+        if (!tbody) return;
+        const tr = document.createElement('tr');
+        tr.className = 'mi-custom-expense-row';
+        tr.innerHTML = `
+            <td style="text-align: center; padding: 6px 4px; border: 1px solid #4a5568;">
+                <button class="btn-delete-row no-print" style="background:none;border:none;cursor:pointer;color:#f87171;" onclick="app.deleteMICustomRow(this)"><i class="fa-solid fa-trash"></i></button>
+            </td>
+            <td style="padding: 6px 8px 6px 24px; border: 1px solid #4a5568; color: #94a3b8;">
+                <input type="text" class="mi-custom-desc" value="" placeholder="Nhập tên chi phí..." oninput="app.recalcInlineMonthlyReport()" style="width:100%;background:transparent;border:none;color:inherit;font-size:inherit;">
+            </td>
+            <td style="border: 1px solid #4a5568;"></td>
+            <td style="border: 1px solid #4a5568;"></td>
+            <td style="text-align: right; padding: 6px 8px; border: 1px solid #4a5568; color: #f87171;">
+                <input type="number" class="mi-custom-amount" value="0" oninput="app.recalcInlineMonthlyReport()" style="text-align:right;width:100%;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:bold;">
+            </td>
+            <td style="border: 1px solid #4a5568;"></td>
+            <td style="border: 1px solid #4a5568;"></td>
+        `;
+        tbody.appendChild(tr);
+        this.recalcInlineMonthlyReport();
+    },
+
+    deleteMICustomRow(btn) {
+        const tr = btn.closest('tr');
+        if (tr) {
+            tr.remove();
+            this.recalcInlineMonthlyReport();
+        }
+    },
+
+    exportMonthlyVesselReport(vesselId, monthStr) {
+        if (typeof XLSX === 'undefined') return alert('Chưa tải xong thư viện xuất Excel!');
+        
+        const vessel = AppData.getVessel(vesselId);
+        const vesselName = vessel ? vessel.name : vesselId;
+        const [year, month] = monthStr.split('-').map(Number);
+        
+        const shipments = AppData.getShipments().filter(s => {
+            const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+            return s.vesselId === vesselId && m === monthStr;
+        });
+        const sortedShipments = shipments.slice().sort((a,b) => (a.voyageNo || '').localeCompare(b.voyageNo || ''));
+        
+        const txs = (AppData.state.transactions || []).filter(t => t.vessel === vesselId && t.date && t.date.substring(0, 7) === monthStr);
+        
+        const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === vesselId && v.fuelDate && v.fuelDate.substring(0, 7) === monthStr).reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+        const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === vesselId && s.date && s.date.substring(0, 7) === monthStr).reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
+        
+        const vesselAdvances = txs.filter(t => t.category === '1.Tàu ứng').reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        const monthlyCost = AppData.getMonthlyCosts(monthStr, vesselId);
+        const crewSalary = monthlyCost.salary || 0;
+        
+        const interestTxs = txs.filter(t => t.category === '6.Lại Vay' || t.category === '6.Lãi Vay');
+        const totalInterest = interestTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        
+        const agentTxs = txs.filter(t => t.category === '2.Chi Phí Cảng');
+        const totalAgent = agentTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        
+        const materialTxs = txs.filter(t => t.category === '9.Vật Tư');
+        const totalMaterial = materialTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const annualConfig = AppData.getAnnualCosts(year, vesselId);
+        const hullInsurance = Math.round(daysInMonth * (annualConfig.hullInsuranceDaily || 0));
+        const socialInsurance = monthlyCost.insurance || 0;
+        const totalInsurance = hullInsurance + socialInsurance;
+        
+        const totalVat = shipments.reduce((sum, s) => sum + (Number(s.costs?.vat) || 0), 0);
+        
+        const inputs = this.getMonthlyVesselReportInputs(vesselId, monthStr);
+        let customTotal = 0;
+        inputs.customExpenses.forEach(exp => {
+            customTotal += Number(exp.amount) || 0;
+        });
+        
+        const totalRevenueSum = shipments.reduce((sum, s) => {
+            let sTotal = Number(s.revenueReal || 0);
+            if (s.revenueInvoice > s.revenueReal) {
+                const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+                sTotal += Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
+            }
+            return sum + sTotal;
+        }, 0);
+        
+        const totalCostSum = doCost + loCost + vesselAdvances + crewSalary + totalInterest + totalAgent + totalMaterial + totalInsurance + totalVat + customTotal;
+        const finalBalance = (Number(inputs.openingBalance) || 0) + totalRevenueSum - totalCostSum;
+        
+        const wb = XLSX.utils.book_new();
+        const rows = [];
+        
+        // 1. Tiêu đề
+        rows.push([`BẢNG THEO DÕI DOANH THU - CHI PHÍ TÀU ${vesselName.toUpperCase()}`]);
+        rows.push([`THÁNG ${month}/${year}`]);
+        rows.push([]);
+        
+        // 2. Header bảng
+        rows.push(['STT', 'CHI TIẾT HẠNG MỤC', 'DƯ ĐẦU THÁNG', 'DOANH THU', 'CHI PHÍ', 'TỒN CUỐI THÁNG', 'GHI CHÚ']);
+        
+        // Dư đầu tháng
+        rows.push(['', 'Tồn tháng trước chuyển sang', Number(inputs.openingBalance) || 0, '', '', '', '']);
+        
+        // Doanh thu chuyến
+        sortedShipments.forEach(s => {
+            const qtyStr = Math.round(s.qty).toLocaleString('en-US');
+            const rateStr = Math.round(s.rate).toLocaleString('en-US');
+            const details = `HĐ ${s.contractNo || ''} ${vesselName} ${s.portLoad || ''} - ${s.portDischarge || ''} (${s.customer || ''}) ${qtyStr} * ${rateStr}`;
+            
+            rows.push([
+                s.voyageNo || '',
+                details,
+                '',
+                Number(s.revenueReal) || 0,
+                '',
+                '',
+                ''
+            ]);
+            
+            if (s.revenueInvoice > s.revenueReal) {
+                const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+                const vatAmt = Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
+                rows.push([
+                    '',
+                    `VAT tính thêm chuyến này (${s.markup ? Math.round(s.markup) : ''})`,
+                    '',
+                    vatAmt,
+                    '',
+                    '',
+                    ''
+                ]);
+            }
+        });
+        
+        // Chi phí
+        // Nhiên liệu DO & LO
+        rows.push(['', 'Nhiên liệu (Dầu DO & LO)', '', '', doCost + loCost, '', '']);
+        rows.push(['', '  Dầu DO cấp trong tháng', '', '', doCost || 0, '', '']);
+        rows.push(['', '  Dầu LO cấp trong tháng', '', '', loCost || 0, '', '']);
+        
+        // Tàu ứng chi phí
+        rows.push(['', 'Tàu ứng chi phí trong tháng', '', '', vesselAdvances || 0, '', '']);
+        
+        // Lương
+        rows.push(['', 'Chi phí lương thủy thủ', '', '', crewSalary || 0, '', '']);
+        
+        // Lãi vay
+        rows.push(['', 'Lãi vay phân bổ', '', '', totalInterest || 0, '', '']);
+        interestTxs.forEach(t => {
+            rows.push(['', `  ${t.content || 'Lãi vay'}`, '', '', Number(t.chi) || 0, '', '']);
+        });
+        
+        // Đại lý / Chi phí cảng
+        rows.push(['', 'Chi phí Cảng phát sinh', '', '', totalAgent || 0, '', '']);
+        agentTxs.forEach(t => {
+            rows.push(['', `  + ${t.content || 'Chi phí cảng'}`, '', '', Number(t.chi) || 0, '', '']);
+        });
+        
+        // Vật tư
+        rows.push(['', 'Vật tư mua cấp tàu', '', '', totalMaterial || 0, '', '']);
+        materialTxs.forEach(t => {
+            rows.push(['', `  ${t.content || 'Vật tư'}`, '', '', Number(t.chi) || 0, '', '']);
+        });
+        
+        // Bảo hiểm
+        rows.push(['', 'Bảo hiểm (Phân bổ BH tàu & BHXH)', '', '', totalInsurance || 0, '', '']);
+        rows.push(['', '  Bảo hiểm thân vỏ phân bổ', '', '', hullInsurance || 0, '', '']);
+        rows.push(['', '  Bảo hiểm xã hội', '', '', socialInsurance || 0, '', '']);
+        
+        // VAT
+        rows.push(['', 'Thuế VAT phát sinh chuyến trong tháng', '', '', totalVat || 0, '', '']);
+        
+        // Chi phí khác
+        rows.push(['', 'Chi phí văn phòng, Thuế và khác', '', '', customTotal || 0, '', '']);
+        inputs.customExpenses.forEach(exp => {
+            rows.push(['', `  ${exp.desc}`, '', '', Number(exp.amount) || 0, '', '']);
+        });
+        
+        // Cộng tổng
+        rows.push([
+            '',
+            'Cộng',
+            Number(inputs.openingBalance) || 0,
+            totalRevenueSum || 0,
+            totalCostSum || 0,
+            finalBalance || 0,
+            ''
+        ]);
+        
+        // Ngày lập báo cáo
+        rows.push([]);
+        const today = new Date();
+        const todayStr = `Lập ngày ${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+        rows.push(['', '', '', '', '', todayStr, '']);
+        
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        
+        // Cấu hình định dạng số & Độ rộng cột
+        for (let key in ws) {
+            if (key[0] === '!') continue;
+            const cell = ws[key];
+            if (typeof cell.v === 'number') {
+                cell.t = 'n';
+                cell.z = '#,##0'; // Giữ số tiền đầy đủ, phân tích hàng nghìn
+            }
+        }
+        
+        ws['!cols'] = [
+            { wch: 8 },  // STT
+            { wch: 55 }, // CHI TIẾT
+            { wch: 18 }, // DƯ ĐẦU THÁNG
+            { wch: 18 }, // DOANH THU
+            { wch: 18 }, // CHI PHÍ
+            { wch: 18 }, // TỒN CUỐI THÁNG
+            { wch: 15 }  // GHI CHÚ
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, ws, 'Theo doi DT_CP');
+        XLSX.writeFile(wb, `Bao_Cao_DT_CP_Tau_${vesselName}_Thang_${month}_${year}.xlsx`);
+    },
+
+    exportJsonBackup() {
+        const backupObj = {
+            version: "5.0",
+            backupDate: new Date().toISOString(),
+            appData: AppData.state,
+            settings: {
+                exclude_docking_depreciation: localStorage.getItem('exclude_docking_depreciation') || 'false',
+                theme: localStorage.getItem('theme') || 'dark'
+            },
+            monthlyReportInputs: {}
+        };
+        
+        // Gather all monthly vessel report inputs (custom expenses, opening balances) from localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('monthly_vessel_report_inputs_')) {
+                backupObj.monthlyReportInputs[key] = localStorage.getItem(key);
+            }
+        }
+        
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        const dateStr = new Date().toISOString().slice(0, 10);
+        downloadAnchor.setAttribute("download", `ShipManage_Backup_${dateStr}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    },
+
+    importJsonBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const backupObj = JSON.parse(e.target.result);
+                if (!backupObj || !backupObj.appData) {
+                    throw new Error("Tệp sao lưu không hợp lệ hoặc thiếu dữ liệu appData.");
+                }
+                
+                if (confirm("Hành động này sẽ GHI ĐÈ toàn bộ dữ liệu hiện tại trên máy của bạn.\nBạn có chắc chắn muốn khôi phục dữ liệu từ tệp này không?")) {
+                    // Restore app state
+                    AppData.state = backupObj.appData;
+                    localStorage.setItem(DB_KEY, JSON.stringify(AppData.state));
+                    
+                    // Restore UI/UX settings
+                    if (backupObj.settings) {
+                        localStorage.setItem('exclude_docking_depreciation', backupObj.settings.exclude_docking_depreciation || 'false');
+                        localStorage.setItem('theme', backupObj.settings.theme || 'dark');
+                    }
+                    
+                    // Restore monthly custom inputs
+                    if (backupObj.monthlyReportInputs) {
+                        Object.keys(backupObj.monthlyReportInputs).forEach(key => {
+                            localStorage.setItem(key, backupObj.monthlyReportInputs[key]);
+                        });
+                    }
+                    
+                    alert("✅ KHÔI PHỤC THÀNH CÔNG!\n\nHệ thống sẽ tải lại trang để áp dụng toàn bộ dữ liệu & cấu hình UI/UX mới.");
+                    window.location.reload();
+                }
+            } catch (err) {
+                console.error("Import JSON failed:", err);
+                alert("❌ THẤT BẠI: Tệp JSON không hợp lệ hoặc bị hỏng!\n\nChi tiết: " + err.message);
+            }
+        };
+        reader.readAsText(file);
+    },
+
     init() {
+        // Initialize Theme from localStorage & Bind Toggle Event
+        const themeToggle = document.querySelector('.theme-toggle');
+        const body = document.body;
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        
+        if (currentTheme === 'light') {
+            body.classList.remove('dark-theme');
+            body.classList.add('light-theme');
+            if (themeToggle) themeToggle.innerHTML = '<i class="fa-regular fa-sun"></i>';
+        } else {
+            body.classList.remove('light-theme');
+            body.classList.add('dark-theme');
+            if (themeToggle) themeToggle.innerHTML = '<i class="fa-regular fa-moon"></i>';
+        }
+
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                if (body.classList.contains('dark-theme')) {
+                    body.classList.remove('dark-theme');
+                    body.classList.add('light-theme');
+                    themeToggle.innerHTML = '<i class="fa-regular fa-sun"></i>';
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    body.classList.remove('light-theme');
+                    body.classList.add('dark-theme');
+                    themeToggle.innerHTML = '<i class="fa-regular fa-moon"></i>';
+                    localStorage.setItem('theme', 'dark');
+                }
+            });
+        }
+
+        // Auto toggle print classes for inline reports printing
+        window.addEventListener('beforeprint', () => {
+            const isModalOpen = document.getElementById('report-modal')?.classList.contains('active');
+            if (!isModalOpen) {
+                document.body.classList.add('printing-inline-report');
+            }
+        });
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('printing-inline-report');
+        });
+
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -1364,8 +2776,10 @@ const app = {
     },
 
     navigate(viewName, ...args) {
+        this.updateHeaderCompanyInfo();
         if (!Views[viewName]) return;
         this.currentView = viewName;
+        this.currentViewArgs = args;
         if (viewName === 'debts' && args.length > 0) {
             this.currentDebtTab = args[0];
         }
@@ -1374,10 +2788,45 @@ const app = {
             if (item.getAttribute('data-view') === viewName) item.classList.add('active');
         });
         const container = document.getElementById('view-container');
-        if (viewName === 'hr') {
-            container.innerHTML = Views.hr(this.hrTab || 'all');
-        } else {
-            container.innerHTML = Views[viewName](...args);
+        try {
+            if (viewName === 'hr') {
+                container.innerHTML = Views.hr(this.hrTab || 'all');
+            } else if (viewName === 'financials') {
+                const m = args[0] !== undefined ? args[0] : (this.lastFinancialsMonth || '');
+                const v = args[1] !== undefined ? args[1] : (this.lastFinancialsVessel || '');
+                const c = args[2] !== undefined ? args[2] : (this.lastFinancialsCategory || '');
+                const p = args[3] !== undefined ? args[3] : (this.lastFinancialsPartner || '');
+                
+                this.lastFinancialsMonth = m;
+                this.lastFinancialsVessel = v;
+                this.lastFinancialsCategory = c;
+                this.lastFinancialsPartner = p;
+                
+                container.innerHTML = Views.financials(m, v, c, p);
+            } else if (viewName === 'fuel') {
+                const vId = args[0] !== undefined ? args[0] : (this.lastFuelVesselId || '');
+                const vessels = AppData.getVessels();
+                this.lastFuelVesselId = vId || (vessels[0] ? vessels[0].id : '');
+                const activeTab = args[1] !== undefined ? args[1] : (this.lastFuelTab || 'DO');
+                this.lastFuelTab = activeTab;
+                
+                container.innerHTML = Views.fuel(this.lastFuelVesselId, activeTab);
+            } else if (viewName === 'shipments') {
+                const m = args[0] !== undefined ? args[0] : (this.lastShipmentsMonth || '');
+                const v = args[1] !== undefined ? args[1] : (this.lastShipmentsVessel || '');
+                const c = args[2] !== undefined ? args[2] : (this.lastShipmentsCustomer || '');
+                
+                this.lastShipmentsMonth = m;
+                this.lastShipmentsVessel = v;
+                this.lastShipmentsCustomer = c;
+                
+                container.innerHTML = Views.shipments(m, v, c);
+            } else {
+                container.innerHTML = Views[viewName](...args);
+            }
+        } catch (err) {
+            console.error('Error rendering view ' + viewName + ':', err);
+            alert('LỖI HIỂN THỊ TRANG ' + viewName + ':\n' + err.message + '\nStack: ' + err.stack);
         }
 
         // Close sidebar on mobile navigation
@@ -1405,6 +2854,21 @@ const app = {
         }
         if (viewName === 'debts') {
             this.initDoubleScroll('debts-voyages-scroll-wrapper');
+        }
+        if (viewName === 'reports' && args[0] === 'monthly') {
+            // Set active vessel/month for inline monthly report persistence
+            const vessels = AppData.getVessels();
+            const fvm = args[3] || (vessels[0] ? vessels[0].id : '');
+            const ships = AppData.getShipments();
+            const monthsSet = new Set();
+            ships.forEach(s => {
+                const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                if (m) monthsSet.add(m);
+            });
+            const availableMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+            const fmm = args[4] || (availableMonths.length > 0 ? availableMonths[0] : '');
+            this.activeReportVessel = fvm;
+            this.activeReportMonth = fmm;
         }
     },
 
@@ -1478,10 +2942,19 @@ const app = {
         const category = document.getElementById('filter-fin-category').value;
         const partner = document.getElementById('filter-fin-partner').value;
         
+        this.lastFinancialsMonth = month;
+        this.lastFinancialsVessel = vessel;
+        this.lastFinancialsCategory = category;
+        this.lastFinancialsPartner = partner;
+        
         this.navigate('financials', month, vessel, category, partner);
     },
 
     resetFinancialsFilters() {
+        this.lastFinancialsMonth = '';
+        this.lastFinancialsVessel = '';
+        this.lastFinancialsCategory = '';
+        this.lastFinancialsPartner = '';
         this.navigate('financials');
     },
 
@@ -1600,7 +3073,19 @@ const app = {
         if (filterMonth) {
             shipments = allShipments.filter(s => {
                 const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
-                return m === filterMonth;
+                if (!m) return false;
+                
+                if (filterMonth.length === 4) { // Year e.g. "2026"
+                    return m.startsWith(filterMonth);
+                } else if (filterMonth.includes('-Q')) { // Quarter e.g. "2026-Q1"
+                    const [y, qStr] = filterMonth.split('-Q');
+                    const q = Number(qStr);
+                    const mm = Number(m.split('-')[1]);
+                    const mq = Math.ceil(mm / 3);
+                    return m.startsWith(y) && mq === q;
+                } else { // Month e.g. "2026-05"
+                    return m === filterMonth;
+                }
             });
         }
 
@@ -1619,6 +3104,11 @@ const app = {
             const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
             const baseCosts = { ...s.costs };
             delete baseCosts.vat;
+            if (this.excludeDockingDepreciation) {
+                delete baseCosts.dockingIntermediate;
+                delete baseCosts.dockingPeriodic;
+                delete baseCosts.depreciation;
+            }
             const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
             const profit = rev - costSum;
             
@@ -1717,6 +3207,11 @@ const app = {
                 const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
                 const baseCosts = { ...s.costs };
                 delete baseCosts.vat;
+                if (this.excludeDockingDepreciation) {
+                    delete baseCosts.dockingIntermediate;
+                    delete baseCosts.dockingPeriodic;
+                    delete baseCosts.depreciation;
+                }
                 const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
                 const profit = rev - costSum;
 
@@ -1743,6 +3238,11 @@ const app = {
                 const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
                 const baseCosts = { ...s.costs };
                 delete baseCosts.vat;
+                if (this.excludeDockingDepreciation) {
+                    delete baseCosts.dockingIntermediate;
+                    delete baseCosts.dockingPeriodic;
+                    delete baseCosts.depreciation;
+                }
                 const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
                 return rev - costSum;
             });
@@ -1817,7 +3317,13 @@ const app = {
             portFees: 0,
             brokerage: 0,
             vat: 0,
-            others: 0
+            others: 0,
+            dockingIntermediate: 0,
+            dockingPeriodic: 0,
+            registryAnnual: 0,
+            depreciation: 0,
+            hullInsurance: 0,
+            largeRepair: 0
         };
 
         shipments.forEach(s => {
@@ -1836,6 +3342,12 @@ const app = {
             costSums.brokerage += Number(s.costs?.brokerage || 0);
             costSums.vat += (vat > 0 ? vat : 0);
             costSums.others += Number(s.costs?.others || 0);
+            costSums.dockingIntermediate += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingIntermediate || 0);
+            costSums.dockingPeriodic += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingPeriodic || 0);
+            costSums.registryAnnual += Number(s.costs?.registryAnnual || 0);
+            costSums.depreciation += this.excludeDockingDepreciation ? 0 : Number(s.costs?.depreciation || 0);
+            costSums.hullInsurance += Number(s.costs?.hullInsurance || 0);
+            costSums.largeRepair += Number(s.costs?.largeRepair || 0);
         });
 
         const costLabels = [
@@ -1852,7 +3364,13 @@ const app = {
             'Phí cảng & hoa tiêu',
             'Tiền Bông',
             'Thuế VAT',
-            'Chi phí khác'
+            'Chi phí khác',
+            'Lên đà trung gian',
+            'Lên đà định kỳ',
+            'Đăng kiểm hàng năm',
+            'Khấu hao tài sản',
+            'Bảo hiểm thân vỏ',
+            'Sửa chữa lớn'
         ];
 
         const costValues = [
@@ -1869,7 +3387,13 @@ const app = {
             costSums.portFees,
             costSums.brokerage,
             costSums.vat,
-            costSums.others
+            costSums.others,
+            costSums.dockingIntermediate,
+            costSums.dockingPeriodic,
+            costSums.registryAnnual,
+            costSums.depreciation,
+            costSums.hullInsurance,
+            costSums.largeRepair
         ];
 
         const costColors = [
@@ -1886,7 +3410,13 @@ const app = {
             'rgba(186, 230, 253, 0.8)',
             'rgba(244, 63, 94, 0.8)',
             'rgba(225, 29, 72, 0.8)',
-            'rgba(156, 163, 175, 0.8)'
+            'rgba(156, 163, 175, 0.8)',
+            'rgba(236, 72, 153, 0.8)',
+            'rgba(168, 85, 247, 0.8)',
+            'rgba(234, 179, 8, 0.8)',
+            'rgba(20, 184, 166, 0.8)',
+            'rgba(99, 102, 241, 0.8)',
+            'rgba(147, 51, 234, 0.8)'
         ];
 
         const filteredCosts = [];
@@ -2002,6 +3532,11 @@ const app = {
             const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
             const baseCosts = { ...s.costs };
             delete baseCosts.vat;
+            if (this.excludeDockingDepreciation) {
+                delete baseCosts.dockingIntermediate;
+                delete baseCosts.dockingPeriodic;
+                delete baseCosts.depreciation;
+            }
             const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
             
             totalCost += costSum;
@@ -2038,7 +3573,13 @@ const app = {
                         portFees: 0,
                         brokerage: 0,
                         vat: 0,
-                        others: 0
+                        others: 0,
+                        dockingIntermediate: 0,
+                        dockingPeriodic: 0,
+                        registryAnnual: 0,
+                        depreciation: 0,
+                        hullInsurance: 0,
+                        largeRepair: 0
                     }
                 };
             }
@@ -2046,6 +3587,11 @@ const app = {
             const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
             const baseCosts = { ...s.costs };
             delete baseCosts.vat;
+            if (this.excludeDockingDepreciation) {
+                delete baseCosts.dockingIntermediate;
+                delete baseCosts.dockingPeriodic;
+                delete baseCosts.depreciation;
+            }
             const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
             
             vesselStats[vId].revenue += rev;
@@ -2068,6 +3614,12 @@ const app = {
             vesselStats[vId].costsDetail.brokerage += Number(s.costs?.brokerage || 0);
             vesselStats[vId].costsDetail.vat += (vat > 0 ? vat : 0);
             vesselStats[vId].costsDetail.others += Number(s.costs?.others || 0);
+            vesselStats[vId].costsDetail.dockingIntermediate += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingIntermediate || 0);
+            vesselStats[vId].costsDetail.dockingPeriodic += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingPeriodic || 0);
+            vesselStats[vId].costsDetail.registryAnnual += Number(s.costs?.registryAnnual || 0);
+            vesselStats[vId].costsDetail.depreciation += this.excludeDockingDepreciation ? 0 : Number(s.costs?.depreciation || 0);
+            vesselStats[vId].costsDetail.hullInsurance += Number(s.costs?.hullInsurance || 0);
+            vesselStats[vId].costsDetail.largeRepair += Number(s.costs?.largeRepair || 0);
         });
 
         let bestVessel = '', maxProfit = -Infinity;
@@ -2123,6 +3675,11 @@ const app = {
                     const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
                     const baseCosts = { ...s.costs };
                     delete baseCosts.vat;
+                    if (this.excludeDockingDepreciation) {
+                        delete baseCosts.dockingIntermediate;
+                        delete baseCosts.dockingPeriodic;
+                        delete baseCosts.depreciation;
+                    }
                     const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
                     prevCost += costSum;
                 });
@@ -2262,20 +3819,26 @@ const app = {
                         
                         // Chi tiết các hạng mục chi phí > 0
                         const costLabels = {
-                            fuelDO: 'Dầu DO',
-                            fuelLO: 'Dầu LO',
-                            crewSalary: 'Lương thuyền viên',
-                            crewFood: 'Tiền ăn',
-                            crewInsurance: 'Bảo hiểm TV',
-                            materialCompany: 'Vật tư Cty cấp',
-                            materialVessel: 'Vật tư Tàu chi',
-                            monthlyOther: 'CP Phân bổ Cty',
-                            agent: 'Đại lý 2 đầu cảng',
-                            vessel2ends: 'Tàu chi 2 đầu cảng',
-                            portFees: 'Phí cảng & hoa tiêu',
-                            brokerage: 'Tiền Bông',
-                            vat: 'Thuế VAT',
-                            others: 'Chi phí khác'
+                                fuelDO: 'Dầu DO',
+                                fuelLO: 'Dầu LO',
+                                crewSalary: 'Lương thuyền viên',
+                                crewFood: 'Tiền ăn',
+                                crewInsurance: 'Bảo hiểm TV',
+                                materialCompany: 'Vật tư Cty cấp',
+                                materialVessel: 'Vật tư Tàu chi',
+                                monthlyOther: 'CP Phân bổ Cty',
+                                agent: 'Đại lý 2 đầu cảng',
+                                vessel2ends: 'Tàu chi 2 đầu cảng',
+                                portFees: 'Phí cảng & hoa tiêu',
+                                brokerage: 'Tiền Bông',
+                                vat: 'Thuế VAT',
+                                others: 'Chi phí khác',
+                                dockingIntermediate: 'Lên đà trung gian',
+                                dockingPeriodic: 'Lên đà định kỳ',
+                                registryAnnual: 'Đăng kiểm hàng năm',
+                                depreciation: 'Khấu hao tài sản',
+                                hullInsurance: 'Bảo hiểm thân vỏ',
+                                largeRepair: 'Sửa chữa lớn'
                         };
 
                         const costRows = Object.keys(costLabels).map(key => {
@@ -2475,11 +4038,11 @@ const app = {
         document.getElementById('t-cat').value = trans.category;
         
         document.getElementById('t-voyage').value = trans.voyageNo || '';
+        document.getElementById('t-partner').value = trans.partner;
         this.onTransactionCatChange();
         if (trans.category === 'CVC') {
             document.getElementById('t-contract').value = trans.contractNo || '';
         }
-        document.getElementById('t-partner').value = trans.partner;
         document.getElementById('t-content').value = trans.content;
         document.getElementById('t-thu').value = trans.thu;
         document.getElementById('t-chi').value = trans.chi;
@@ -2504,9 +4067,107 @@ const app = {
         if (cat === 'CVC') {
             wrapper.style.display = 'block';
             const vesselId = document.getElementById('t-vessel').value;
-            const shipments = AppData.state.shipments.filter(s => s.vesselId === vesselId);
+            const partnerVal = document.getElementById('t-partner').value;
+            
+            const normalizeName = (name) => {
+                if (!name) return '';
+                return name.trim().toUpperCase().replace(/\s+/g, ' ');
+            };
+
+            const normalizedPartner = normalizeName(partnerVal);
+
+            // Filter shipments by vessel first
+            let filteredShipments = AppData.state.shipments.filter(s => s.vesselId === vesselId);
+            
+            // If partner is specified, filter by normalized partner name too
+            if (normalizedPartner) {
+                filteredShipments = filteredShipments.filter(s => normalizeName(s.customer) === normalizedPartner);
+            }
+
+            const getShipmentRemainingDebt = (shipment) => {
+                const custName = normalizeName(shipment.customer);
+                if (!custName) return Number(shipment.revenueInvoice || 0);
+
+                const custShipments = AppData.state.shipments.filter(x => normalizeName(x.customer) === custName);
+                const sortedShipments = [...custShipments].sort((a, b) => {
+                    const dateA = a.dateStart || '';
+                    const dateB = b.dateStart || '';
+                    if (dateA !== dateB) return dateA.localeCompare(dateB);
+                    return (a.contractNo || '').localeCompare(b.contractNo || '', undefined, {numeric: true, sensitivity: 'base'});
+                });
+
+                const custTrans = (AppData.state.transactions || []).filter(t => t.partner && normalizeName(t.partner) === custName);
+                
+                const explicitPaidMap = {};
+                let unallocatedPaid = 0;
+                
+                custTrans.forEach(t => {
+                    if (t.category === 'CVC') {
+                        const matchedShipment = sortedShipments.find(x => x.contractNo && x.contractNo === t.contractNo);
+                        if (matchedShipment) {
+                            explicitPaidMap[matchedShipment.id] = (explicitPaidMap[matchedShipment.id] || 0) + (Number(t.thu) || 0);
+                        } else {
+                            unallocatedPaid += (Number(t.thu) || 0);
+                        }
+                    }
+                });
+
+                const openingDebt = AppData.state.company.customerOpeningDebts ? (Number(AppData.state.company.customerOpeningDebts[shipment.customer]) || Number(AppData.state.company.customerOpeningDebts[custName]) || 0) : 0;
+                let remainingPaid = unallocatedPaid;
+                remainingPaid -= openingDebt;
+                if (remainingPaid < 0) remainingPaid = 0;
+
+                let targetDebt = 0;
+                for (let i = 0; i < sortedShipments.length; i++) {
+                    const curr = sortedShipments[i];
+                    let invoiceAmt = Number(curr.revenueInvoice) || 0;
+                    let explicitPaid = explicitPaidMap[curr.id] || 0;
+                    let paidForThis = explicitPaid;
+                    
+                    if (remainingPaid > 0) {
+                        if (i === sortedShipments.length - 1) {
+                            paidForThis += remainingPaid;
+                            remainingPaid = 0;
+                        } else if (invoiceAmt > paidForThis) {
+                            let gap = invoiceAmt - paidForThis;
+                            let add = Math.min(remainingPaid, gap);
+                            paidForThis += add;
+                            remainingPaid -= add;
+                        }
+                    }
+                    if (curr.id === shipment.id) {
+                        targetDebt = invoiceAmt - paidForThis;
+                        break;
+                    }
+                }
+                return targetDebt;
+            };
+
+            const sortedOptions = filteredShipments.map(s => {
+                const debt = getShipmentRemainingDebt(s);
+                return {
+                    contractNo: s.contractNo,
+                    debt: debt,
+                    label: s.contractNo + (debt > 0 ? ` (Còn nợ: ${AppData.formatCurrency(debt)})` : ' (Hết nợ)')
+                };
+            }).sort((a, b) => {
+                // Unpaid contracts first
+                if (a.debt > 0 && b.debt <= 0) return -1;
+                if (a.debt <= 0 && b.debt > 0) return 1;
+                // Otherwise sort by contract number
+                return a.contractNo.localeCompare(b.contractNo, undefined, {numeric: true, sensitivity: 'base'});
+            });
+
+            // Save currently selected contract value
+            const currentVal = contractSelect.value;
+            
             contractSelect.innerHTML = '<option value="">-- Chọn Mã HĐ --</option>' + 
-                shipments.map(s => `<option value="${s.contractNo}">${s.contractNo}</option>`).join('');
+                sortedOptions.map(opt => `<option value="${opt.contractNo}">${opt.label}</option>`).join('');
+
+            // Restore selection if it still exists in the new options list
+            if (currentVal && sortedOptions.some(opt => opt.contractNo === currentVal)) {
+                contractSelect.value = currentVal;
+            }
         } else {
             wrapper.style.display = 'none';
             contractSelect.value = '';
@@ -2562,6 +4223,55 @@ const app = {
             const vesselId = v.vesselId;
             AppData.deleteFuelVoyage(id);
             this.navigate('fuel', vesselId);
+        }
+    },
+
+    saveLOConfig(vesselId) {
+        const loHours = Number(document.getElementById('lo-hours').value) || 800;
+        const loRepl = Number(document.getElementById('lo-repl-qty').value) || 8;
+        const loTopup = Number(document.getElementById('lo-topup-qty').value) || 3;
+        
+        AppData.updateVessel(vesselId, {
+            loHours: loHours,
+            loReplacementQty: loRepl,
+            loTopupQty: loTopup
+        });
+        
+        AppData.recalculateAllShipments();
+        alert('Đã lưu cấu hình định mức dầu LO và tự động tính toán lại chi phí cho các chuyến hàng!');
+        this.navigate('fuel', vesselId, 'LO');
+    },
+
+    saveLOSupply(vesselId) {
+        const date = document.getElementById('lo-supply-date').value;
+        const vendor = document.getElementById('lo-supply-vendor').value.trim();
+        const qty = Number(document.getElementById('lo-supply-qty').value) || 0;
+        const price = Number(document.getElementById('lo-supply-price').value) || 0;
+        
+        if (!date || !vendor || qty <= 0 || price <= 0) {
+            alert('Vui lòng nhập đầy đủ và chính xác thông tin phiếu cấp!');
+            return;
+        }
+
+        const supply = {
+            vesselId: vesselId,
+            date: date,
+            vendor: vendor,
+            qty: qty,
+            price: price
+        };
+        
+        AppData.addLOSupply(supply);
+        AppData.recalculateAllShipments();
+        alert('Đã thêm phiếu cấp dầu LO mới và tự động tính toán lại chi phí cho các chuyến hàng!');
+        this.navigate('fuel', vesselId, 'LO');
+    },
+
+    deleteLOSupply(id, vesselId) {
+        if (confirm('Bạn có chắc chắn muốn xóa phiếu cấp dầu LO này?')) {
+            AppData.deleteLOSupply(id);
+            AppData.recalculateAllShipments();
+            this.navigate('fuel', vesselId, 'LO');
         }
     },
 
@@ -2672,6 +4382,8 @@ const app = {
             const e = new Date(end);
             const hours = Math.abs(e - s) / (1000 * 60 * 60);
             document.getElementById('f-hours').value = hours.toFixed(2);
+        } else {
+            document.getElementById('f-hours').value = '0';
         }
     },
     saveFuelLog() {
@@ -2710,6 +4422,8 @@ const app = {
     loadMonthlyCosts() {
         const month = document.getElementById('m-month').value;
         const vesselId = document.getElementById('m-vessel').value;
+        this.lastMonthlyCostsMonth = month;
+        this.lastMonthlyCostsVesselId = vesselId;
         const costs = AppData.getMonthlyCosts(month, vesselId);
         document.getElementById('m-salary').value = costs.salary || 0;
         document.getElementById('m-ins').value = costs.insurance || 0;
@@ -2717,11 +4431,14 @@ const app = {
         document.getElementById('m-material-company').value = costs.materialCompany || 0;
         document.getElementById('m-material-vessel').value = costs.materialVessel || 0;
         document.getElementById('m-loan-interest').value = costs.loanInterest || 0;
+        document.getElementById('m-loan-interest-external').value = costs.loanInterestExternal || 0;
         document.getElementById('m-other').value = costs.other || 0;
     },
     saveMonthlyCosts() {
         const month = document.getElementById('m-month').value;
         const vesselId = document.getElementById('m-vessel').value;
+        this.lastMonthlyCostsMonth = month;
+        this.lastMonthlyCostsVesselId = vesselId;
         const data = {
             month,
             vesselId,
@@ -2731,20 +4448,65 @@ const app = {
             materialCompany: Number(document.getElementById('m-material-company').value) || 0,
             materialVessel: Number(document.getElementById('m-material-vessel').value) || 0,
             loanInterest: Number(document.getElementById('m-loan-interest').value) || 0,
+            loanInterestExternal: Number(document.getElementById('m-loan-interest-external').value) || 0,
             other: Number(document.getElementById('m-other').value) || 0
         };
+        
+        // Detect manual modifications to loanInterest against ledger transactions total
+        const transactionInterest = (AppData.state.transactions || [])
+            .filter(t => t.vessel === vesselId && t.category === '6.Lãi Vay' && t.date && t.date.substring(0, 7) === month)
+            .reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+        data.isManualLoanInterest = (data.loanInterest !== transactionInterest);
+
         AppData.saveMonthlyCosts(data);
         // Recalculate daily allocations to voyages
         AppData.recalculateAllShipmentAllocations(vesselId, month);
         alert('Đã lưu chi phí tháng ' + data.month + ' cho tàu ' + data.vesselId + ' và tự động phân bổ lại cho các chuyến đi!');
     },
+    loadAnnualCosts() {
+        const year = document.getElementById('a-year').value;
+        const vesselId = document.getElementById('a-vessel').value;
+        this.annualCostsYear = year;
+        this.annualCostsVesselId = vesselId;
+        this.navigate('annual-costs');
+    },
+    saveAnnualCosts() {
+        const year = Number(document.getElementById('a-year').value);
+        const vesselId = document.getElementById('a-vessel').value;
+        
+        this.annualCostsYear = year;
+        this.annualCostsVesselId = vesselId;
+        
+        const data = {
+            year,
+            vesselId,
+            dockingIntermediateCost: Number(document.getElementById('a-docking-int-cost').value) || 0,
+            dockingIntermediateYears: Number(document.getElementById('a-docking-int-years').value) || 2.5,
+            dockingIntermediateDate: document.getElementById('a-docking-int-date').value || '',
+            dockingPeriodicCost: Number(document.getElementById('a-docking-per-cost').value) || 0,
+            dockingPeriodicYears: Number(document.getElementById('a-docking-per-years').value) || 5,
+            dockingPeriodicDate: document.getElementById('a-docking-per-date').value || '',
+            registryAnnualCost: Number(document.getElementById('a-registry-ann-cost').value) || 0,
+            registryAnnualYears: Number(document.getElementById('a-registry-ann-years').value) || 1,
+            registryAnnualDate: document.getElementById('a-registry-ann-date').value || '',
+            depreciationCost: Number(document.getElementById('a-depreciation-cost').value) || 0,
+            hullInsuranceCost: Number(document.getElementById('a-hull-ins-cost').value) || 0,
+            largeRepairCost: Number(document.getElementById('a-large-repair-cost').value) || 0
+        };
+        AppData.saveAnnualCosts(data);
+        alert('Đã lưu cấu hình chi phí năm ' + data.year + ' cho tàu ' + data.vesselId + ' và tự động phân bổ lại cho toàn bộ chuyến đi!');
+        this.navigate('annual-costs');
+    },
 
     // Shipment Actions
     openShipmentModal() { 
         document.getElementById('ship-modal-content').innerHTML = Views.shipModal();
+        const loInput = document.getElementById('s-c-fuel-lo');
+        if (loInput) loInput.dataset.isOverridden = 'false';
         
         // Auto-fill defaults for new shipment
         document.getElementById('s-contract-no').value = AppData.getNextContractNo();
+        this.suggestCommissionRate();
         const firstVessel = document.getElementById('s-vessel-id').value;
         if (firstVessel) {
             document.getElementById('s-voy-no').value = AppData.getNextVoyageNo(firstVessel);
@@ -2774,12 +4536,14 @@ const app = {
         const qty = Number(document.getElementById('s-qty').value) || 0;
         const rate = Number(document.getElementById('s-rate').value) || 0;
         const markup = Number(document.getElementById('s-markup').value) || 0;
+        const commRateVal = document.getElementById('s-commission-rate').value;
+        const customRate = commRateVal !== '' ? Number(commRateVal) : undefined;
         const fuelP = Number(document.getElementById('s-fuel-p').value) || 0;
         
         const revReal = qty * rate;
         const revInvoice = (rate + markup) * qty;
         const contractNo = document.getElementById('s-contract-no').value;
-        const refund = AppData.calcRefund(revInvoice, revReal, contractNo);
+        const refund = AppData.calcRefund(revInvoice, revReal, contractNo, customRate);
         
         document.getElementById('val-rev-real').innerText = AppData.formatCurrency(revReal);
         document.getElementById('val-rev-inv').innerText = AppData.formatCurrency(revInvoice);
@@ -2809,8 +4573,29 @@ const app = {
             document.getElementById('s-c-fuel').value = fuelCost;
         }
 
+        // Calculate LO cost automatically if hours and vessel configuration are available and not overridden
+        const loInput = document.getElementById('s-c-fuel-lo');
+        let fuelLO = 0;
+        if (loInput) {
+            fuelLO = Number(loInput.value) || 0;
+            if (vessel && loInput.dataset.isOverridden !== 'true') {
+                const loHours = Number(vessel.loHours) || 800;
+                const loRepl = Number(vessel.loReplacementQty) || 8;
+                const loTopup = Number(vessel.loTopupQty) || 3;
+                const dateStart = document.getElementById('s-start')?.value || new Date().toISOString().split('T')[0];
+                const loPrice = AppData.getLastLOPrice(vesselId, dateStart);
+                const hourlyLORate = loHours > 0 ? ((loRepl + loTopup) / loHours) : 0;
+                fuelLO = Math.round(hours * hourlyLORate * loPrice);
+                loInput.value = fuelLO;
+                
+                // Trigger input event for formatted output if excel-input setup is active
+                if (loInput.dataset.excelInput === 'true') {
+                    loInput.value = fuelLO;
+                }
+            }
+        }
+
         // Calculate VAT: 8% Doanh Thu hoá đơn - 8% (Dầu DO + Dầu LO + Đại lý 2 đầu + Hoa tiêu, phí cảng)
-        const fuelLO = Number(document.getElementById('s-c-fuel-lo')?.value) || 0;
         const agent = Number(document.getElementById('s-c-agent')?.value) || 0;
         const portFees = Number(document.getElementById('s-c-port-fees')?.value) || 0;
         const deduc = fuelCost + fuelLO + agent + portFees;
@@ -2818,6 +4603,28 @@ const app = {
         document.getElementById('s-c-vat').value = Math.round(vat);
 
         this.calcBrokerage();
+    },
+    
+    suggestCommissionRate() {
+        const cust = (document.getElementById('s-customer')?.value || '').toLowerCase();
+        const contract = (document.getElementById('s-contract-no')?.value || '').toUpperCase();
+        const rateInput = document.getElementById('s-commission-rate');
+        if (!rateInput) return;
+        
+        if (cust.includes('bình minh') || cust.includes('binh minh') || cust.includes('thái bình dương') || cust.includes('thai binh duong') || contract === 'HD25' || contract === 'HD54') {
+            rateInput.value = 20;
+        } else {
+            rateInput.value = 28;
+        }
+        this.calcShipmentFinance();
+    },
+
+    handleFuelLOInput() {
+        const loInput = document.getElementById('s-c-fuel-lo');
+        if (loInput) {
+            loInput.dataset.isOverridden = 'true';
+        }
+        this.calcShipmentFinance();
     },
 
     getPortRegion(portName) {
@@ -2899,6 +4706,17 @@ const app = {
         document.getElementById('s-c-m-mat-company').value = allocate('materialCompany');
         document.getElementById('s-c-m-mat-vessel').value = allocate('materialVessel');
         document.getElementById('s-c-m-other').value = allocate('other');
+        document.getElementById('s-c-loan-interest').value = allocate('loanInterest');
+        document.getElementById('s-c-loan-interest-external').value = allocate('loanInterestExternal');
+
+        // New annual cost allocations
+        const annualAlloc = AppData.calcAnnualAllocation(start, end, vId);
+        document.getElementById('s-c-docking-int').value = annualAlloc.dockingIntermediate;
+        document.getElementById('s-c-docking-per').value = annualAlloc.dockingPeriodic;
+        document.getElementById('s-c-registry-ann').value = annualAlloc.registryAnnual;
+        document.getElementById('s-c-depreciation').value = annualAlloc.depreciation;
+        document.getElementById('s-c-hull-insurance').value = annualAlloc.hullInsurance;
+        document.getElementById('s-c-large-repair').value = annualAlloc.largeRepair;
     },
 
     syncShipmentFuel() {
@@ -2952,6 +4770,7 @@ const app = {
             qty: Number(document.getElementById('s-qty').value) || 0,
             rate: Number(document.getElementById('s-rate').value) || 0,
             markup: Number(document.getElementById('s-markup').value) || 0,
+            commissionRate: Number(document.getElementById('s-commission-rate').value) || 0,
             fuelPrice: Number(document.getElementById('s-fuel-p').value) || 0,
             fuelHours: Number(document.getElementById('s-c-hours').value) || 0,
             revenueReal: Number(document.getElementById('val-rev-real').innerText.replace(/[^0-9]/g,'')),
@@ -2971,7 +4790,15 @@ const app = {
                 brokerage: Number(document.getElementById('s-c-brokerage').value) || 0,
                 vat: Number(document.getElementById('s-c-vat').value) || 0,
                 portFees: Number(document.getElementById('s-c-port-fees').value) || 0,
-                others: Number(document.getElementById('s-c-others').value) || 0
+                others: Number(document.getElementById('s-c-others').value) || 0,
+                loanInterest: Number(document.getElementById('s-c-loan-interest').value) || 0,
+                loanInterestExternal: Number(document.getElementById('s-c-loan-interest-external').value) || 0,
+                dockingIntermediate: Number(document.getElementById('s-c-docking-int').value) || 0,
+                dockingPeriodic: Number(document.getElementById('s-c-docking-per').value) || 0,
+                registryAnnual: Number(document.getElementById('s-c-registry-ann').value) || 0,
+                depreciation: Number(document.getElementById('s-c-depreciation').value) || 0,
+                hullInsurance: Number(document.getElementById('s-c-hull-insurance').value) || 0,
+                largeRepair: Number(document.getElementById('s-c-large-repair').value) || 0
             }
         };
         AppData.addShipment(s);
@@ -2983,43 +4810,63 @@ const app = {
         }
     },
     editShipment(id) {
-        const s = AppData.state.shipments.find(x => x.id === id);
-        if(!s) return;
-        document.getElementById('ship-modal-content').innerHTML = Views.shipModal();
-        document.getElementById('s-id').value = s.id;
-        document.getElementById('s-contract-no').value = s.contractNo || '';
-        document.getElementById('s-voy-no').value = s.voyageNo;
-        document.getElementById('s-vessel-id').value = s.vesselId;
-        document.getElementById('s-customer').value = s.customer || '';
-        document.getElementById('s-cargo').value = s.cargo;
-        document.getElementById('s-p-load').value = s.portLoad || '';
-        document.getElementById('s-p-dis').value = s.portDischarge || '';
-        document.getElementById('s-start').value = s.dateStart;
-        document.getElementById('s-end').value = s.dateEnd;
-        document.getElementById('s-report-month').value = s.reportMonth || '';
-        document.getElementById('s-qty').value = s.qty;
-        document.getElementById('s-rate').value = s.rate;
-        document.getElementById('s-markup').value = s.markup;
-        document.getElementById('s-fuel-p').value = s.fuelPrice;
-        
-        document.getElementById('s-c-hours').value = s.fuelHours || 0;
-        document.getElementById('s-c-fuel').value = s.costs.fuelDO || 0;
-        document.getElementById('s-c-fuel-lo').value = s.costs.fuelLO || 0;
-        document.getElementById('s-c-sal').value = s.costs.crewSalary || 0;
-        document.getElementById('s-c-food').value = s.costs.crewFood || 0;
-        document.getElementById('s-c-ins').value = s.costs.crewInsurance || 0;
-        document.getElementById('s-c-m-mat-company').value = s.costs.materialCompany || 0;
-        document.getElementById('s-c-m-mat-vessel').value = s.costs.materialVessel || 0;
-        document.getElementById('s-c-m-other').value = s.costs.monthlyOther || 0;
-        document.getElementById('s-c-agent').value = s.costs.agent || 0;
-        document.getElementById('s-c-vessel-2ends').value = s.costs.vessel2ends || 0;
-        document.getElementById('s-c-brokerage').value = s.costs.brokerage || 0;
-        document.getElementById('s-c-vat').value = s.costs.vat || 0;
-        document.getElementById('s-c-port-fees').value = s.costs.portFees || 0;
-        document.getElementById('s-c-others').value = s.costs.others || 0;
+        try {
+            const s = AppData.state.shipments.find(x => x.id === id);
+            if(!s) return;
+            document.getElementById('ship-modal-content').innerHTML = Views.shipModal();
+            document.getElementById('s-id').value = s.id;
+            document.getElementById('s-contract-no').value = s.contractNo || '';
+            document.getElementById('s-voy-no').value = s.voyageNo;
+            document.getElementById('s-vessel-id').value = s.vesselId;
+            document.getElementById('s-customer').value = s.customer || '';
+            document.getElementById('s-cargo').value = s.cargo;
+            document.getElementById('s-p-load').value = s.portLoad || '';
+            document.getElementById('s-p-dis').value = s.portDischarge || '';
+            document.getElementById('s-start').value = s.dateStart;
+            document.getElementById('s-end').value = s.dateEnd;
+            document.getElementById('s-report-month').value = s.reportMonth || '';
+            document.getElementById('s-qty').value = s.qty;
+            document.getElementById('s-rate').value = s.rate;
+            document.getElementById('s-markup').value = s.markup;
+            const savedRate = s.commissionRate !== undefined ? s.commissionRate : ((s.contractNo === 'HD25' || s.contractNo === 'HD54' || (s.customer || '').toLowerCase().includes('bình minh') || (s.customer || '').toLowerCase().includes('thái bình dương')) ? 20 : 28);
+            document.getElementById('s-commission-rate').value = savedRate;
+            document.getElementById('s-fuel-p').value = s.fuelPrice;
+            
+            const costs = s.costs || {};
+            document.getElementById('s-c-hours').value = s.fuelHours || 0;
+            document.getElementById('s-c-fuel').value = costs.fuelDO || 0;
+            const loInput = document.getElementById('s-c-fuel-lo');
+            if (loInput) {
+                loInput.value = costs.fuelLO || 0;
+                loInput.dataset.isOverridden = 'true';
+            }
+            document.getElementById('s-c-sal').value = costs.crewSalary || 0;
+            document.getElementById('s-c-food').value = costs.crewFood || 0;
+            document.getElementById('s-c-ins').value = costs.crewInsurance || 0;
+            document.getElementById('s-c-m-mat-company').value = costs.materialCompany || 0;
+            document.getElementById('s-c-m-mat-vessel').value = costs.materialVessel || 0;
+            document.getElementById('s-c-m-other').value = costs.monthlyOther || 0;
+            document.getElementById('s-c-agent').value = costs.agent || 0;
+            document.getElementById('s-c-vessel-2ends').value = costs.vessel2ends || 0;
+            document.getElementById('s-c-brokerage').value = costs.brokerage || 0;
+            document.getElementById('s-c-vat').value = costs.vat || 0;
+            document.getElementById('s-c-port-fees').value = costs.portFees || 0;
+            document.getElementById('s-c-others').value = costs.others || 0;
+            document.getElementById('s-c-docking-int').value = costs.dockingIntermediate || 0;
+            document.getElementById('s-c-docking-per').value = costs.dockingPeriodic || 0;
+            document.getElementById('s-c-registry-ann').value = costs.registryAnnual || 0;
+            document.getElementById('s-c-depreciation').value = costs.depreciation || 0;
+            document.getElementById('s-c-hull-insurance').value = costs.hullInsurance || 0;
+            document.getElementById('s-c-large-repair').value = costs.largeRepair || 0;
+            document.getElementById('s-c-loan-interest').value = costs.loanInterest || 0;
+            document.getElementById('s-c-loan-interest-external').value = costs.loanInterestExternal || 0;
 
-        this.calcShipmentFinance();
-        this.openModal('ship-modal');
+            this.calcShipmentFinance();
+            this.openModal('ship-modal');
+        } catch (e) {
+            console.error("Lỗi trong editShipment:", e);
+            alert("Lỗi sửa chuyến hàng:\n" + e.message + "\n\nStack: " + e.stack);
+        }
     },
     deleteShipment(id) {
         if (confirm('Bạn có chắc muốn xóa chuyến hàng này?')) {
@@ -3036,6 +4883,23 @@ const app = {
         if(!s) return;
         document.getElementById('report-content').innerHTML = Views.report(s);
         this.openModal('report-modal');
+    },
+
+    updateHeaderCompanyInfo() {
+        const headerInfoEl = document.getElementById('header-company-info');
+        if (!headerInfoEl) return;
+        const c = AppData.getCompany() || {};
+        headerInfoEl.innerHTML = `
+            <div class="company-name" title="${c.name || ''}">${c.name || 'CÔNG TY CHƯA CẬP NHẬT'}</div>
+            <div class="company-address" title="Địa chỉ">
+                <i class="fa-solid fa-location-dot"></i> ${c.address || 'Chưa có địa chỉ'}
+            </div>
+            <div class="company-meta">
+                <span class="detail-item" title="Mã số thuế"><i class="fa-solid fa-receipt"></i> MST: ${c.taxId || 'Chưa có MST'}</span>
+                <span class="detail-divider">|</span>
+                <span class="detail-item" title="Thông tin ngân hàng"><i class="fa-solid fa-credit-card"></i> ${c.bankInfo || 'Chưa có thông tin ngân hàng'}</span>
+            </div>
+        `;
     },
 
     // Company Actions
@@ -3237,7 +5101,14 @@ const app = {
                     brokerage: colIdx('Tiền Bông (VNĐ)'),
                     vat: colIdx('Thuế VAT (VNĐ)'),
                     portFees: colIdx('Hoa Tiêu, Tàu Lai, Phí Cảng (VNĐ)'),
-                    others: colIdx('Chi Phí Khác Tàu Chi (VNĐ)')
+                    others: colIdx('Chi Phí Khác Tàu Chi (VNĐ)'),
+                    loanInterest: colIdx('Lãi Vay Ngân Hàng (VNĐ)') !== -1 ? colIdx('Lãi Vay Ngân Hàng (VNĐ)') : colIdx('Lãi Vay (VNĐ)'),
+                    loanInterestExternal: colIdx('Lãi Vay Ngoài (VNĐ)'),
+                    dockingIntermediate: colIdx('Lên Đà Trung Gian (VNĐ)'),
+                    dockingPeriodic: colIdx('Lên Đà Định Kỳ (VNĐ)'),
+                    registryAnnual: colIdx('Đăng Kiểm Hàng Năm (VNĐ)'),
+                    depreciation: colIdx('Khấu Hao (VNĐ)'),
+                    hullInsurance: colIdx('Bảo Hiểm Thân Vỏ (VNĐ)')
                 };
 
                 let count = 0;
@@ -3637,6 +5508,8 @@ const app = {
     loadVesselExpenses() {
         const month = document.getElementById('ve-month').value;
         const vesselId = document.getElementById('ve-vessel').value;
+        this.lastVesselExpensesMonth = month;
+        this.lastVesselExpensesVesselId = vesselId;
         const stats = AppData.getVesselFundStats(vesselId, month);
 
         // Update Stats Cards
@@ -3647,33 +5520,111 @@ const app = {
 
         // Fetch existing Captain Report
         const report = AppData.getCaptainReport(vesselId, month) || {
-            food: '',
-            material: '',
+            food: 0,
+            material: 0,
             portExpenses: [],
-            brokerages: []
+            brokerages: [],
+            foodDetails: [],
+            materialDetails: [],
+            portDetails: []
         };
 
-        // Set static fields
+        // Set static fields (temporarily set, calculations will overwrite them)
         document.getElementById('ve-food').value = report.food !== undefined ? report.food : '';
         document.getElementById('ve-material').value = report.material !== undefined ? report.material : '';
 
-        // Generate dynamic rows for Port Expenses
-        const portContainer = document.getElementById('ve-ports-container');
-        portContainer.innerHTML = '';
-        if (report.portExpenses && report.portExpenses.length > 0) {
-            report.portExpenses.forEach(p => {
-                this.addPortExpenseRow(p.port, p.voyageNo, p.amount);
-            });
+        // Generate dynamic rows for Food Details
+        const foodBody = document.getElementById('ve-food-details-body');
+        if (foodBody) {
+            foodBody.innerHTML = '';
+            if (report.foodDetails && report.foodDetails.length > 0) {
+                report.foodDetails.forEach(fd => {
+                    this.addFoodDetailRow(fd.description, fd.amount);
+                });
+            } else if (Number(report.food) > 0) {
+                this.addFoodDetailRow('Tiền ăn tháng (kết chuyển)', report.food);
+            } else {
+                this.addFoodDetailRow();
+            }
+        }
+
+        // Generate dynamic rows for Material Details
+        const materialBody = document.getElementById('ve-material-details-body');
+        if (materialBody) {
+            materialBody.innerHTML = '';
+            if (report.materialDetails && report.materialDetails.length > 0) {
+                report.materialDetails.forEach(md => {
+                    this.addMaterialDetailRow(md.description, md.amount);
+                });
+            } else if (Number(report.material) > 0) {
+                this.addMaterialDetailRow('Tiền vật tư (kết chuyển)', report.material);
+            } else {
+                this.addMaterialDetailRow();
+            }
+        }
+
+        // Generate dynamic groups for Port Details
+        const portGroupsContainer = document.getElementById('ve-port-groups-container');
+        if (portGroupsContainer) {
+            portGroupsContainer.innerHTML = '';
+            
+            let itemsToLoad = [];
+            if (report.portDetails && report.portDetails.length > 0) {
+                itemsToLoad = report.portDetails;
+            } else if (report.portExpenses && report.portExpenses.length > 0) {
+                itemsToLoad = report.portExpenses.map(pe => ({
+                    port: pe.port,
+                    voyageNo: pe.voyageNo,
+                    description: 'Chi phí cảng (kết chuyển)',
+                    amount: pe.amount
+                }));
+            }
+
+            if (itemsToLoad.length > 0) {
+                // Group flat port items by (portName + voyageNo)
+                const groupsMap = {};
+                itemsToLoad.forEach(item => {
+                    const key = `${item.port || ''}||${item.voyageNo || ''}`;
+                    if (!groupsMap[key]) {
+                        groupsMap[key] = {
+                            port: item.port || '',
+                            voyageNo: item.voyageNo || '',
+                            rows: []
+                        };
+                    }
+                    groupsMap[key].rows.push({
+                        description: item.description || '',
+                        amount: item.amount || ''
+                    });
+                });
+
+                Object.values(groupsMap).forEach(g => {
+                    const groupDiv = this.addPortDetailGroup(g.port, g.voyageNo);
+                    g.rows.forEach(r => {
+                        this.addPortDetailGroupRow(groupDiv, r.description, r.amount);
+                    });
+                });
+            } else {
+                // Add one default empty group with one empty row
+                this.addPortDetailGroup('', '', true);
+            }
         }
 
         // Generate dynamic rows for Brokerages
         const brokerageContainer = document.getElementById('ve-brokerages-container');
-        brokerageContainer.innerHTML = '';
-        if (report.brokerages && report.brokerages.length > 0) {
-            report.brokerages.forEach(b => {
-                this.addBrokerageRow(b.voyageNo, b.amount);
-            });
+        if (brokerageContainer) {
+            brokerageContainer.innerHTML = '';
+            if (report.brokerages && report.brokerages.length > 0) {
+                report.brokerages.forEach(b => {
+                    this.addBrokerageRow(b.voyageNo, b.amount);
+                });
+            }
         }
+
+        // Run calculations once to align totals
+        this.calcFoodDetailsTotal();
+        this.calcMaterialDetailsTotal();
+        this.syncPortDetailsToLeft();
 
         // Update dynamic allocated voyages list
         this.renderAllocatedVoyages(vesselId, month);
@@ -3681,34 +5632,258 @@ const app = {
 
     getVoyageOptionsHtml(vesselId, selectedVoyageNo = '') {
         const shipments = AppData.getShipments().filter(s => s.vesselId === vesselId);
+        const fuelVoyages = AppData.getFuelVoyages(vesselId) || [];
+
+        // Collect all unique voyage numbers
+        const uniqueVoyages = new Map(); // voyageNo -> cargo
+
+        // Add from shipments first (since we prefer shipments' cargo description)
+        shipments.forEach(s => {
+            if (s.voyageNo) {
+                uniqueVoyages.set(s.voyageNo, s.cargo || '');
+            }
+        });
+
+        // Add from fuel voyages
+        fuelVoyages.forEach(fv => {
+            if (fv.voyageNo && !uniqueVoyages.has(fv.voyageNo)) {
+                uniqueVoyages.set(fv.voyageNo, fv.cargoType || '');
+            } else if (fv.voyageNo && !uniqueVoyages.get(fv.voyageNo)) {
+                // If it exists but has no cargo, update it with cargoType if available
+                uniqueVoyages.set(fv.voyageNo, fv.cargoType || '');
+            }
+        });
+
+        // Convert Map to array of { voyageNo, cargo }
+        const voyageList = Array.from(uniqueVoyages.entries()).map(([voyageNo, cargo]) => ({
+            voyageNo,
+            cargo
+        }));
+
+        // Sort descending (newest first, i.e., C16, C15, ...)
+        voyageList.sort((a, b) => {
+            const getNum = s => {
+                if (!s || !s.voyageNo) return 0;
+                const match = s.voyageNo.match(/\d+/);
+                return match ? parseInt(match[0], 10) : 0;
+            };
+            const numA = getNum(a);
+            const numB = getNum(b);
+            return numB - numA;
+        });
+
         let html = '<option value="">-- Chọn chuyến --</option>';
-        html += shipments.map(s => 
-            `<option value="${s.voyageNo}" ${s.voyageNo === selectedVoyageNo ? 'selected' : ''}>Chuyến ${s.voyageNo} (${s.cargo})</option>`
-        ).join('');
+        html += voyageList.map(v => {
+            const label = v.cargo ? `Chuyến ${v.voyageNo} (${v.cargo})` : `Chuyến ${v.voyageNo}`;
+            return `<option value="${v.voyageNo}" ${v.voyageNo === selectedVoyageNo ? 'selected' : ''}>${label}</option>`;
+        }).join('');
         return html;
     },
 
-    addPortExpenseRow(port = '', voyageNo = '', amount = '') {
-        const container = document.getElementById('ve-ports-container');
+    // Detail Row Generators & Event Handlers
+    addFoodDetailRow(description = '', amount = '') {
+        const tbody = document.getElementById('ve-food-details-body');
+        if (!tbody) return;
+
+        const tr = document.createElement('tr');
+        tr.className = 'food-detail-row';
+        tr.innerHTML = `
+            <td style="padding: 4px 6px !important; vertical-align: middle;"><input type="text" class="form-control food-desc" placeholder="Thịt, rau, gạo, bồi dưỡng..." value="${description}" style="font-size:0.8rem; padding:2px 6px; height: 26px; background: rgba(0,0,0,0.3);" oninput="app.calcFoodDetailsTotal()"></td>
+            <td style="padding: 4px 6px !important; vertical-align: middle;"><input type="number" class="form-control food-amount" placeholder="Số tiền" value="${amount || ''}" style="font-size:0.8rem; padding:2px 6px; height: 26px; text-align:right; background: rgba(0,0,0,0.3);" oninput="app.calcFoodDetailsTotal()"></td>
+            <td style="padding: 4px 6px !important; vertical-align: middle; text-align: center;"><button type="button" class="icon-btn" onclick="app.removeFoodDetailRow(this)" style="color:var(--rose-light); padding:0; line-height:1;"><i class="fa-solid fa-trash-can" style="font-size:0.85rem;"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+        this.calcFoodDetailsTotal();
+    },
+
+    removeFoodDetailRow(btn) {
+        btn.closest('tr').remove();
+        this.calcFoodDetailsTotal();
+    },
+
+    calcFoodDetailsTotal() {
+        const rows = document.querySelectorAll('.food-detail-row');
+        let total = 0;
+        rows.forEach(r => {
+            const val = r.querySelector('.food-amount').value;
+            total += Number(val) || 0;
+        });
+        const totalIndicator = document.getElementById('ve-food-detail-total');
+        if (totalIndicator) totalIndicator.innerText = AppData.formatCurrency(total);
+        const mainInput = document.getElementById('ve-food');
+        if (mainInput) mainInput.value = total || '';
+    },
+
+    addMaterialDetailRow(description = '', amount = '') {
+        const tbody = document.getElementById('ve-material-details-body');
+        if (!tbody) return;
+
+        const tr = document.createElement('tr');
+        tr.className = 'material-detail-row';
+        tr.innerHTML = `
+            <td style="padding: 4px 6px !important; vertical-align: middle;"><input type="text" class="form-control material-desc" placeholder="Sơn, dây, lọc dầu, nhớt..." value="${description}" style="font-size:0.8rem; padding:2px 6px; height: 26px; background: rgba(0,0,0,0.3);" oninput="app.calcMaterialDetailsTotal()"></td>
+            <td style="padding: 4px 6px !important; vertical-align: middle;"><input type="number" class="form-control material-amount" placeholder="Số tiền" value="${amount || ''}" style="font-size:0.8rem; padding:2px 6px; height: 26px; text-align:right; background: rgba(0,0,0,0.3);" oninput="app.calcMaterialDetailsTotal()"></td>
+            <td style="padding: 4px 6px !important; vertical-align: middle; text-align: center;"><button type="button" class="icon-btn" onclick="app.removeMaterialDetailRow(this)" style="color:var(--rose-light); padding:0; line-height:1;"><i class="fa-solid fa-trash-can" style="font-size:0.85rem;"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+        this.calcMaterialDetailsTotal();
+    },
+
+    removeMaterialDetailRow(btn) {
+        btn.closest('tr').remove();
+        this.calcMaterialDetailsTotal();
+    },
+
+    calcMaterialDetailsTotal() {
+        const rows = document.querySelectorAll('.material-detail-row');
+        let total = 0;
+        rows.forEach(r => {
+            const val = r.querySelector('.material-amount').value;
+            total += Number(val) || 0;
+        });
+        const totalIndicator = document.getElementById('ve-material-detail-total');
+        if (totalIndicator) totalIndicator.innerText = AppData.formatCurrency(total);
+        const mainInput = document.getElementById('ve-material');
+        if (mainInput) mainInput.value = total || '';
+    },
+
+    // Grouped Port Cost Handlers
+    addPortDetailGroup(port = '', voyageNo = '', addBlankRow = false) {
+        const container = document.getElementById('ve-port-groups-container');
+        if (!container) return;
+
         const vesselId = document.getElementById('ve-vessel').value;
         const optionsHtml = this.getVoyageOptionsHtml(vesselId, voyageNo);
 
-        const row = document.createElement('div');
-        row.className = 'port-expense-row';
-        row.style = 'display:flex; gap:0.5rem; margin-bottom:0.5rem; align-items:center;';
-        row.innerHTML = `
-            <input type="text" class="form-control port-name" placeholder="Biên phòng, hoa tiêu, bồi dưỡng..." value="${port}" style="flex:2; font-size:0.85rem; padding:6px; background: rgba(0,0,0,0.3);">
-            <select class="form-control port-voyage" style="flex:1.2; font-size:0.85rem; padding:6px; background: rgba(0,0,0,0.3);">
-                ${optionsHtml}
-            </select>
-            <input type="number" class="form-control port-amount" placeholder="Số tiền" value="${amount}" style="flex:1.5; font-size:0.85rem; padding:6px; text-align:right; background: rgba(0,0,0,0.3);">
-            <button type="button" class="icon-btn" onclick="app.removePortExpenseRow(this)" style="color:var(--rose-light);"><i class="fa-solid fa-trash-can"></i></button>
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'port-detail-group';
+        groupDiv.style = 'background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-md); padding: 0.6rem; margin-bottom: 0.5rem;';
+        groupDiv.innerHTML = `
+            <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 0.5rem; flex-wrap: wrap;">
+                <div style="flex: 2; display: flex; align-items: center; gap: 0.35rem; min-width: 140px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">Tên Cảng:</span>
+                    <input type="text" class="form-control port-group-name" placeholder="Ví dụ: Cảng Vũng Tàu..." value="${port}" style="font-size:0.8rem; padding: 2px 6px; height: 26px; background: rgba(0,0,0,0.3);" oninput="app.syncPortDetailsToLeft()">
+                </div>
+                <div style="flex: 1.5; display: flex; align-items: center; gap: 0.35rem; min-width: 120px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">Chuyến:</span>
+                    <select class="form-control port-group-voyage" style="font-size:0.8rem; padding: 2px 6px; height: 26px; background: rgba(0,0,0,0.3);" onchange="app.syncPortDetailsToLeft()">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <button type="button" class="icon-btn" onclick="app.removePortDetailGroup(this)" style="color:var(--rose-light); font-size: 0.85rem; padding:0; line-height:1;" title="Xóa cảng & chuyến này"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+            <div class="table-responsive" style="margin-bottom: 0.35rem;">
+                <table class="table" style="background: transparent; font-size: 0.8rem; margin: 0;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <th style="padding: 4px 6px !important;">Nội dung chi tiết</th>
+                            <th style="width: 160px; text-align: right; padding: 4px 6px !important;">Số tiền (VND)</th>
+                            <th style="width: 45px; text-align: center; padding: 4px 6px !important;"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="port-group-rows-body">
+                        <!-- Rows will go here -->
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-outline btn-xs" onclick="app.addPortDetailGroupRow(this)" style="font-size:0.7rem; padding: 2px 6px; border-color: rgba(255,255,255,0.1);"><i class="fa-solid fa-plus"></i> Thêm dòng chi phí</button>
         `;
-        container.appendChild(row);
+        container.appendChild(groupDiv);
+
+        if (addBlankRow) {
+            this.addPortDetailGroupRow(groupDiv);
+        }
+
+        this.syncPortDetailsToLeft();
+
+        // Scroll to the bottom of container automatically
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 50);
+
+        return groupDiv;
     },
 
-    removePortExpenseRow(btn) {
-        btn.closest('.port-expense-row').remove();
+    removePortDetailGroup(btn) {
+        btn.closest('.port-detail-group').remove();
+        this.syncPortDetailsToLeft();
+    },
+
+    addPortDetailGroupRow(btnOrGroup, description = '', amount = '') {
+        let tbody;
+        if (btnOrGroup instanceof HTMLElement && btnOrGroup.classList.contains('port-detail-group')) {
+            tbody = btnOrGroup.querySelector('.port-group-rows-body');
+        } else {
+            tbody = btnOrGroup.closest('.port-detail-group').querySelector('.port-group-rows-body');
+        }
+        if (!tbody) return;
+
+        const tr = document.createElement('tr');
+        tr.className = 'port-group-row-item';
+        tr.innerHTML = `
+            <td style="padding: 4px 6px !important; vertical-align: middle;"><input type="text" class="form-control port-item-desc" placeholder="Biên phòng, hoa tiêu, lai dắt, bồi dưỡng..." value="${description}" style="font-size:0.8rem; padding:2px 6px; height: 26px; background: rgba(0,0,0,0.3);" oninput="app.syncPortDetailsToLeft()"></td>
+            <td style="padding: 4px 6px !important; vertical-align: middle;"><input type="number" class="form-control port-item-amount" placeholder="Số tiền" value="${amount || ''}" style="font-size:0.8rem; padding:2px 6px; height: 26px; text-align:right; background: rgba(0,0,0,0.3);" oninput="app.syncPortDetailsToLeft()"></td>
+            <td style="padding: 4px 6px !important; vertical-align: middle; text-align: center;"><button type="button" class="icon-btn" onclick="app.removePortDetailGroupRow(this)" style="color:var(--rose-light); padding:0; line-height:1;"><i class="fa-solid fa-trash-can" style="font-size:0.85rem;"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+        this.syncPortDetailsToLeft();
+    },
+
+    removePortDetailGroupRow(btn) {
+        btn.closest('.port-group-row-item').remove();
+        this.syncPortDetailsToLeft();
+    },
+
+    syncPortDetailsToLeft() {
+        const groups = document.querySelectorAll('.port-detail-group');
+        let total = 0;
+        
+        // Group flat items by port name + voyageNo
+        const aggregatedGroups = {};
+        groups.forEach(g => {
+            const port = g.querySelector('.port-group-name').value.trim();
+            const voyage = g.querySelector('.port-group-voyage').value;
+            
+            const rows = g.querySelectorAll('.port-group-row-item');
+            rows.forEach(r => {
+                const amt = Number(r.querySelector('.port-item-amount').value) || 0;
+                total += amt;
+
+                if (port || amt > 0) {
+                    const key = `${port}||${voyage}`;
+                    if (!aggregatedGroups[key]) {
+                        aggregatedGroups[key] = { port, voyage, amount: 0 };
+                    }
+                    aggregatedGroups[key].amount += amt;
+                }
+            });
+        });
+
+        // Update total port details indicator
+        const portDetailTotal = document.getElementById('ve-port-detail-total');
+        if (portDetailTotal) portDetailTotal.innerText = AppData.formatCurrency(total);
+
+        // Regenerate #ve-ports-container on the left
+        const container = document.getElementById('ve-ports-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const vesselId = document.getElementById('ve-vessel').value;
+
+        Object.values(aggregatedGroups).forEach(g => {
+            const optionsHtml = this.getVoyageOptionsHtml(vesselId, g.voyage);
+            const row = document.createElement('div');
+            row.className = 'port-expense-row';
+            row.style = 'display:flex; gap:0.5rem; margin-bottom:0.5rem; align-items:center;';
+            row.innerHTML = `
+                <input type="text" class="form-control port-name" placeholder="Tên cảng" value="${g.port}" readonly style="flex:2; font-size:0.85rem; padding:6px; background: rgba(255,255,255,0.05); color: var(--text-main); pointer-events: none;">
+                <select class="form-control port-voyage" disabled style="flex:1.2; font-size:0.85rem; padding:6px; background: rgba(255,255,255,0.05); color: var(--text-main); pointer-events: none;">
+                    ${optionsHtml}
+                </select>
+                <input type="number" class="form-control port-amount" placeholder="Số tiền" value="${g.amount}" readonly style="flex:1.5; font-size:0.85rem; padding:6px; text-align:right; background: rgba(255,255,255,0.05); color: var(--text-main); pointer-events: none;">
+            `;
+            container.appendChild(row);
+        });
     },
 
     addBrokerageRow(voyageNo = '', amount = '') {
@@ -3739,14 +5914,76 @@ const app = {
             document.getElementById('ve-material').value = '';
             document.getElementById('ve-ports-container').innerHTML = '';
             document.getElementById('ve-brokerages-container').innerHTML = '';
+
+            // Clear detail bodies
+            document.getElementById('ve-food-details-body').innerHTML = '';
+            document.getElementById('ve-material-details-body').innerHTML = '';
+            document.getElementById('ve-port-groups-container').innerHTML = '';
+
+            // Add defaults
+            this.addFoodDetailRow();
+            this.addMaterialDetailRow();
+            const groupDiv = this.addPortDetailGroup();
+            this.addPortDetailGroupRow(groupDiv);
         }
     },
 
     saveMonthlyCaptainReport() {
         const vesselId = document.getElementById('ve-vessel').value;
         const month = document.getElementById('ve-month').value;
+        this.lastVesselExpensesMonth = month;
+        this.lastVesselExpensesVesselId = vesselId;
 
-        // Collect Port Expenses
+        // Collect Food Details
+        const foodDetails = [];
+        const foodRows = document.querySelectorAll('.food-detail-row');
+        foodRows.forEach(r => {
+            const description = r.querySelector('.food-desc').value.trim();
+            const amount = Number(r.querySelector('.food-amount').value) || 0;
+            if (description || amount > 0) {
+                foodDetails.push({ description, amount });
+            }
+        });
+
+        // Collect Material Details
+        const materialDetails = [];
+        const materialRows = document.querySelectorAll('.material-detail-row');
+        materialRows.forEach(r => {
+            const description = r.querySelector('.material-desc').value.trim();
+            const amount = Number(r.querySelector('.material-amount').value) || 0;
+            if (description || amount > 0) {
+                materialDetails.push({ description, amount });
+            }
+        });
+
+        // Collect Port Details
+        const portDetails = [];
+        const portGroups = document.querySelectorAll('.port-detail-group');
+        let hasPortMissingVoyage = false;
+        portGroups.forEach(g => {
+            const port = g.querySelector('.port-group-name').value.trim();
+            const voyageNo = g.querySelector('.port-group-voyage').value;
+
+            const rows = g.querySelectorAll('.port-group-row-item');
+            rows.forEach(r => {
+                const description = r.querySelector('.port-item-desc').value.trim();
+                const amount = Number(r.querySelector('.port-item-amount').value) || 0;
+
+                if (port || description || amount > 0) {
+                    if (!voyageNo) {
+                        hasPortMissingVoyage = true;
+                    }
+                    portDetails.push({ port, voyageNo, description, amount });
+                }
+            });
+        });
+
+        if (hasPortMissingVoyage) {
+            alert('Vui lòng chọn chuyến đi tương ứng cho các khoản Chi phí cảng trong bảng chi tiết!');
+            return;
+        }
+
+        // Collect Port Expenses (from left side container summary)
         const portExpenses = [];
         const portRows = document.querySelectorAll('.port-expense-row');
         for (let row of portRows) {
@@ -3756,10 +5993,6 @@ const app = {
             const amount = Number(amountVal) || 0;
 
             if (port || amount > 0) {
-                if (!voyageNo) {
-                    alert('Vui lòng chọn chuyến đi tương ứng cho các khoản Chi phí cảng!');
-                    return;
-                }
                 portExpenses.push({ port, amount, voyageNo });
             }
         }
@@ -3789,7 +6022,10 @@ const app = {
             food: Number(document.getElementById('ve-food').value) || 0,
             material: Number(document.getElementById('ve-material').value) || 0,
             portExpenses,
-            brokerages
+            brokerages,
+            foodDetails,
+            materialDetails,
+            portDetails
         };
 
         // Save and refresh

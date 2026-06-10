@@ -31,6 +31,11 @@ const Views = {
             const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
             const baseCosts = { ...s.costs };
             delete baseCosts.vat; // Tránh cộng dồn
+            if (app.excludeDockingDepreciation) {
+                delete baseCosts.dockingIntermediate;
+                delete baseCosts.dockingPeriodic;
+                delete baseCosts.depreciation;
+            }
             const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
             totalCost += costSum;
         });
@@ -38,15 +43,158 @@ const Views = {
         const totalProfit = totalRevenue - totalCost;
         const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
 
+        const transForBalance = AppData.getTransactions() || [];
+        const totalOpening = Object.values(AppData.state.company.openingBalances || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+        const totalTrans = transForBalance.reduce((sum, t) => sum + (Number(t.thu) || 0) - (Number(t.chi) || 0), 0);
+        const totalBalance = totalOpening + totalTrans;
+
+        const accountBalancesHtml = ['ABbank', 'Viettinbank', 'Tài khoản cá nhân', 'Tiền mặt'].map(acc => {
+            const opening = (AppData.state.company.openingBalances && AppData.state.company.openingBalances[acc]) || 0;
+            const balance = opening + transForBalance.filter(t => t.account === acc).reduce((sum, t) => sum + (Number(t.thu) || 0) - (Number(t.chi) || 0), 0);
+            let shortName = acc;
+            if (acc === 'Tài khoản cá nhân') shortName = 'Cá nhân';
+            return `
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
+                    <span style="margin-right: 6px;">${shortName}:</span>
+                    <span style="font-weight:500; color:var(--text-main);">${AppData.formatCurrency(balance)}</span>
+                </div>
+            `;
+        }).join('');
+
+        const { totalCustomerDebt } = AppData.getCustomerDebts();
+        const supplierDebtsList = AppData.getSupplierDebts();
+        const totalSupplierDebt = supplierDebtsList.reduce((sum, s) => sum + s.debt, 0);
+
+        // Blue Box and Red Box Calculations
+        let totalFuelQty = 0;
+        let totalFuelVal = 0;
+        const vesselsList = AppData.getVessels() || [];
+        
+        const blueBoxRowsHtml = vesselsList.map(v => {
+            const voyages = AppData.getFuelVoyages(v.id);
+            const sortedAsc = AppData.sortVoyages(voyages, 'asc');
+            const qtyRemaining = AppData.getVesselFuelBalance(v.id);
+            
+            let valRemaining = 0;
+            let initialFuelC1 = 0;
+            let priceC1 = 0;
+            let latestPrice = 0;
+            
+            if (sortedAsc.length > 0) {
+                const c1 = sortedAsc[0];
+                initialFuelC1 = Number(c1.initialFuel || 0);
+                priceC1 = Number(c1.fuelUnitPrice || 0);
+                if (priceC1 === 0) {
+                    priceC1 = AppData.getLastFuelPrice(v.id, c1.voyageNo);
+                }
+                latestPrice = AppData.getLastFuelPrice(v.id);
+                valRemaining = (qtyRemaining * latestPrice) - (initialFuelC1 * priceC1);
+            }
+            
+            totalFuelQty += qtyRemaining;
+            totalFuelVal += valRemaining;
+            
+            const qtyFormatted = new Intl.NumberFormat('vi-VN').format(Math.round(qtyRemaining || 0));
+            const valFormatted = AppData.formatCurrency(valRemaining);
+            
+            const tooltip = `Giá trị = (Tồn cuối chuyến * Đơn giá gần nhất) - (Tồn trước C1 * Đơn giá C1)\n= (${qtyFormatted} * ${AppData.formatCurrency(latestPrice)}) - (${new Intl.NumberFormat('vi-VN').format(initialFuelC1)} * ${AppData.formatCurrency(priceC1)})`;
+            
+            return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                    <td style="padding: 3px 6px; font-weight: 500; border: none;">${v.name}</td>
+                    <td style="padding: 3px 6px; text-align: right; font-weight: 600; color: var(--text-main); border: none;">${qtyFormatted} Lít</td>
+                    <td style="padding: 3px 6px; text-align: right; font-weight: 600; color: ${valRemaining >= 0 ? '#10b981' : '#ef4444'}; border: none;" title="${tooltip}">${valFormatted}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        const totalFuelQtyFormatted = new Intl.NumberFormat('vi-VN').format(Math.round(totalFuelQty || 0));
+        const totalFuelValFormatted = AppData.formatCurrency(totalFuelVal);
+
+        let totalAllocatedCosts = 0;
+        const redBoxRowsHtml = vesselsList.map(v => {
+            const shipShipments = filteredShips.filter(s => s.vesselId === v.id);
+            let sumDockingInt = 0;
+            let sumDockingPer = 0;
+            let sumDepreciation = 0;
+            let sumRegistryAnnual = 0;
+            let sumHullInsurance = 0;
+            
+            shipShipments.forEach(s => {
+                const c = s.costs || {};
+                sumDockingInt += app.excludeDockingDepreciation ? 0 : Number(c.dockingIntermediate || 0);
+                sumDockingPer += app.excludeDockingDepreciation ? 0 : Number(c.dockingPeriodic || 0);
+                sumDepreciation += app.excludeDockingDepreciation ? 0 : Number(c.depreciation || 0);
+                sumRegistryAnnual += Number(c.registryAnnual || 0);
+                sumHullInsurance += Number(c.hullInsurance || 0);
+            });
+            
+            const totalShipCosts = sumDockingInt + sumDockingPer + sumDepreciation + sumRegistryAnnual + sumHullInsurance;
+            totalAllocatedCosts += totalShipCosts;
+            
+            const costsFormatted = AppData.formatCurrency(totalShipCosts);
+            const tooltip = `Lên đà TG: ${AppData.formatCurrency(sumDockingInt)}\nLên đà ĐK: ${AppData.formatCurrency(sumDockingPer)}\nKhấu hao: ${AppData.formatCurrency(sumDepreciation)}\nĐăng kiểm: ${AppData.formatCurrency(sumRegistryAnnual)}\nBảo hiểm: ${AppData.formatCurrency(sumHullInsurance)}`;
+            
+            return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                    <td style="padding: 3px 6px; font-weight: 500; border: none;">${v.name}</td>
+                    <td style="padding: 3px 6px; text-align: right; font-weight: 600; color: var(--accent); border: none;" title="${tooltip}">${costsFormatted}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        const totalAllocatedCostsFormatted = AppData.formatCurrency(totalAllocatedCosts);
+
+        let totalVoyagesCount = 0;
+        const voyagesBoxRowsHtml = vesselsList.map(v => {
+            const shipShipments = filteredShips.filter(s => s.vesselId === v.id);
+            const count = shipShipments.length;
+            totalVoyagesCount += count;
+            
+            const voyageList = shipShipments.map(s => `Chuyến ${s.voyageNo}`).join(', ') || 'Không có chuyến nào';
+            const tooltip = `Danh sách chuyến: ${voyageList}`;
+            
+            return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                    <td style="padding: 3px 6px; font-weight: 500; border: none;">${v.name}</td>
+                    <td style="padding: 3px 6px; text-align: right; font-weight: 600; color: #3b82f6; border: none;" title="${tooltip}">${count} chuyến</td>
+                </tr>
+            `;
+        }).join('');
+
         return `
             <div class="view-section">
                 <!-- Page Header & Filter -->
-                <div class="page-header" style="flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1.5rem;">
+                <div class="page-header" style="flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-bottom: 1.5rem;">
                     <div>
-                        <h1 class="page-title">Bảng điều khiển</h1>
+                        <h1 class="page-title">Tổng quan</h1>
                         <p class="page-subtitle">${company.name}</p>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.03); padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    
+                    <!-- Ô màu xanh thứ nhất: Số dư tài khoản & Tổng số dư -->
+                    <div class="header-widget glass-card" style="display: flex; flex-direction: column; padding: 10px 16px; gap: 4px; font-size: 0.8rem; border-left: 3px solid var(--secondary); background: rgba(16, 185, 129, 0.05); min-width: 260px;">
+                        <div style="display: flex; justify-content: space-between; font-weight: bold; color: var(--secondary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; margin-bottom: 2px;">
+                            <span>TỔNG SỐ DƯ TÀI KHOẢN:</span>
+                            <span>${AppData.formatCurrency(totalBalance)}</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; color: var(--text-muted);">
+                            ${accountBalancesHtml}
+                        </div>
+                    </div>
+                    
+                    <!-- Ô màu xanh thứ hai: Tổng công nợ Khách hàng & Nhà cung cấp -->
+                    <div class="header-widget glass-card" style="display: flex; flex-direction: column; padding: 10px 16px; gap: 4px; font-size: 0.8rem; border-left: 3px solid var(--info); background: rgba(14, 165, 233, 0.05); min-width: 250px; justify-content: center;">
+                        <div style="display: flex; justify-content: space-between; padding-bottom: 2px;">
+                            <span style="color: var(--text-muted); font-weight: 500;">Công nợ Khách hàng:</span>
+                            <span style="color: var(--accent); font-weight: bold;">${AppData.formatCurrency(totalCustomerDebt)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px;">
+                            <span style="color: var(--text-muted); font-weight: 500;">Công nợ NCC (Dầu):</span>
+                            <span style="color: var(--warning); font-weight: bold;">${AppData.formatCurrency(totalSupplierDebt)}</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.03); padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-left: auto;">
                         <label style="font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin: 0; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-filter" style="color:var(--primary-light);"></i> Lọc tháng hạch toán:
                         </label>
@@ -54,6 +202,94 @@ const Views = {
                             <option value="">-- Tất cả các tháng --</option>
                             ${availableMonths.map(m => `<option value="${m}" ${m === filterMonth ? 'selected' : ''}>Tháng ${m.split('-')[1]}/${m.split('-')[0]}</option>`).join('')}
                         </select>
+                    </div>
+                </div>
+
+                <!-- KPI Section Row 1: Fuel, Fixed Costs & Voyage Count (Compact grid-3 row) -->
+                <div class="grid-3" style="margin-bottom: 1.5rem;">
+                    <!-- Ô màu xanh: Theo dõi Dầu tồn DO & Giá trị -->
+                    <div class="glass-card" style="border-left: 3px solid #3b82f6; background: rgba(59, 130, 246, 0.02); padding: 8px 12px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h3 style="margin-top: 0; margin-bottom: 6px; font-size: 0.85rem; color: #3b82f6; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-gas-pump"></i> Lượng & Giá trị Dầu tồn DO
+                            </h3>
+                            <div class="table-container" style="margin: 0; padding: 0; background: transparent; border: none; box-shadow: none;">
+                                <table class="table" style="width: 100%; font-size: 0.78rem; border-collapse: collapse; margin: 0;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); background: transparent;">
+                                            <th style="text-align: left; padding: 3px 6px; color: var(--text-muted); font-weight: 600; background: transparent; border: none; font-size: 0.72rem;">Tàu</th>
+                                            <th style="text-align: right; padding: 3px 6px; color: var(--text-muted); font-weight: 600; background: transparent; border: none; font-size: 0.72rem;">Tồn (1)</th>
+                                            <th style="text-align: right; padding: 3px 6px; color: var(--text-muted); font-weight: 600; background: transparent; border: none; font-size: 0.72rem;">Giá trị (2)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${blueBoxRowsHtml}
+                                        <tr style="border-top: 1px solid rgba(255,255,255,0.15); font-weight: bold; background: rgba(255,255,255,0.02);">
+                                            <td style="padding: 4px 6px; color: var(--text-main); border: none;">Tổng cộng</td>
+                                            <td style="padding: 4px 6px; text-align: right; color: var(--text-main); border: none;">${totalFuelQtyFormatted} Lít</td>
+                                            <td style="padding: 4px 6px; text-align: right; color: ${totalFuelVal >= 0 ? '#10b981' : '#ef4444'}; border: none;">${totalFuelValFormatted}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ô màu đỏ: Tổng chi phí cố định phân bổ -->
+                    <div class="glass-card" style="border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.02); padding: 8px 12px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0; margin-bottom: 6px;">
+                                <h3 style="margin: 0; font-size: 0.85rem; color: #ef4444; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-wrench"></i> Chi phí Cố định (Đà, Khấu hao, ĐK, BH)
+                                </h3>
+                                <label style="font-size: 0.72rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; margin: 0;" title="Bỏ chi phí lên đà trung gian, định kỳ, khấu hao. Giữ lại đăng kiểm và bảo hiểm thân vỏ.">
+                                    <input type="checkbox" id="exclude-docking-depr-chk" onchange="app.toggleExcludeDockingDepreciation(this.checked)" ${app.excludeDockingDepreciation ? 'checked' : ''} style="margin: 0; width: 12px; height: 12px;"> Bỏ đà & khấu hao
+                                </label>
+                            </div>
+                            <div class="table-container" style="margin: 0; padding: 0; background: transparent; border: none; box-shadow: none;">
+                                <table class="table" style="width: 100%; font-size: 0.78rem; border-collapse: collapse; margin: 0;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); background: transparent;">
+                                            <th style="text-align: left; padding: 3px 6px; color: var(--text-muted); font-weight: 600; background: transparent; border: none; font-size: 0.72rem;">Tàu</th>
+                                            <th style="text-align: right; padding: 3px 6px; color: var(--text-muted); font-weight: 600; background: transparent; border: none; font-size: 0.72rem;">Tổng chi phí</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${redBoxRowsHtml}
+                                        <tr style="border-top: 1px solid rgba(255,255,255,0.15); font-weight: bold; background: rgba(255,255,255,0.02);">
+                                            <td style="padding: 4px 6px; color: var(--text-main); border: none;">Tổng cộng</td>
+                                            <td style="padding: 4px 6px; text-align: right; color: #ef4444; border: none;">${totalAllocatedCostsFormatted}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ô màu xanh bên phải: Số chuyến thực hiện -->
+                    <div class="glass-card" style="border-left: 3px solid #3b82f6; background: rgba(59, 130, 246, 0.02); padding: 8px 12px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h3 style="margin-top: 0; margin-bottom: 6px; font-size: 0.85rem; color: #3b82f6; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-route"></i> Số chuyến đã thực hiện
+                            </h3>
+                            <div class="table-container" style="margin: 0; padding: 0; background: transparent; border: none; box-shadow: none;">
+                                <table class="table" style="width: 100%; font-size: 0.78rem; border-collapse: collapse; margin: 0;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); background: transparent;">
+                                            <th style="text-align: left; padding: 3px 6px; color: var(--text-muted); font-weight: 600; background: transparent; border: none; font-size: 0.72rem;">Tàu</th>
+                                            <th style="text-align: right; padding: 3px 6px; color: var(--text-muted); font-weight: 600; background: transparent; border: none; font-size: 0.72rem;">Số chuyến</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${voyagesBoxRowsHtml}
+                                        <tr style="border-top: 1px solid rgba(255,255,255,0.15); font-weight: bold; background: rgba(255,255,255,0.02);">
+                                            <td style="padding: 4px 6px; color: var(--text-main); border: none;">Tổng cộng</td>
+                                            <td style="padding: 4px 6px; text-align: right; color: #3b82f6; border: none;">${totalVoyagesCount} chuyến</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -70,7 +306,7 @@ const Views = {
                     </div>
                     <div class="kpi-card kpi-danger">
                         <div class="kpi-details">
-                            <span class="kpi-title">Tổng Chi phí Chuyến</span>
+                            <span class="kpi-title">Tổng Chi phí Chuy���n</span>
                             <span class="kpi-value" style="color: var(--accent);">${AppData.formatCurrency(totalCost)}</span>
                         </div>
                         <div class="kpi-icon-wrapper">
@@ -592,17 +828,202 @@ const Views = {
         `;
     },
 
-    fuel: (vesselId) => {
+    fuel: (vesselId, activeTab = 'DO') => {
         const vessels = AppData.getVessels();
-        const selectedVesselId = vesselId || vessels[0].id;
+        const selectedVesselId = vesselId || (vessels[0] ? vessels[0].id : '');
         const selectedVessel = AppData.getVessel(selectedVesselId);
-        const voyages = AppData.getFuelVoyages(selectedVesselId);
 
+        if (activeTab === 'LO') {
+            const loSupplies = AppData.getLOSupplies(selectedVesselId);
+            
+            // Default config values from vessel
+            const loHours = selectedVessel.loHours !== undefined ? selectedVessel.loHours : 800;
+            const loRepl = selectedVessel.loReplacementQty !== undefined ? selectedVessel.loReplacementQty : 8;
+            const loTopup = selectedVessel.loTopupQty !== undefined ? selectedVessel.loTopupQty : 3;
+            const totalLO = Number(loRepl) + Number(loTopup);
+            const hourlyRate = loHours > 0 ? (totalLO / loHours) : 0;
+            
+            // Calculate LO oil statistics from C1 onwards
+            const getVoyageNumber = (voyNo) => {
+                if (!voyNo) return 0;
+                const match = String(voyNo).match(/\d+/);
+                return match ? parseInt(match[0], 10) : 0;
+            };
+            const shipments = AppData.getShipments().filter(s => s.vesselId === selectedVesselId);
+            const loShipments = shipments.filter(s => getVoyageNumber(s.voyageNo) >= 1);
+            const totalHours = loShipments.reduce((sum, s) => sum + (Number(s.fuelHours) || 0), 0);
+            const totalSupplied = loSupplies.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
+            const totalConsumed = totalHours * hourlyRate;
+            const remaining = totalSupplied - totalConsumed;
+            
+            return `
+                <div class="view-section">
+                    <div class="page-header">
+                        <div>
+                            <h1 class="page-title">Quản lý Nhiên liệu (Dầu LO)</h1>
+                            <p class="page-subtitle">Cấu hình định mức & lịch sử cấp Dầu LO cho tàu ${selectedVessel.name}</p>
+                        </div>
+                        <div style="display:flex; gap:1rem;">
+                            <select class="form-control" onchange="app.navigate('fuel', this.value, 'LO')" style="width:auto;">
+                                ${vessels.map(v => `<option value="${v.id}" ${v.id === selectedVesselId ? 'selected' : ''}>${v.id}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="tabs" style="display:flex; gap:10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                        <button class="btn btn-outline" onclick="app.navigate('fuel', '${selectedVesselId}', 'DO')">
+                            <i class="fa-solid fa-gas-pump"></i> Dầu DO
+                        </button>
+                        <button class="btn btn-primary" onclick="app.navigate('fuel', '${selectedVesselId}', 'LO')">
+                            <i class="fa-solid fa-oil-can"></i> Dầu LO (Lube Oil)
+                        </button>
+                    </div>
+
+                    <!-- LO Statistics KPI Grid -->
+                    <div class="kpi-grid" style="margin-bottom: 2rem;">
+                        <div class="kpi-card kpi-info">
+                            <div class="kpi-details">
+                                <span class="kpi-title">Tổng giờ chạy (từ C1)</span>
+                                <span class="kpi-value">${totalHours.toLocaleString('vi-VN', {maximumFractionDigits: 1})} h</span>
+                            </div>
+                            <div class="kpi-icon-wrapper"><i class="fa-solid fa-clock"></i></div>
+                        </div>
+                        <div class="kpi-card kpi-primary">
+                            <div class="kpi-details">
+                                <span class="kpi-title">Tổng LO đã cấp</span>
+                                <span class="kpi-value">${totalSupplied.toLocaleString('vi-VN', {maximumFractionDigits: 1})} fi</span>
+                            </div>
+                            <div class="kpi-icon-wrapper"><i class="fa-solid fa-truck-field"></i></div>
+                        </div>
+                        <div class="kpi-card kpi-danger">
+                            <div class="kpi-details">
+                                <span class="kpi-title">Tổng LO đã dùng</span>
+                                <span class="kpi-value">${totalConsumed.toLocaleString('vi-VN', {maximumFractionDigits: 1})} fi</span>
+                            </div>
+                            <div class="kpi-icon-wrapper"><i class="fa-solid fa-oil-can"></i></div>
+                        </div>
+                        <div class="kpi-card kpi-success">
+                            <div class="kpi-details">
+                                <span class="kpi-title">Lượng LO còn lại</span>
+                                <span class="kpi-value" style="color: ${remaining >= 0 ? 'var(--secondary)' : 'var(--accent)'};">${remaining.toLocaleString('vi-VN', {maximumFractionDigits: 1})} fi</span>
+                            </div>
+                            <div class="kpi-icon-wrapper"><i class="fa-solid fa-boxes-stacked"></i></div>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <!-- Left Column: LO Oil Rate Configuration -->
+                        <div class="glass-card">
+                            <h3 style="color:var(--primary-light); margin-bottom:1.25rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                                <i class="fa-solid fa-sliders"></i> Định mức Dầu LO
+                            </h3>
+                            <form onsubmit="event.preventDefault(); app.saveLOConfig('${selectedVesselId}');">
+                                <div class="form-group">
+                                    <label class="form-label">Chu kỳ thay dầu hoàn toàn (Số giờ chạy)</label>
+                                    <input type="number" class="form-control" id="lo-hours" value="${loHours}" required placeholder="Ví dụ: 800">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Số lượng fi thay thế hoàn toàn (drum)</label>
+                                    <input type="number" step="any" class="form-control" id="lo-repl-qty" value="${loRepl}" required placeholder="Ví dụ: 8">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Số lượng fi thay thế/bù trong quá trình (drum)</label>
+                                    <input type="number" step="any" class="form-control" id="lo-topup-qty" value="${loTopup}" required placeholder="Ví dụ: 3">
+                                </div>
+                                
+                                <div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:var(--radius-sm); margin-bottom:1.5rem; font-size:0.9rem; line-height:1.6;">
+                                    <div>• Tổng dầu LO tiêu hao chu kỳ: <strong>${totalLO} fi</strong> (${loRepl}fi thay hoàn toàn + ${loTopup}fi bù quá trình)</div>
+                                    <div>• Định mức tiêu hao mỗi giờ chạy: <strong>${hourlyRate.toFixed(5)} fi / giờ chạy</strong></div>
+                                    <div style="margin-top:0.25rem; color:var(--info);">• Chi phí dầu LO mỗi chuyến = Số giờ chạy × ${hourlyRate.toFixed(5)} × Đơn giá dầu LO tại thời điểm cấp.</div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary" style="width:100%;">
+                                    <i class="fa-solid fa-floppy-disk"></i> Lưu định mức dầu LO
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Right Column: Supplies Registry & History -->
+                        <div class="glass-card">
+                            <h3 style="color:var(--secondary); margin-bottom:1.25rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                                <i class="fa-solid fa-cart-plus"></i> Nhập/Cấp Dầu LO mới
+                            </h3>
+                            <form onsubmit="event.preventDefault(); app.saveLOSupply('${selectedVesselId}');" style="margin-bottom:2rem;">
+                                <div class="grid-2">
+                                    <div class="form-group">
+                                        <label class="form-label">Thời gian cấp</label>
+                                        <input type="date" class="form-control" id="lo-supply-date" value="${new Date().toISOString().substring(0, 10)}" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Nhà cung cấp (NCC)</label>
+                                        <input type="text" class="form-control" id="lo-supply-vendor" placeholder="Nhập tên nhà cung cấp..." required>
+                                    </div>
+                                </div>
+                                <div class="grid-2">
+                                    <div class="form-group">
+                                        <label class="form-label">Số lượng cấp (fi)</label>
+                                        <input type="number" step="any" class="form-control" id="lo-supply-qty" placeholder="Ví dụ: 8" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Đơn giá nhập (VNĐ/fi)</label>
+                                        <input type="number" step="any" class="form-control" id="lo-supply-price" placeholder="Nhập đơn giá..." required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success" style="width:100%;">
+                                    <i class="fa-solid fa-plus"></i> Thêm phiếu cấp Dầu LO
+                                </button>
+                            </form>
+
+                            <h3 style="color:var(--text-main); font-size:1rem; margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">
+                                Lịch sử cấp Dầu LO
+                            </h3>
+                            <div class="table-container" style="max-height: 250px;">
+                                <table class="table" style="font-size:0.85rem;">
+                                    <thead>
+                                        <tr>
+                                            <th>Ngày cấp</th>
+                                            <th>Nhà cung cấp</th>
+                                            <th style="text-align:right;">Số lượng</th>
+                                            <th style="text-align:right;">Đơn giá/fi</th>
+                                            <th style="text-align:center;">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${loSupplies.length === 0 ? `
+                                            <tr>
+                                                <td colspan="5" style="text-align:center; font-style:italic; padding:2rem; color:var(--text-muted);">
+                                                    Chưa ghi nhận đợt cấp dầu LO nào cho tàu này.
+                                                </td>
+                                            </tr>
+                                        ` : loSupplies.map(s => `
+                                            <tr>
+                                                <td>${s.date.split('-').reverse().join('/')}</td>
+                                                <td><strong>${s.vendor}</strong></td>
+                                                <td style="text-align:right;">${s.qty || 0} fi</td>
+                                                <td style="text-align:right; font-weight:700; color:var(--secondary);">${AppData.formatCurrency(s.price)}</td>
+                                                <td style="text-align:center;">
+                                                    <button class="btn btn-outline" style="padding:0.1rem 0.3rem; border-color:var(--rose-light);" onclick="app.deleteLOSupply('${s.id}', '${selectedVesselId}')">
+                                                        <i class="fa-solid fa-trash" style="color:var(--rose-light);"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Default to Dầu DO view
+        const voyages = AppData.getFuelVoyages(selectedVesselId);
         return `
             <div class="view-section">
                 <div class="page-header">
                     <div>
-                        <h1 class="page-title">Quản lý Nhiên liệu</h1>
+                        <h1 class="page-title">Quản lý Nhiên liệu (Dầu DO)</h1>
                         <p class="page-subtitle">Theo dõi theo từng Chuyến hàng (C1, C2...) cho tàu ${selectedVessel.name}</p>
                     </div>
                     
@@ -615,7 +1036,7 @@ const Views = {
                             <div style="display:flex; gap:1.5rem; align-items:center;">
                                 <div class="glass-card" style="padding:0.5rem 1rem; border-color:var(--primary-light); min-width:180px;">
                                     <small style="display:block; font-size:0.7rem; opacity:0.7; margin-bottom:0.2rem; text-transform:uppercase;">Tồn đầu tàu</small>
-                                    <input type="number" class="form-control" style="background:transparent; border:none; padding:0; height:auto; font-weight:700; font-size:1.1rem; color:white; width:100%;" 
+                                    <input type="text" class="form-control" style="background:transparent; border:none; padding:0; height:auto; font-weight:700; font-size:1.1rem; color:white; width:100%;" 
                                         value="${firstVoy ? (firstVoy.initialFuel || 0) : 0}" 
                                         onchange="app.updateInitialFuel('${firstVoy ? firstVoy.id : ''}', this.value)"
                                         placeholder="Nhập tồn đầu...">
@@ -629,7 +1050,7 @@ const Views = {
                     })()}
 
                     <div style="display:flex; gap:1rem;">
-                        <select class="form-control" onchange="app.navigate('fuel', this.value)" style="width:auto;">
+                        <select class="form-control" onchange="app.navigate('fuel', this.value, 'DO')" style="width:auto;">
                             ${vessels.map(v => `<option value="${v.id}" ${v.id === selectedVesselId ? 'selected' : ''}>${v.id}</option>`).join('')}
                         </select>
                         <button class="btn btn-primary" onclick="app.openFuelVoyageModal('${selectedVesselId}')">
@@ -639,6 +1060,15 @@ const Views = {
                             <i class="fa-solid fa-file-excel"></i> Xuất Báo Cáo
                         </button>
                     </div>
+                </div>
+
+                <div class="tabs" style="display:flex; gap:10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="app.navigate('fuel', '${selectedVesselId}', 'DO')">
+                        <i class="fa-solid fa-gas-pump"></i> Dầu DO
+                    </button>
+                    <button class="btn btn-outline" onclick="app.navigate('fuel', '${selectedVesselId}', 'LO')">
+                        <i class="fa-solid fa-oil-can"></i> Dầu LO (Lube Oil)
+                    </button>
                 </div>
 
                 <div class="grid-1">
@@ -699,9 +1129,9 @@ const Views = {
                                             ${logs.map(l => `
                                                 <tr>
                                                     <td>${l.startPos}</td>
-                                                    <td><small>${l.startTime.replace('T', ' ')}</small></td>
+                                                    <td><small>${(l.startTime || '').replace('T', ' ')}</small></td>
                                                     <td>${l.endPos}</td>
-                                                    <td><small>${l.endTime.replace('T', ' ')}</small></td>
+                                                    <td><small>${(l.endTime || '').replace('T', ' ')}</small></td>
                                                     <td>${Math.round(l.fuelRate)} L/h</td>
                                                     <td><strong>${l.hours}h</strong></td>
                                                     <td>
@@ -785,12 +1215,12 @@ const Views = {
                     <input type="hidden" id="f-id">
                     <input type="hidden" id="f-voyage-id" value="${voyageId}">
                     <div class="grid-2">
-                        <div class="form-group"><label class="form-label">Thời gian đi</label><input type="datetime-local" class="form-control" id="f-start-time" required onchange="app.calcFuelLogHours()"></div>
-                        <div class="form-group"><label class="form-label">Nơi đi</label><input type="text" class="form-control" id="f-start-pos" required></div>
+                        <div class="form-group"><label class="form-label">Thời gian đi</label><input type="datetime-local" class="form-control" id="f-start-time" onchange="app.calcFuelLogHours()"></div>
+                        <div class="form-group"><label class="form-label">Nơi đi</label><input type="text" class="form-control" id="f-start-pos"></div>
                     </div>
                     <div class="grid-2">
-                        <div class="form-group"><label class="form-label">Thời gian đến</label><input type="datetime-local" class="form-control" id="f-end-time" required onchange="app.calcFuelLogHours()"></div>
-                        <div class="form-group"><label class="form-label">Nơi đến</label><input type="text" class="form-control" id="f-end-pos" required></div>
+                        <div class="form-group"><label class="form-label">Thời gian đến</label><input type="datetime-local" class="form-control" id="f-end-time" onchange="app.calcFuelLogHours()"></div>
+                        <div class="form-group"><label class="form-label">Nơi đến</label><input type="text" class="form-control" id="f-end-pos"></div>
                     </div>
                     <div class="grid-2">
                         <div class="form-group"><label class="form-label">Định mức (Lít/giờ)</label><input type="number" step="any" class="form-control" id="f-fuel-rate" required placeholder="Ví dụ: 150"></div>
@@ -880,9 +1310,9 @@ const Views = {
     },
 
     'monthly-costs': () => {
-        const month = new Date().toISOString().substring(0, 7);
         const vessels = AppData.getVessels();
-        const firstVesselId = vessels[0] ? vessels[0].id : '';
+        const month = app.lastMonthlyCostsMonth || new Date().toISOString().substring(0, 7);
+        const firstVesselId = app.lastMonthlyCostsVesselId || (vessels[0] ? vessels[0].id : '');
         const costs = AppData.getMonthlyCosts(month, firstVesselId);
         return `
             <div class="view-section">
@@ -894,7 +1324,7 @@ const Views = {
                             <div class="form-group">
                                 <label class="form-label">Chọn tàu</label>
                                 <select class="form-control" id="m-vessel" onchange="app.loadMonthlyCosts()">
-                                    ${vessels.map(v => `<option value="${v.id}">${v.id}</option>`).join('')}
+                                    ${vessels.map(v => `<option value="${v.id}" ${v.id === firstVesselId ? 'selected' : ''}>${v.id}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
@@ -911,9 +1341,15 @@ const Views = {
                             <input type="number" step="any" class="form-control" id="m-material-company" value="${costs.materialCompany || 0}">
                         </div>
 
-                        <div class="form-group">
-                            <label class="form-label">Lãi vay (VND) <span style="font-size:0.75rem; color:var(--info); font-weight:normal;">(Tự động tính từ Giao dịch)</span></label>
-                            <input type="number" step="any" class="form-control" id="m-loan-interest" value="${costs.loanInterest || 0}" readonly style="background:rgba(0,0,0,0.3); color:var(--text-muted);">
+                        <div class="grid-2" style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 1rem;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label">1. Lãi vay ngân hàng (VND) <span style="font-size:0.75rem; color:var(--info); font-weight:normal;">(Tự động / Tự nhập)</span></label>
+                                <input type="number" step="any" class="form-control" id="m-loan-interest" value="${costs.loanInterest || 0}">
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label">2. Lãi vay ngoài (VND) <span style="font-size:0.75rem; color:var(--warning); font-weight:normal;">(Tự nhập)</span></label>
+                                <input type="number" step="any" class="form-control" id="m-loan-interest-external" value="${costs.loanInterestExternal || 0}">
+                            </div>
                         </div>
                         
                         <div class="form-group">
@@ -930,9 +1366,9 @@ const Views = {
     },
 
     'vessel-expenses': () => {
-        const month = new Date().toISOString().substring(0, 7);
         const vessels = AppData.getVessels();
-        const firstVesselId = vessels[0] ? vessels[0].id : '';
+        const month = app.lastVesselExpensesMonth || new Date().toISOString().substring(0, 7);
+        const firstVesselId = app.lastVesselExpensesVesselId || (vessels[0] ? vessels[0].id : '');
         const stats = AppData.getVesselFundStats(firstVesselId, month);
 
         return `
@@ -956,7 +1392,7 @@ const Views = {
                         <div class="form-group" style="margin: 0;">
                             <label class="form-label">Chọn tàu</label>
                             <select class="form-control" id="ve-vessel" onchange="app.loadVesselExpenses()">
-                                ${vessels.map(v => `<option value="${v.id}">${v.id}</option>`).join('')}
+                                ${vessels.map(v => `<option value="${v.id}" ${v.id === firstVesselId ? 'selected' : ''}>${v.id}</option>`).join('')}
                             </select>
                         </div>
                     </div>
@@ -1007,7 +1443,7 @@ const Views = {
 
                 <!-- Structured Input Section Grid -->
                 <div class="grid-2" style="grid-template-columns: 1.15fr 1.85fr; gap: 1.5rem; align-items: start;">
-                    <!-- Left column: Captain's Monthly Form -->
+                    <!-- Left column: Captain's Monthly Form Summary -->
                     <div class="glass-card" style="padding: 1.5rem;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
                             <h3 style="margin:0; color:var(--info); font-size:1.1rem;"><i class="fa-solid fa-file-invoice-dollar"></i> Nhập Báo cáo Thuyền trưởng</h3>
@@ -1017,24 +1453,24 @@ const Views = {
                         <!-- 1. Tiền ăn uống -->
                         <div class="form-group" style="margin-bottom: 1rem;">
                             <label class="form-label" style="font-weight: 600; color: var(--text-main);"><i class="fa-solid fa-utensils"></i> 1. Tiền ăn & bồi dưỡng TV</label>
-                            <input type="number" class="form-control" id="ve-food" placeholder="Nhập tổng tiền ăn uống..." style="background: rgba(0,0,0,0.4); font-weight:600; color: var(--secondary);">
-                            <small class="form-text text-muted">Chi phí ăn uống phân bổ đều theo số ngày chạy tàu.</small>
+                            <input type="number" class="form-control" id="ve-food" placeholder="Tính từ chi tiết bên phải..." readonly style="background: rgba(255,255,255,0.05); font-weight:600; color: var(--secondary); cursor: not-allowed; pointer-events: none;">
+                            <small class="form-text text-muted">Chi phí ăn uống tự động tính từ khung chi tiết ở bên phải.</small>
                         </div>
 
                         <!-- 4. Vật tư & CP khác -->
                         <div class="form-group" style="margin-bottom: 1.25rem;">
                             <label class="form-label" style="font-weight: 600; color: var(--text-main);"><i class="fa-solid fa-wrench"></i> 4. Tiền Vật tư, sửa chữa (Tàu chi)</label>
-                            <input type="number" class="form-control" id="ve-material" placeholder="Nhập tổng tiền vật tư, sửa chữa..." style="background: rgba(0,0,0,0.4); font-weight:600; color: var(--secondary);">
-                            <small class="form-text text-muted">Chi phí vật tư tàu tự mua phân bổ đều theo số ngày chạy tàu.</small>
+                            <input type="number" class="form-control" id="ve-material" placeholder="Tính từ chi tiết bên phải..." readonly style="background: rgba(255,255,255,0.05); font-weight:600; color: var(--secondary); cursor: not-allowed; pointer-events: none;">
+                            <small class="form-text text-muted">Chi phí vật tư tự động tính từ khung chi tiết ở bên phải.</small>
                         </div>
 
                         <!-- 2. Chi phí cảng -->
                         <div style="margin-bottom: 1.5rem;">
-                            <label class="form-label" style="font-weight: 600; color: var(--text-main); margin-bottom: 0.5rem; display:block;"><i class="fa-solid fa-anchor"></i> 2. Chi phí tại các đầu cảng</label>
+                            <label class="form-label" style="font-weight: 600; color: var(--text-main); margin-bottom: 0.5rem; display:block;"><i class="fa-solid fa-anchor"></i> 2. Chi phí tại các đầu cảng (Tổng hợp tự động)</label>
                             <div id="ve-ports-container" style="background: rgba(0,0,0,0.2); border: 1px dashed var(--border-color); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; min-height: 50px;">
                                 <!-- Port rows dynamically added -->
                             </div>
-                            <button type="button" class="btn btn-outline btn-xs" onclick="app.addPortExpenseRow()" style="font-size:0.75rem; padding: 4px 8px; border-color: rgba(255,255,255,0.15);"><i class="fa-solid fa-plus"></i> Thêm Chi Phí Cảng</button>
+                            <small class="form-text text-muted" style="display:block; margin-top:-0.25rem; margin-bottom:0.5rem;">Danh sách cảng được tổng hợp tự động theo Cảng + Chuyến từ chi tiết bên phải.</small>
                         </div>
 
                         <!-- 3. Tiền Bông từng chuyến -->
@@ -1053,33 +1489,94 @@ const Views = {
                         </div>
                     </div>
 
-                    <!-- Right column: Dynamic Voyage Distribution List -->
-                    <div class="glass-card" style="padding: 1.5rem; min-height: 500px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-                            <h3 style="margin:0; color:var(--accent); font-size:1.1rem;"><i class="fa-solid fa-ship"></i> Phân bổ Chi phí vào các Chuyến trong tháng</h3>
-                            <span class="badge badge-success" style="font-size:0.75rem;">Đồng bộ Tức thì</span>
+                    <!-- Right column: Detailed Inputs for Food, Material and Ports -->
+                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <!-- Panel 1: Chi tiết Tiền ăn & Bồi dưỡng TV -->
+                        <div class="glass-card" style="padding: 1.5rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                                <h3 style="margin:0; color:var(--info); font-size:1.1rem;"><i class="fa-solid fa-utensils"></i> Chi tiết Tiền ăn & Bồi dưỡng TV</h3>
+                                <span style="font-weight:600; color:var(--secondary); font-size:0.9rem;" id="ve-food-detail-total">0đ</span>
+                            </div>
+                            <div class="table-responsive" style="margin-bottom: 0.5rem; max-height: 200px; overflow-y: auto;">
+                                <table class="table" style="background: rgba(0,0,0,0.1); font-size: 0.8rem; margin: 0;">
+                                    <thead>
+                                        <tr>
+                                            <th style="padding: 4px 6px !important;">Nội dung chi tiết</th>
+                                            <th style="width: 160px; text-align: right; padding: 4px 6px !important;">Số tiền (VND)</th>
+                                            <th style="width: 45px; text-align: center; padding: 4px 6px !important;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ve-food-details-body">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="app.addFoodDetailRow()" style="font-size:0.75rem; padding: 4px 8px; border-color: rgba(255,255,255,0.15);"><i class="fa-solid fa-plus"></i> Thêm chi tiết tiền ăn</button>
                         </div>
-                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.45;">
-                            Các chuyến hàng chạy trong tháng của tàu được lọc dưới đây sẽ tự động nhận phân bổ từ Báo cáo Thuyền trưởng (theo số ngày chạy chuyến hoặc gán trực tiếp).
-                        </p>
-                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
-                            <table class="table" style="background: rgba(0,0,0,0.15);">
-                                <thead>
-                                    <tr>
-                                        <th>Mã chuyến</th>
-                                        <th>Thời gian chạy</th>
-                                        <th style="text-align: right;">Tiền ăn</th>
-                                        <th style="text-align: right;">Vật tư tàu chi</th>
-                                        <th style="text-align: right;">Cảng tàu chi</th>
-                                        <th style="text-align: right;">Tiền bông</th>
-                                        <th style="text-align: right; color:var(--rose-light);">Tổng chi két tàu</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ve-allocated-voyages">
-                                    <!-- Populated dynamically via JS -->
-                                </tbody>
-                            </table>
+
+                        <!-- Panel 2: Chi tiết Chi phí tại các đầu cảng (Grouped version) -->
+                        <div class="glass-card" style="padding: 1.5rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                                <h3 style="margin:0; color:var(--info); font-size:1.1rem;"><i class="fa-solid fa-anchor"></i> Chi tiết Chi phí tại các đầu cảng</h3>
+                                <span style="font-weight:600; color:var(--secondary); font-size:0.9rem;" id="ve-port-detail-total">0đ</span>
+                            </div>
+                            <div id="ve-port-groups-container" style="max-height: 380px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 0.75rem;">
+                                <!-- Port-Voyage groups will be generated here -->
+                            </div>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="app.addPortDetailGroup('', '', true)" style="font-size:0.75rem; padding: 4px 8px; border-color: rgba(255,255,255,0.15); margin-top: 0.5rem;"><i class="fa-solid fa-plus"></i> Thêm Cảng & Chuyến mới</button>
                         </div>
+
+                        <!-- Panel 3: Chi tiết Chi phí Vật tư -->
+                        <div class="glass-card" style="padding: 1.5rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                                <h3 style="margin:0; color:var(--info); font-size:1.1rem;"><i class="fa-solid fa-wrench"></i> Chi tiết Vật tư, sửa chữa (Tàu chi)</h3>
+                                <span style="font-weight:600; color:var(--secondary); font-size:0.9rem;" id="ve-material-detail-total">0đ</span>
+                            </div>
+                            <div class="table-responsive" style="margin-bottom: 0.5rem; max-height: 200px; overflow-y: auto;">
+                                <table class="table" style="background: rgba(0,0,0,0.1); font-size: 0.8rem; margin: 0;">
+                                    <thead>
+                                        <tr>
+                                            <th style="padding: 4px 6px !important;">Nội dung chi tiết</th>
+                                            <th style="width: 160px; text-align: right; padding: 4px 6px !important;">Số tiền (VND)</th>
+                                            <th style="width: 45px; text-align: center; padding: 4px 6px !important;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ve-material-details-body">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="app.addMaterialDetailRow()" style="font-size:0.75rem; padding: 4px 8px; border-color: rgba(255,255,255,0.15);"><i class="fa-solid fa-plus"></i> Thêm chi tiết vật tư</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Voyage Allocation Table at the very bottom, full width -->
+                <div class="glass-card" style="padding: 1.5rem; margin-top: 1.5rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                        <h3 style="margin:0; color:var(--accent); font-size:1.1rem;"><i class="fa-solid fa-ship"></i> Phân bổ Chi phí vào các Chuyến trong tháng</h3>
+                        <span class="badge badge-success" style="font-size:0.75rem;">Đồng bộ Tức thì</span>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.45;">
+                        Các chuyến hàng chạy trong tháng của tàu được lọc dưới đây sẽ tự động nhận phân bổ từ Báo cáo Thuyền trưởng (theo số ngày chạy chuyến hoặc gán trực tiếp).
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table" style="background: rgba(0,0,0,0.15);">
+                            <thead>
+                                <tr>
+                                    <th>Mã chuyến</th>
+                                    <th>Thời gian chạy</th>
+                                    <th style="text-align: right;">Tiền ăn</th>
+                                    <th style="text-align: right;">Vật tư tàu chi</th>
+                                    <th style="text-align: right;">Cảng tàu chi</th>
+                                    <th style="text-align: right;">Tiền bông</th>
+                                    <th style="text-align: right; color:var(--rose-light);">Tổng chi két tàu</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ve-allocated-voyages">
+                                <!-- Populated dynamically via JS -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -1186,11 +1683,12 @@ const Views = {
                         <div class="form-group"><label class="form-label">Ngày dỡ hàng</label><input type="date" class="form-control" id="s-end" required onchange="app.calcShipmentAllocations()"></div>
                         <div class="form-group"><label class="form-label">Tháng hạch toán</label><input type="month" class="form-control" id="s-report-month" title="Mặc định lấy theo tháng của ngày xếp hàng"></div>
                     </div>
-                    <div class="grid-4">
+                    <div class="grid-5" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
                         <div class="form-group"><label class="form-label">Khối lượng (Tấn)</label><input type="number" step="any" class="form-control" id="s-qty" oninput="app.calcShipmentFinance()" required></div>
                         <div class="form-group"><label class="form-label">Đơn giá thực</label><input type="number" step="any" class="form-control" id="s-rate" oninput="app.calcShipmentFinance()" required></div>
                         <div class="form-group"><label class="form-label">Tiền gửi (VND/tấn)</label><input type="number" step="any" class="form-control" id="s-markup" oninput="app.calcShipmentFinance()" value="0"></div>
                         <div class="form-group"><label class="form-label">Giá dầu chuyến</label><input type="number" step="any" class="form-control" id="s-fuel-p" oninput="app.calcShipmentFinance()" value="20000"></div>
+                        <div class="form-group"><label class="form-label">Tỷ lệ Thuế VAT (%)</label><input type="number" step="any" class="form-control" id="s-commission-rate" oninput="app.calcShipmentFinance()" value="28"></div>
                     </div>
                     <div class="grid-3" style="background:rgba(255,255,255,0.05); padding:1rem; border-radius:var(--radius-md); margin-bottom:1.5rem;">
                         <div><small class="stat-label">Doanh thu Hóa đơn</small><div id="val-rev-inv" style="font-weight:bold; color:var(--info);">0 đ</div></div>
@@ -1202,7 +1700,7 @@ const Views = {
                     <div class="grid-4">
                         <div class="form-group"><label class="form-label">Số giờ chạy (Auto)</label><input type="number" class="form-control" id="s-c-hours" readonly style="background:rgba(0,0,0,0.3);"></div>
                         <div class="form-group"><label class="form-label">Tiền dầu DO (Auto)</label><input type="number" class="form-control" id="s-c-fuel" readonly style="background:rgba(0,0,0,0.3);"></div>
-                        <div class="form-group"><label class="form-label">Tiền dầu LO</label><input type="number" class="form-control" id="s-c-fuel-lo" oninput="app.calcShipmentFinance()"></div>
+                        <div class="form-group"><label class="form-label">Tiền dầu LO</label><input type="number" class="form-control" id="s-c-fuel-lo" oninput="app.handleFuelLOInput()"></div>
                         <div class="form-group"><label class="form-label">Đại lý 2 đầu cảng</label><input type="number" class="form-control" id="s-c-agent" oninput="app.calcShipmentFinance()"></div>
                     </div>
                     
@@ -1218,6 +1716,20 @@ const Views = {
                         <div class="form-group"><label class="form-label" style="color:var(--warning);">Vật tư Tàu chi (Alloc)</label><input type="number" class="form-control" id="s-c-m-mat-vessel" readonly style="background:rgba(0,0,0,0.3); color:var(--warning);"></div>
                         <div class="form-group"><label class="form-label">Tàu chi 2 đầu cảng (Tàu chi)</label><input type="number" class="form-control" id="s-c-vessel-2ends" oninput="app.calcShipmentFinance()"></div>
                         <div class="form-group"><label class="form-label">Tiền Bông (Auto/Tàu chi)</label><input type="number" class="form-control" id="s-c-brokerage" oninput="app.calcShipmentFinance()"></div>
+                    </div>
+
+                    <div class="grid-2" style="background:rgba(255,255,255,0.02); padding:1rem; border-radius:var(--radius-sm); border:1px dashed var(--border-color); margin-bottom:1rem; display:grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                        <div class="form-group" style="margin:0;"><label class="form-label" style="color:var(--warning);">Lãi vay Ngân hàng (Alloc)</label><input type="number" class="form-control" id="s-c-loan-interest" readonly style="background:rgba(0,0,0,0.3); color:var(--warning);"></div>
+                        <div class="form-group" style="margin:0;"><label class="form-label" style="color:var(--warning);">Lãi vay ngoài (Alloc)</label><input type="number" class="form-control" id="s-c-loan-interest-external" readonly style="background:rgba(0,0,0,0.3); color:var(--warning);"></div>
+                    </div>
+
+                    <div class="grid-6" style="background:rgba(255,255,255,0.02); padding:1rem; border-radius:var(--radius-sm); border:1px dashed var(--border-color); margin-bottom:1rem; display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;">
+                        <div class="form-group"><label class="form-label" style="color:var(--secondary); font-size:0.75rem;">Lên đà TG (Alloc)</label><input type="number" class="form-control" id="s-c-docking-int" readonly style="background:rgba(0,0,0,0.3); color:var(--secondary);"></div>
+                        <div class="form-group"><label class="form-label" style="color:var(--secondary); font-size:0.75rem;">Lên đà ĐK (Alloc)</label><input type="number" class="form-control" id="s-c-docking-per" readonly style="background:rgba(0,0,0,0.3); color:var(--secondary);"></div>
+                        <div class="form-group"><label class="form-label" style="color:var(--secondary); font-size:0.75rem;">Đăng kiểm (Alloc)</label><input type="number" class="form-control" id="s-c-registry-ann" readonly style="background:rgba(0,0,0,0.3); color:var(--secondary);"></div>
+                        <div class="form-group"><label class="form-label" style="color:var(--secondary); font-size:0.75rem;">Khấu hao (Alloc)</label><input type="number" class="form-control" id="s-c-depreciation" readonly style="background:rgba(0,0,0,0.3); color:var(--secondary);"></div>
+                        <div class="form-group"><label class="form-label" style="color:var(--secondary); font-size:0.75rem;">BH thân vỏ (Alloc)</label><input type="number" class="form-control" id="s-c-hull-insurance" readonly style="background:rgba(0,0,0,0.3); color:var(--secondary);"></div>
+                        <div class="form-group"><label class="form-label" style="color:var(--secondary); font-size:0.75rem;">Sửa chữa lớn (Alloc)</label><input type="number" class="form-control" id="s-c-large-repair" readonly style="background:rgba(0,0,0,0.3); color:var(--secondary);"></div>
                     </div>
 
                     <div class="grid-4">
@@ -2477,80 +2989,262 @@ const Views = {
         const fuelDO = s.costs.fuelDO || 0;
         const fuelLO = s.costs.fuelLO || 0;
         const agent = s.costs.agent || 0;
+        const vessel2ends = s.costs.vessel2ends || 0;
         const portFees = s.costs.portFees || 0;
+        const brokerage = s.costs.brokerage || 0;
+        const crewSalary = s.costs.crewSalary || 0;
+        const crewFood = s.costs.crewFood || 0;
+        const crewInsurance = s.costs.crewInsurance || 0;
+        const materialCompany = s.costs.materialCompany || 0;
+        const materialVessel = s.costs.materialVessel || 0;
+        const loanInterest = s.costs.loanInterest || 0;
+        const loanInterestExternal = s.costs.loanInterestExternal || 0;
+        const monthlyOther = s.costs.monthlyOther || 0;
+        const others = s.costs.others || 0;
+        
+        const depreciation = app.excludeDockingDepreciation ? 0 : (s.costs.depreciation || 0);
+        const hullInsurance = s.costs.hullInsurance || 0;
+        const dockingIntermediate = app.excludeDockingDepreciation ? 0 : (s.costs.dockingIntermediate || 0);
+        const dockingPeriodic = app.excludeDockingDepreciation ? 0 : (s.costs.dockingPeriodic || 0);
+        const registryAnnual = s.costs.registryAnnual || 0;
+
         const deduc = fuelDO + fuelLO + agent + portFees;
         const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.08 * deduc));
-        const baseCosts = { ...s.costs };
-        delete baseCosts.vat; // Tránh cộng dồn nếu đã có VAT trong object
         
-        const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + vat;
+        const costSum = fuelDO + fuelLO + agent + vessel2ends + portFees + brokerage + crewSalary + crewFood + crewInsurance + materialCompany + materialVessel + loanInterest + loanInterestExternal + monthlyOther + others + depreciation + hullInsurance + dockingIntermediate + dockingPeriodic + registryAnnual + vat;
         const profit = s.revenueReal - costSum;
         const vessel = AppData.getVessel(s.vesselId);
         
+        // Helper: format rows with percentage column
+        const costRow = (label, value) => {
+            const pct = costSum > 0 ? ((value / costSum) * 100).toFixed(1) : '0.0';
+            return `
+                <tr>
+                    <td>${label}</td>
+                    <td style="text-align: right; font-weight: 500;">${AppData.formatCurrency(value)}</td>
+                    <td style="text-align: right; color: var(--text-muted); font-size: 0.85rem; width: 80px;">${pct}%</td>
+                </tr>
+            `;
+        };
+
+        // Gather all shipments for comparison
+        const allShipments = AppData.getShipments() || [];
+        
+        // Compare with other shipments of the same vessel
+        const sameVesselShipments = allShipments.filter(x => x.vesselId === s.vesselId && x.id !== s.id);
+        
+        // Compare with same route shipments (other vessels)
+        const sameRouteShipments = allShipments.filter(x => x.portLoad === s.portLoad && x.portDischarge === s.portDischarge && x.id !== s.id);
+
+        // Find top cost item (excluding total and vat)
+        const costItemsList = [
+            { label: 'Nhiên liệu DO', value: s.costs.fuelDO || 0 },
+            { label: 'Nhiên liệu LO', value: s.costs.fuelLO || 0 },
+            { label: 'Đại lý 2 đầu cảng', value: s.costs.agent || 0 },
+            { label: 'Tàu chi 2 đầu cảng', value: s.costs.vessel2ends || 0 },
+            { label: 'Phí cảng, Tàu lai, Hoa tiêu', value: s.costs.portFees || 0 },
+            { label: 'Tiền Bông', value: s.costs.brokerage || 0 },
+            { label: 'Lương thuyền viên', value: s.costs.crewSalary || 0 },
+            { label: 'Tiền ăn thuyền viên', value: s.costs.crewFood || 0 },
+            { label: 'Bảo hiểm nhân sự', value: s.costs.crewInsurance || 0 },
+            { label: 'Vật tư Cty cấp', value: s.costs.materialCompany || 0 },
+            { label: 'Vật tư Tàu chi', value: s.costs.materialVessel || 0 },
+            { label: 'Lãi vay ngân hàng', value: s.costs.loanInterest || 0 },
+            { label: 'Lãi vay ngoài', value: s.costs.loanInterestExternal || 0 },
+            { label: 'Chi phí khác từ Cty', value: s.costs.monthlyOther || 0 },
+            { label: 'Chi phí khác tàu chi', value: s.costs.others || 0 },
+            { label: 'Khấu hao tài sản', value: s.costs.depreciation || 0 },
+            { label: 'Bảo hiểm thân vỏ', value: s.costs.hullInsurance || 0 },
+            { label: 'Lên đà trung gian', value: s.costs.dockingIntermediate || 0 },
+            { label: 'Lên đà định kỳ', value: s.costs.dockingPeriodic || 0 },
+            { label: 'Đăng kiểm hàng năm', value: s.costs.registryAnnual || 0 }
+        ];
+        costItemsList.sort((a, b) => b.value - a.value);
+        const topCost = costItemsList[0];
+        const topCostPct = costSum > 0 ? ((topCost.value / costSum) * 100).toFixed(1) : '0';
+
+        // Same Vessel Comparison HTML
+        let sameVesselCompareHTML = '';
+        if (sameVesselShipments.length > 0) {
+            const avgCost = sameVesselShipments.reduce((sum, x) => {
+                const xDeduc = (x.costs?.fuelDO || 0) + (x.costs?.fuelLO || 0) + (x.costs?.agent || 0) + (x.costs?.portFees || 0);
+                const xVat = Math.round((0.08 * (x.revenueInvoice || x.revenueReal)) - (0.08 * xDeduc));
+                const xBase = { ...x.costs };
+                delete xBase.vat;
+                const xTotal = Object.values(xBase).reduce((s, v) => s + (Number(v) || 0), 0) + xVat;
+                return sum + xTotal;
+            }, 0) / sameVesselShipments.length;
+            
+            const avgProfit = sameVesselShipments.reduce((sum, x) => {
+                const xDeduc = (x.costs?.fuelDO || 0) + (x.costs?.fuelLO || 0) + (x.costs?.agent || 0) + (x.costs?.portFees || 0);
+                const xVat = Math.round((0.08 * (x.revenueInvoice || x.revenueReal)) - (0.08 * xDeduc));
+                const xBase = { ...x.costs };
+                delete xBase.vat;
+                const xTotal = Object.values(xBase).reduce((s, v) => s + (Number(v) || 0), 0) + xVat;
+                return sum + (x.revenueReal - xTotal);
+            }, 0) / sameVesselShipments.length;
+
+            const costDiff = costSum - avgCost;
+            const profitDiff = profit - avgProfit;
+            
+            sameVesselCompareHTML = `
+                <div style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid var(--primary-light);">
+                    <h4 style="margin: 0 0 0.5rem 0; color: var(--primary-light);">So sánh với trung bình các chuyến khác cùng tàu (${sameVesselShipments.length} chuyến):</h4>
+                    <p style="margin: 0.25rem 0; font-size: 0.9rem;">• Chi phí chuyến này: <strong>${AppData.formatCurrency(costSum)}</strong> (${costDiff >= 0 ? '<span style="color:var(--rose-light);">cao hơn</span>' : '<span style="color:var(--secondary);">thấp hơn</span>'} trung bình <strong>${AppData.formatCurrency(Math.abs(costDiff))}</strong>).</p>
+                    <p style="margin: 0.25rem 0; font-size: 0.9rem;">• Hiệu quả (lợi nhuận): <strong>${AppData.formatCurrency(profit)}</strong> (${profitDiff >= 0 ? '<span style="color:var(--secondary);">tốt hơn</span>' : '<span style="color:var(--rose-light);">thấp hơn</span>'} trung bình <strong>${AppData.formatCurrency(Math.abs(profitDiff))}</strong>).</p>
+                </div>
+            `;
+        } else {
+            sameVesselCompareHTML = `
+                <div style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid var(--text-muted); opacity: 0.7;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: var(--text-muted);">So sánh với các chuyến khác cùng tàu:</h4>
+                    <p style="margin: 0; font-size: 0.9rem; font-style: italic;">• Chưa có chuyến khác của cùng tàu này trong dữ liệu lịch sử để so sánh.</p>
+                </div>
+            `;
+        }
+
+        // Same Route Comparison HTML (Other Vessels)
+        let sameRouteCompareHTML = '';
+        const otherVesselsSameRoute = sameRouteShipments.filter(x => x.vesselId !== s.vesselId);
+        if (otherVesselsSameRoute.length > 0) {
+            const avgCost = otherVesselsSameRoute.reduce((sum, x) => {
+                const xDeduc = (x.costs?.fuelDO || 0) + (x.costs?.fuelLO || 0) + (x.costs?.agent || 0) + (x.costs?.portFees || 0);
+                const xVat = Math.round((0.08 * (x.revenueInvoice || x.revenueReal)) - (0.08 * xDeduc));
+                const xBase = { ...x.costs };
+                delete xBase.vat;
+                const xTotal = Object.values(xBase).reduce((s, v) => s + (Number(v) || 0), 0) + xVat;
+                return sum + xTotal;
+            }, 0) / otherVesselsSameRoute.length;
+
+            const avgDO = otherVesselsSameRoute.reduce((sum, x) => sum + (Number(x.costs?.fuelDO) || 0), 0) / otherVesselsSameRoute.length;
+            
+            const doDiff = (s.costs.fuelDO || 0) - avgDO;
+            const costDiff = costSum - avgCost;
+            
+            sameRouteCompareHTML = `
+                <div style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid var(--info);">
+                    <h4 style="margin: 0 0 0.5rem 0; color: var(--info);">So sánh với tàu khác chạy cùng tuyến (${s.portLoad || 'Cảng xếp'} → ${s.portDischarge || 'Cảng dỡ'} - ${otherVesselsSameRoute.length} chuyến):</h4>
+                    <p style="margin: 0.25rem 0; font-size: 0.9rem;">• Tổng chi phí: <strong>${AppData.formatCurrency(costSum)}</strong> (${costDiff >= 0 ? '<span style="color:var(--rose-light);">cao hơn</span>' : '<span style="color:var(--secondary);">thấp hơn</span>'} trung bình tuyến <strong>${AppData.formatCurrency(Math.abs(costDiff))}</strong>).</p>
+                    <p style="margin: 0.25rem 0; font-size: 0.9rem;">• Tiêu thụ Dầu DO: <strong>${AppData.formatCurrency(s.costs.fuelDO)}</strong> (${doDiff >= 0 ? '<span style="color:var(--rose-light);">hao dầu hơn</span>' : '<span style="color:var(--secondary);">tiết kiệm dầu hơn</span>'} trung bình tuyến <strong>${AppData.formatCurrency(Math.abs(doDiff))}</strong>).</p>
+                </div>
+            `;
+        } else {
+            sameRouteCompareHTML = `
+                <div style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid var(--text-muted); opacity: 0.7;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: var(--text-muted);">So sánh với tàu khác chạy cùng tuyến:</h4>
+                    <p style="margin: 0; font-size: 0.9rem; font-style: italic;">• Tuyến đường ${s.portLoad || '---'} → ${s.portDischarge || '---'} chưa ghi nhận chuyến hàng của tàu khác để so sánh chéo.</p>
+                </div>
+            `;
+        }
+
         return `
-            <div class="report-container glass-panel" style="padding: 2rem; color: var(--text-main); font-family: 'Inter', sans-serif;">
+            <div class="report-container glass-panel" style="padding: 2rem; color: var(--text-main); font-family: 'Inter', sans-serif; max-height: 85vh; overflow-y: auto;">
                 <div style="text-align: center; border-bottom: 2px solid var(--primary-light); padding-bottom: 1rem; margin-bottom: 2rem;">
-                    <h2 style="color: var(--primary-light); text-transform: uppercase;">Báo cáo Kết quả Kinh doanh Chuyến hàng</h2>
-                    <p>Mã chuyến: <strong>${s.voyageNo}</strong> | Tàu: <strong>${vessel ? vessel.name : s.vesselId}</strong></p>
+                    <h2 style="color: var(--primary-light); text-transform: uppercase; margin-bottom: 0.25rem;">Báo cáo Kết quả Kinh doanh Chuyến hàng</h2>
+                    <p style="margin: 0;">Mã chuyến: <strong>${s.voyageNo}</strong> | Tàu: <strong>${vessel ? vessel.name : s.vesselId}</strong></p>
                 </div>
 
-                <div class="grid-2" style="margin-bottom: 2rem; font-size: 0.9rem;">
+                <div class="grid-2" style="margin-bottom: 2rem; font-size: 0.95rem; line-height: 1.6;">
                     <div>
-                        <p>Thời gian: <strong>${s.dateStart}</strong> đến <strong>${s.dateEnd}</strong></p>
-                        <p>Hàng hóa: <strong>${s.cargo}</strong></p>
+                        <p style="margin: 0.25rem 0;">Thời gian: <strong>${s.dateStart}</strong> đến <strong>${s.dateEnd}</strong> (<strong>${AppData.calcDays(s.dateStart, s.dateEnd)} ngày</strong>)</p>
+                        <p style="margin: 0.25rem 0;">Hàng hóa: <strong>${s.cargo}</strong></p>
                     </div>
                     <div style="text-align: right;">
-                        <p>Khối lượng: <strong>${s.qty.toLocaleString()} tấn</strong></p>
-                        <p>Tuyến đường: <strong>${s.portLoad || '---'} → ${s.portDischarge || '---'}</strong></p>
+                        <p style="margin: 0.25rem 0;">Khối lượng: <strong>${s.qty.toLocaleString()} tấn</strong> | Đơn giá: <strong>${AppData.formatCurrency(s.rate)} / tấn</strong></p>
+                        <p style="margin: 0.25rem 0;">Tuyến đường: <strong>${s.portLoad || '---'} → ${s.portDischarge || '---'}</strong></p>
                     </div>
                 </div>
 
                 <div style="margin-bottom: 2rem;">
-                    <h3 style="border-left: 4px solid var(--info); padding-left: 10px; margin-bottom: 1rem;">I. DOANH THU</h3>
+                    <h3 style="border-left: 4px solid var(--info); padding-left: 10px; margin-bottom: 1rem; font-size: 1.1rem; color: var(--info);">I. DOANH THU</h3>
                     <table class="table" style="background: rgba(255,255,255,0.02);">
-                        <tr style="font-weight: bold; background: rgba(0,255,100,0.05);">
-                            <td>1. DOANH THU THỰC TẾ</td>
-                            <td style="text-align: right; color: var(--secondary);">${AppData.formatCurrency(s.revenueReal)}</td>
-                        </tr>
-                        <tr><td>2. Tiền VAT (8% HĐ - 8% DO, LO, Đại lý, Cảng)</td><td style="text-align: right;">${AppData.formatCurrency(vat)}</td></tr>
-                        <tr style="font-weight: bold; border-top: 1px solid var(--border-color);">
-                            <td>3. DOANH THU SAU KHI TRỪ VAT</td>
-                            <td style="text-align: right; color: var(--info);">${AppData.formatCurrency(s.revenueReal - vat)}</td>
-                        </tr>
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); opacity: 0.8; font-size: 0.85rem;">
+                                <th>Hạng mục</th>
+                                <th style="text-align: right;">Số tiền</th>
+                                <th style="text-align: right; width: 80px;">Tỷ trọng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="font-weight: bold; background: rgba(0,255,100,0.05);">
+                                <td>1. DOANH THU THỰC TẾ</td>
+                                <td style="text-align: right; color: var(--secondary);">${AppData.formatCurrency(s.revenueReal)}</td>
+                                <td style="text-align: right; color: var(--secondary);">100.0%</td>
+                            </tr>
+                            <tr>
+                                <td>2. Tiền VAT (8% HĐ - 8% DO, LO, Đại lý, Cảng)</td>
+                                <td style="text-align: right;">${AppData.formatCurrency(vat)}</td>
+                                <td style="text-align: right; color: var(--text-muted); font-size: 0.85rem;">-</td>
+                            </tr>
+                            <tr style="font-weight: bold; border-top: 1px solid var(--border-color);">
+                                <td>3. DOANH THU SAU KHI TRỪ VAT</td>
+                                <td style="text-align: right; color: var(--info);">${AppData.formatCurrency(s.revenueReal - vat)}</td>
+                                <td style="text-align: right; color: var(--info);">-</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
 
                 <div style="margin-bottom: 2rem;">
-                    <h3 style="border-left: 4px solid var(--rose-light); padding-left: 10px; margin-bottom: 1rem;">II. CHI PHÍ CHUYẾN HÀNG</h3>
+                    <h3 style="border-left: 4px solid var(--rose-light); padding-left: 10px; margin-bottom: 1rem; font-size: 1.1rem; color: var(--rose-light);">II. CHI PHÍ CHUYẾN HÀNG</h3>
                     <table class="table" style="background: rgba(255,255,255,0.02);">
-                        <tr><td>1. Nhiên liệu DO</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.fuelDO)}</td></tr>
-                        <tr><td>2. Nhiên liệu LO</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.fuelLO || 0)}</td></tr>
-                        <tr><td>3. Đại lý 2 đầu cảng</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.agent || 0)}</td></tr>
-                        <tr><td>4. Tàu chi 2 đầu cảng</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.vessel2ends || 0)}</td></tr>
-                        <tr><td>5. Phí cảng, Tàu lai, Hoa tiêu</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.portFees || 0)}</td></tr>
-                        <tr><td>6. Tiền Bông</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.brokerage || 0)}</td></tr>
-                        <tr><td>7. Lương thuyền viên (Phân bổ)</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.crewSalary)}</td></tr>
-                        <tr><td>8. Tiền ăn thuyền viên (Phân bổ)</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.crewFood)}</td></tr>
-                        <tr><td>9. Bảo hiểm (Phân bổ)</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.crewInsurance || 0)}</td></tr>
-                        <tr><td>10. Vật tư, sửa chữa Cty cấp (Phân bổ)</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.materialCompany || 0)}</td></tr>
-                        <tr><td>11. Vật tư, sửa chữa Tàu chi (Phân bổ)</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.materialVessel || 0)}</td></tr>
-                        <tr><td>12. Lãi vay (Phân bổ)</td><td style="text-align: right; color: var(--warning);">${AppData.formatCurrency(s.costs.loanInterest || 0)}</td></tr>
-                        <tr><td>13. Phân bổ chi phí khác từ Cty</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.monthlyOther || 0)}</td></tr>
-                        <tr><td>14. Chi phí khác tàu chi tại chuyến</td><td style="text-align: right;">${AppData.formatCurrency(s.costs.others || 0)}</td></tr>
-                        <tr style="font-weight: bold; background: rgba(255,0,100,0.05);">
-                            <td>TỔNG CHI PHÍ</td>
-                            <td style="text-align: right; color: var(--rose-light);">${AppData.formatCurrency(costSum)}</td>
-                        </tr>
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); opacity: 0.8; font-size: 0.85rem;">
+                                <th>Khoản mục chi phí</th>
+                                <th style="text-align: right;">Số tiền</th>
+                                <th style="text-align: right; width: 80px;">Tỷ lệ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${costRow('1. Nhiên liệu DO', fuelDO)}
+                            ${costRow('2. Nhiên liệu LO', fuelLO)}
+                            ${costRow('3. Đại lý 2 đầu cảng', agent)}
+                            ${costRow('4. Tàu chi 2 đầu cảng', vessel2ends)}
+                            ${costRow('5. Phí cảng, Tàu lai, Hoa tiêu', portFees)}
+                            ${costRow('6. Tiền Bông', brokerage)}
+                            ${costRow('7. Lương thuyền viên (Phân bổ)', crewSalary)}
+                            ${costRow('8. Tiền ăn thuyền viên (Phân bổ)', crewFood)}
+                            ${costRow('9. Bảo hiểm (Phân bổ)', crewInsurance)}
+                            ${costRow('10. Vật tư, sửa chữa Cty cấp (Phân bổ)', materialCompany)}
+                            ${costRow('11. Vật tư, sửa chữa Tàu chi (Phân bổ)', materialVessel)}
+                            ${costRow('12. Lãi vay ngân hàng (Phân bổ)', loanInterest)}
+                            ${costRow('12b. Lãi vay ngoài (Phân bổ)', loanInterestExternal)}
+                            ${costRow('13. Phân bổ chi phí khác từ Cty', monthlyOther)}
+                            ${costRow('14. Chi phí khác tàu chi tại chuyến', others)}
+                            ${costRow('15. Khấu hao tài sản (Phân bổ)', depreciation)}
+                            ${costRow('16. Bảo hiểm thân vỏ (Phân bổ)', hullInsurance)}
+                            ${costRow('17. Lên đà trung gian (Phân bổ)', dockingIntermediate)}
+                            ${costRow('18. Lên đà định kỳ (Phân bổ)', dockingPeriodic)}
+                            ${costRow('19. Đăng kiểm hàng năm (Phân bổ)', registryAnnual)}
+                            <tr style="font-weight: bold; background: rgba(255,0,100,0.05); border-top: 1px solid var(--border-color);">
+                                <td>TỔNG CHI PHÍ</td>
+                                <td style="text-align: right; color: var(--rose-light);">${AppData.formatCurrency(costSum)}</td>
+                                <td style="text-align: right; color: var(--rose-light);">100.0%</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
 
-                <div style="background: var(--primary-dark); padding: 1.5rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--primary-light);">
-                    <h2 style="margin: 0;">III. LỢI NHUẬN RÒNG</h2>
-                    <h2 style="margin: 0; color: ${profit >= 0 ? 'var(--secondary)' : 'var(--rose-light)'};">${AppData.formatCurrency(profit)}</h2>
+                <div style="background: var(--primary-dark); padding: 1.5rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--primary-light); margin-bottom: 2rem;">
+                    <h2 style="margin: 0; font-size: 1.25rem;">III. LỢI NHUẬN RÒNG</h2>
+                    <h2 style="margin: 0; font-size: 1.25rem; color: ${profit >= 0 ? 'var(--secondary)' : 'var(--rose-light)'};">${AppData.formatCurrency(profit)}</h2>
+                </div>
+
+                <div style="margin-bottom: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                    <h3 style="border-left: 4px solid var(--warning); padding-left: 10px; margin-bottom: 1rem; font-size: 1.1rem; color: var(--warning);">IV. PHÂN TÍCH & SO SÁNH CHI PHÍ</h3>
+                    
+                    <div style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid var(--warning);">
+                        <h4 style="margin: 0 0 0.5rem 0; color: var(--warning);">Hạng mục chiếm tỷ trọng cao nhất:</h4>
+                        <p style="margin: 0; font-size: 0.95rem;">• Chi phí <strong>${topCost.label}</strong> đang chiếm tỷ trọng lớn nhất với <strong>${AppData.formatCurrency(topCost.value)}</strong>, chiếm tới <strong>${topCostPct}%</strong> tổng chi phí chuyến.</p>
+                    </div>
+
+                    ${sameVesselCompareHTML}
+
+                    ${sameRouteCompareHTML}
                 </div>
                 
-                <div style="margin-top: 2rem; text-align: center;">
-                    <button class="btn btn-outline" onclick="app.closeModal('report-modal')">Đóng Báo Cáo</button>
+                <div style="margin-top: 2rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                    <button class="btn btn-outline" onclick="app.closeModal('report-modal')" style="margin-right: 10px;">Đóng Báo Cáo</button>
                     <button class="btn btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> In Báo Cáo</button>
                 </div>
             </div>
@@ -2626,10 +3320,420 @@ const Views = {
         `;
     },
 
-    reports: (currentTab = 'voyage', filterMonth = '') => {
+    reports: (currentTab = 'voyage', filterMonth = '', filterVessel = '', filterVesselMonthly = '', filterMonthMonthly = '') => {
         let content = '';
 
-        if (currentTab === 'fuel') {
+        if (currentTab === 'monthly') {
+            // === BÁO CÁO THÁNG (DOANH THU - CHI PHÍ TÀU) ===
+            const vessels = AppData.getVessels();
+            const firstVesselId = vessels[0] ? vessels[0].id : '';
+
+            // Build available months from shipments
+            const ships = AppData.getShipments();
+            const monthsSet = new Set();
+            ships.forEach(s => {
+                const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                if (m) monthsSet.add(m);
+            });
+            const availableMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+
+            // Defaults
+            if (!filterVesselMonthly && firstVesselId) filterVesselMonthly = firstVesselId;
+            if (!filterMonthMonthly && availableMonths.length > 0) filterMonthMonthly = availableMonths[0];
+
+            const fvm = filterVesselMonthly;
+            const fmm = filterMonthMonthly;
+
+            let reportHTML = '';
+
+            if (fvm && fmm) {
+                const vessel = AppData.getVessel(fvm);
+                const vesselName = vessel ? vessel.name : fvm;
+                const [year, month] = fmm.split('-').map(Number);
+
+                // Shipments for vessel/month
+                const shipments = ships.filter(s => {
+                    const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                    return s.vesselId === fvm && m === fmm;
+                }).sort((a, b) => (a.voyageNo || '').localeCompare(b.voyageNo || ''));
+
+                // Transactions
+                const txs = (AppData.state.transactions || []).filter(t => t.vessel === fvm && t.date && t.date.substring(0, 7) === fmm);
+
+                // DO cost
+                const doCost = AppData.state.fuelVoyages.filter(v => v.vesselId === fvm && v.fuelDate && v.fuelDate.substring(0, 7) === fmm)
+                    .reduce((sum, v) => sum + Math.round((Number(v.addedFuel) || 0) * (Number(v.fuelUnitPrice) || 0)), 0);
+
+                // LO cost
+                const loCost = (AppData.state.loSupplies || []).filter(s => s.vesselId === fvm && s.date && s.date.substring(0, 7) === fmm)
+                    .reduce((sum, s) => sum + Math.round((Number(s.qty) || 0) * (Number(s.price) || 0)), 0);
+
+                // Tàu ứng chi phí
+                const vesselAdvanceTxs = txs.filter(t => t.category === '1.Tàu ứng');
+                const vesselAdvances = vesselAdvanceTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+                // Lương
+                const monthlyCost = AppData.getMonthlyCosts(fmm, fvm);
+                const crewSalary = monthlyCost.salary || 0;
+
+                // Lãi vay
+                const interestTxs = txs.filter(t => t.category === '6.Lãi Vay' || t.category === '6.Lại Vay');
+                const totalInterest = interestTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+                // Chi phí cảng
+                const agentTxs = txs.filter(t => t.category === '2.Chi Phí Cảng');
+                const totalAgent = agentTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+                // Vật tư
+                const materialTxs = txs.filter(t => t.category === '9.Vật Tư');
+                const totalMaterial = materialTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+
+                // Bảo hiểm
+                const daysInMonth = new Date(year, month, 0).getDate();
+                const annualConfig = AppData.getAnnualCosts(year, fvm);
+                const hullInsurance = Math.round(daysInMonth * (annualConfig.hullInsuranceDaily || 0));
+                const socialInsurance = monthlyCost.insurance || 0;
+                const totalInsurance = hullInsurance + socialInsurance;
+
+                // VAT từ chuyến (tính tự động)
+                const autoVat = shipments.reduce((sum, s) => sum + (Number(s.costs?.vat) || 0), 0);
+
+                // Inputs lưu trữ (dư đầu tháng, chi phí văn phòng, VAT tùy chỉnh)
+                const inputs = app.getMonthlyVesselReportInputs(fvm, fmm);
+                const openingBalance = Number(inputs.openingBalance) || 0;
+                let customTotal = 0;
+                inputs.customExpenses.forEach(exp => { customTotal += Number(exp.amount) || 0; });
+
+                // Doanh thu
+                const totalRevenueSum = shipments.reduce((sum, s) => {
+                    let sTotal = Number(s.revenueReal || 0);
+                    if (s.revenueInvoice > s.revenueReal) {
+                        sTotal += Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * 0.28);
+                    }
+                    return sum + sTotal;
+                }, 0);
+
+                const vatForCost = autoVat;
+                const totalCostSum = doCost + loCost + vesselAdvances + crewSalary + totalInterest + totalAgent + totalMaterial + totalInsurance + vatForCost + customTotal;
+                const finalBalance = openingBalance + totalRevenueSum - totalCostSum;
+
+                reportHTML = `
+                    <div id="monthly-report-inline" class="glass-card" style="padding: 0; overflow: hidden;">
+                        <!-- Action bar -->
+                        <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: rgba(255,255,255,0.03);">
+                            <strong style="color: var(--primary-light); font-size: 1rem;"><i class="fa-solid fa-file-invoice-dollar"></i> Bảng theo dõi Doanh thu - Chi phí Tháng ${month}/${year} - Tàu ${vesselName}</strong>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-outline" style="border-color: #10b981; color: #10b981;" onclick="app.exportMonthlyVesselReport('${fvm}', '${fmm}')">
+                                    <i class="fa-solid fa-file-excel"></i> Xuất Excel
+                                </button>
+                                <button class="btn btn-primary" onclick="window.print()">
+                                    <i class="fa-solid fa-print"></i> In báo cáo
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print header -->
+                        <div class="print-header" style="padding: 1.5rem 1.5rem 0.5rem; text-align: center;">
+                            <h2 style="font-size: 1.1rem; font-weight: 900; text-transform: uppercase; margin: 0;">BẢNG THEO DÕI DOANH THU - CHI PHÍ TÀU ${vesselName.toUpperCase()}</h2>
+                            <h3 style="font-size: 1rem; font-weight: 700; margin: 4px 0 0;">THÁNG ${month}/${year}</h3>
+                        </div>
+
+                        <div style="padding: 1rem 1.5rem 1.5rem; overflow-x: auto;"
+                             data-do-cost="${doCost}"
+                             data-lo-cost="${loCost}"
+                             data-advances="${vesselAdvances}"
+                             data-salary="${crewSalary}"
+                             data-interest="${totalInterest}"
+                             data-agent="${totalAgent}"
+                             data-material="${totalMaterial}"
+                             data-insurance="${totalInsurance}"
+                             data-vat="${vatForCost}"
+                             data-revenue="${totalRevenueSum}"
+                             id="monthly-report-data">
+                            <table class="report-print-table" style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                                <thead>
+                                    <tr style="background: #2d3a4a; color: #e2e8f0; font-weight: bold;">
+                                        <th style="width: 50px; text-align: center; padding: 8px 4px; border: 1px solid #4a5568;">STT</th>
+                                        <th style="padding: 8px; border: 1px solid #4a5568;">CHI TIẾT HẠNG MỤC</th>
+                                        <th style="text-align: right; width: 130px; padding: 8px; border: 1px solid #4a5568;">DƯ ĐẦU THÁNG</th>
+                                        <th style="text-align: right; width: 130px; padding: 8px; border: 1px solid #4a5568;">DOANH THU</th>
+                                        <th style="text-align: right; width: 130px; padding: 8px; border: 1px solid #4a5568;">CHI PHÍ</th>
+                                        <th style="text-align: right; width: 130px; padding: 8px; border: 1px solid #4a5568;">TỒN CUỐI THÁNG</th>
+                                        <th style="width: 100px; text-align: center; padding: 8px; border: 1px solid #4a5568;">GHI CHÚ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dư đầu tháng -->
+                                    <tr style="background: rgba(148,163,184,0.15); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Tồn tháng trước chuyển sang</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568;">
+                                            <input type="number" id="mi-rep-opening" class="print-input print-input-amount"
+                                                value="${openingBalance}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; background:transparent; border:none; color:inherit; font-size:inherit;">
+                                        </td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+
+                                    <!-- DOANH THU CHUYẾN -->
+                                    ${shipments.map((s, idx) => {
+                                        const qtyStr = Math.round(Number(s.qty || 0)).toLocaleString('en-US');
+                                        const rateStr = Math.round(Number(s.rate || 0)).toLocaleString('en-US');
+                                        const details = `HĐ ${s.contractNo || ''} ${vesselName} ${s.portLoad || ''} - ${s.portDischarge || ''} (${s.customer || ''}) ${qtyStr} * ${rateStr}`;
+                                        let vatRow = '';
+                                        if (s.revenueInvoice > s.revenueReal) {
+                                            const vatAmt = Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * 0.28);
+                                            vatRow = `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                                <td style="text-align: center; padding: 6px 4px; border: 1px solid #4a5568;"></td>
+                                                <td style="padding: 6px 8px 6px 24px; border: 1px solid #4a5568; color: #94a3b8;">VAT tính thêm chuyến này</td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                                <td style="text-align: right; padding: 6px 8px; border: 1px solid #4a5568; color: #10b981; font-weight: 500;">${AppData.formatCurrency(vatAmt)}</td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                            </tr>`;
+                                        }
+                                        return `
+                                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                                <td style="text-align: center; padding: 6px 4px; border: 1px solid #4a5568; font-weight: bold;">${s.voyageNo || (idx+1)}</td>
+                                                <td style="padding: 6px 8px; border: 1px solid #4a5568; font-weight: 500;">${details}</td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                                <td style="text-align: right; padding: 6px 8px; border: 1px solid #4a5568; color: #10b981; font-weight: bold;">${AppData.formatCurrency(s.revenueReal)}</td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                                <td style="border: 1px solid #4a5568;"></td>
+                                            </tr>${vatRow}`;
+                                    }).join('')}
+
+                                    <!-- DẦU DO -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold; border-top: 1px solid #4a5568;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Dầu DO</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(doCost)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+
+                                    <!-- DẦU LO -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Dầu LO</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(loCost)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+
+                                    <!-- TÀU CHI -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Tàu chi (Tiền ứng trong tháng)</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(vesselAdvances)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+
+                                    <!-- LƯƠNG -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Lương</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(crewSalary)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+
+                                    <!-- LÃI VAY -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Lãi vay (Trong và ngoài ngân hàng)</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalInterest)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+                                    ${interestTxs.map(t => `
+                                        <tr>
+                                            <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;"></td>
+                                            <td style="padding: 5px 8px 5px 24px; border: 1px solid #4a5568; color: #94a3b8;">${t.content || 'Lãi vay'}</td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568;">${AppData.formatCurrency(t.chi)}</td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                        </tr>`).join('')}
+
+                                    <!-- CHI PHÍ CẢNG -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Chi phí cảng</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalAgent)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+                                    ${agentTxs.map(t => `
+                                        <tr>
+                                            <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;"></td>
+                                            <td style="padding: 5px 8px 5px 24px; border: 1px solid #4a5568; color: #94a3b8;">+ ${t.content || 'Chi phí cảng'}</td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568;">${AppData.formatCurrency(t.chi)}</td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                        </tr>`).join('')}
+
+                                    <!-- VẬT TƯ -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Vật tư</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalMaterial)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+                                    ${materialTxs.map(t => `
+                                        <tr>
+                                            <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;"></td>
+                                            <td style="padding: 5px 8px 5px 24px; border: 1px solid #4a5568; color: #94a3b8;">${t.content || 'Vật tư'}</td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568;">${AppData.formatCurrency(t.chi)}</td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                        </tr>`).join('')}
+
+                                    <!-- BẢO HIỂM -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">Bảo hiểm</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalInsurance)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 5px 8px 5px 24px; border: 1px solid #4a5568; color: #94a3b8;">Bảo hiểm tàu (Phân bổ tháng - ${daysInMonth} ngày)</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568;">${AppData.formatCurrency(hullInsurance)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 5px 8px 5px 24px; border: 1px solid #4a5568; color: #94a3b8;">Bảo hiểm xã hội tháng</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568;">${AppData.formatCurrency(socialInsurance)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+
+                                    <!-- VAT -->
+                                    <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="padding: 7px 8px; border: 1px solid #4a5568;">VAT (các chuyến phát sinh trong tháng)</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;" id="mi-rep-vat-display">${AppData.formatCurrency(vatForCost)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+                                </tbody>
+
+                                <!-- Chi phí văn phòng / tự nhập -->
+                                <tbody id="mi-rep-custom-body">
+                                    <tr style="background: rgba(100,116,139,0.2); border-top: 2px solid #64748b;">
+                                        <td colspan="7" style="font-weight: bold; padding: 7px 8px; border: 1px solid #4a5568;">Chi phí văn phòng và các chi phí khác:</td>
+                                    </tr>
+                                    ${inputs.customExpenses.map((exp, expIdx) => `
+                                        <tr class="mi-custom-expense-row">
+                                            <td style="text-align: center; padding: 6px 4px; border: 1px solid #4a5568;">
+                                                <button class="btn-delete-row no-print" style="background:none;border:none;cursor:pointer;color:#f87171;" onclick="app.deleteMICustomRow(this)"><i class="fa-solid fa-trash"></i></button>
+                                            </td>
+                                            <td style="padding: 6px 8px 6px 24px; border: 1px solid #4a5568; color: #94a3b8;">
+                                                <input type="text" class="mi-custom-desc" value="${exp.desc || ''}" placeholder="Nhập tên chi phí..." oninput="app.recalcInlineMonthlyReport()" style="width:100%;background:transparent;border:none;color:inherit;font-size:inherit;">
+                                            </td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="text-align: right; padding: 6px 8px; border: 1px solid #4a5568; color: #f87171;">
+                                                <input type="number" class="mi-custom-amount" value="${exp.amount || 0}" oninput="app.recalcInlineMonthlyReport()" style="text-align:right;width:100%;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:bold;">
+                                            </td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                            <td style="border: 1px solid #4a5568;"></td>
+                                        </tr>`).join('')}
+                                </tbody>
+
+                                <tbody>
+                                    <!-- Add row button -->
+                                    <tr class="no-print">
+                                        <td colspan="7" style="border: 1px solid #4a5568; padding: 6px 8px; background: rgba(0,0,0,0.1);">
+                                            <button class="btn btn-outline" style="padding: 0.3rem 0.6rem; font-size: 0.82rem;" onclick="app.addMICustomRow()">
+                                                <i class="fa-solid fa-plus"></i> Thêm chi phí văn phòng / khác
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- TỔNG CỘNG -->
+                                    <tr style="background: #2d3a4a; font-weight: bold; font-size: 1rem; border-top: 2px solid #64748b;">
+                                        <td style="text-align: center; padding: 10px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 10px 8px; border: 1px solid #4a5568; color: #e2e8f0; font-size: 1.05rem;">Cộng</td>
+                                        <td style="text-align: right; padding: 10px 8px; border: 1px solid #4a5568; color: #60a5fa;" id="mi-rep-total-opening">${AppData.formatCurrency(openingBalance)}</td>
+                                        <td style="text-align: right; padding: 10px 8px; border: 1px solid #4a5568; color: #10b981;" id="mi-rep-total-revenue">${AppData.formatCurrency(totalRevenueSum)}</td>
+                                        <td style="text-align: right; padding: 10px 8px; border: 1px solid #4a5568; color: #f87171;" id="mi-rep-total-cost">${AppData.formatCurrency(totalCostSum)}</td>
+                                        <td style="text-align: right; padding: 10px 8px; border: 1px solid #4a5568; color: #34d399; font-size: 1.1rem;" id="mi-rep-total-balance">${AppData.formatCurrency(finalBalance)}</td>
+                                        <td style="border: 1px solid #4a5568;"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <div style="margin-top: 2rem; text-align: right; font-style: italic; font-size: 0.85rem; color: #94a3b8;">
+                                Lập ngày ${String(new Date().getDate()).padStart(2, '0')}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                reportHTML = `<p style="text-align:center; color:var(--text-muted); padding: 2rem;">Vui lòng chọn tàu và tháng để xem báo cáo.</p>`;
+            }
+
+            content = `
+                <div class="glass-card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;">
+                        <div class="form-group" style="margin: 0; width: 180px;">
+                            <label class="form-label" style="margin-bottom: 0.25rem;">Chọn Tàu</label>
+                            <select class="form-control" style="width: 100%;" onchange="app.navigate('reports', 'monthly', '', '', this.value, '${fmm}')">
+                                ${vessels.map(v => `<option value="${v.id}" ${v.id === fvm ? 'selected' : ''}>${v.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0; width: 180px;">
+                            <label class="form-label" style="margin-bottom: 0.25rem;">Tháng hạch toán</label>
+                            <select class="form-control" style="width: 100%;" onchange="app.navigate('reports', 'monthly', '', '', '${fvm}', this.value)">
+                                <option value="">-- Chọn tháng --</option>
+                                ${availableMonths.map(m => `<option value="${m}" ${m === fmm ? 'selected' : ''}>Tháng ${m.split('-')[1]}/${m.split('-')[0]}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                ${reportHTML}
+            `;
+        } else if (currentTab === 'fuel') {
             const supplierDebts = AppData.getSupplierDebts();
             
             // Extract all purchases with their allocated payments
@@ -2773,7 +3877,9 @@ const Views = {
 
             const monthShips = ships.filter(s => {
                 const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
-                return m === filterMonth;
+                const matchesMonth = m === filterMonth;
+                const matchesVessel = !filterVessel || s.vesselId === filterVessel;
+                return matchesMonth && matchesVessel;
             }).sort((a, b) => {
                 const numA = parseInt((a.contractNo || '').replace(/\D/g, '')) || 0;
                 const numB = parseInt((b.contractNo || '').replace(/\D/g, '')) || 0;
@@ -2784,15 +3890,35 @@ const Views = {
 
             content = `
                 <div class="glass-card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <label style="font-weight: bold; color: var(--text-main);">Lọc theo tháng hạch toán:</label>
-                            <select class="form-control" style="width: 200px;" onchange="app.navigate('reports', 'voyage', this.value)">
-                                <option value="">-- Chọn tháng --</option>
-                                ${availableMonths.map(m => `<option value="${m}" ${m === filterMonth ? 'selected' : ''}>Tháng ${m.split('-')[1]}/${m.split('-')[0]}</option>`).join('')}
-                            </select>
+                    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;">
+                            <div class="form-group" style="margin: 0; width: 180px;">
+                                <label class="form-label" style="margin-bottom: 0.25rem;">Tháng hạch toán</label>
+                                <select class="form-control" style="width: 100%;" onchange="app.navigate('reports', 'voyage', this.value, '${filterVessel}')">
+                                    <option value="">-- Chọn tháng --</option>
+                                    ${availableMonths.map(m => `<option value="${m}" ${m === filterMonth ? 'selected' : ''}>Tháng ${m.split('-')[1]}/${m.split('-')[0]}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0; width: 180px;">
+                                <label class="form-label" style="margin-bottom: 0.25rem;">Chọn Tàu</label>
+                                <select class="form-control" style="width: 100%;" onchange="app.navigate('reports', 'voyage', '${filterMonth}', this.value)">
+                                    <option value="">-- Tất cả tàu --</option>
+                                    ${AppData.getVessels().map(v => `<option value="${v.id}" ${v.id === filterVessel ? 'selected' : ''}>${v.name}</option>`).join('')}
+                                </select>
+                            </div>
                         </div>
-                        <button class="btn btn-outline" onclick="app.exportShipmentReport()"><i class="fa-solid fa-file-excel"></i> Xuất Excel Tất Cả</button>
+                        
+                        <div style="display: flex; gap: 8px; align-items: flex-end; padding-top: 1.5rem;">
+                            ${(filterVessel && filterMonth) ? `
+                                <button class="btn btn-outline" style="border-color: var(--info); color: var(--info); font-weight: 600;" onclick="app.printMonthlyVesselReport('${filterVessel}', '${filterMonth}', false)">
+                                    <i class="fa-solid fa-file-invoice"></i> Xem Báo Cáo Tháng
+                                </button>
+                                <button class="btn btn-primary" style="font-weight: 600;" onclick="app.printMonthlyVesselReport('${filterVessel}', '${filterMonth}', true)">
+                                    <i class="fa-solid fa-print"></i> In Báo Cáo Tháng
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-outline" onclick="app.exportShipmentReport()"><i class="fa-solid fa-file-excel"></i> Xuất Excel Tất Cả</button>
+                        </div>
                     </div>
                 </div>
 
@@ -2812,6 +3938,7 @@ const Views = {
                                     <th style="text-align: right;">Doanh thu (VNĐ)</th>
                                     <th style="text-align: right;">Tổng chi phí (VNĐ)</th>
                                     <th style="text-align: right;">Lợi nhuận (VNĐ)</th>
+                                    <th style="width: 100px; text-align: center;">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2821,6 +3948,11 @@ const Views = {
                                     const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
                                     const baseCosts = { ...s.costs };
                                     delete baseCosts.vat; // Tránh cộng dồn
+                                    if (app.excludeDockingDepreciation) {
+                                        delete baseCosts.dockingIntermediate;
+                                        delete baseCosts.dockingPeriodic;
+                                        delete baseCosts.depreciation;
+                                    }
                                     const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
                                     
                                     const profit = rev - costSum;
@@ -2839,6 +3971,12 @@ const Views = {
                                             <td style="text-align: right; color: var(--secondary);">${AppData.formatCurrency(rev)}</td>
                                             <td style="text-align: right; color: var(--rose-light);">${AppData.formatCurrency(costSum)}</td>
                                             <td style="text-align: right;" class="${profit >= 0 ? 'value-positive' : 'value-negative'}"><strong>${AppData.formatCurrency(profit)}</strong></td>
+                                            <td>
+                                                <div style="display: flex; gap: 4px; justify-content: center;">
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.4rem;" title="Xem Báo Cáo" onclick="app.openShipmentReport('${s.id}')"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--success)"></i></button>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.4rem;" title="In Báo Cáo" onclick="app.printShipmentReportDirectly('${s.id}')"><i class="fa-solid fa-print" style="color:var(--primary-light)"></i></button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     `;
                                 }).join('')}
@@ -2847,6 +3985,7 @@ const Views = {
                                     <td style="text-align: right; color: var(--secondary); font-size: 1.1rem;">${AppData.formatCurrency(totalRev)}</td>
                                     <td style="text-align: right; color: var(--rose-light); font-size: 1.1rem;">${AppData.formatCurrency(totalCost)}</td>
                                     <td style="text-align: right; font-size: 1.1rem;" class="${totalProfit >= 0 ? 'value-positive' : 'value-negative'}">${AppData.formatCurrency(totalProfit)}</td>
+                                    <td></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -2866,15 +4005,188 @@ const Views = {
                 </div>
 
                 <div style="display:flex; gap:1rem; border-bottom:1px solid var(--border-color); margin-bottom:1.5rem;">
-                    <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'voyage' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'voyage' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'voyage')">
+                    <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'voyage' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'voyage' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'voyage', '${filterMonth}', '${filterVessel}')">
                         <i class="fa-solid fa-route"></i> Báo cáo Chuyến hàng
                     </button>
-                    <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'fuel' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'fuel' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'fuel')">
+                    <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'fuel' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'fuel' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'fuel', '${filterMonth}')">
                         <i class="fa-solid fa-gas-pump"></i> Bảng Theo Dõi Cấp DO
+                    </button>
+                    <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'monthly' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'monthly' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'monthly', '', '', '', '')">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> Báo cáo Tháng
                     </button>
                 </div>
 
                 ${content}
+            </div>
+        `;
+    },
+
+    'annual-costs': () => {
+        const vessels = AppData.getVessels();
+        const firstVesselId = vessels[0] ? vessels[0].id : '';
+        const currentYear = new Date().getFullYear();
+        
+        // Find configuration for pre-filling or default
+        const activeVesselId = app.annualCostsVesselId || firstVesselId;
+        const activeYear = Number(app.annualCostsYear || currentYear);
+        const config = AppData.getAnnualCosts(activeYear, activeVesselId);
+        
+        // Build docking and registration schedule alerts for all vessels
+        const reminders = [];
+        vessels.forEach(v => {
+            // Get config for the selected year for this vessel
+            const vConfig = AppData.getAnnualCosts(activeYear, v.id);
+            
+            const getReminderInfo = (dateStr, label) => {
+                if (!dateStr) return null;
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const target = new Date(dateStr);
+                if (isNaN(target.getTime())) return null; // Crash protection for invalid dates
+                target.setHours(0,0,0,0);
+                const diffTime = target - today;
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                
+                let badgeClass = 'badge-success';
+                let text = `Còn ${diffDays} ngày`;
+                let style = 'border-left: 4px solid var(--secondary); background: rgba(0, 255, 100, 0.02);';
+                
+                if (diffDays < 0) {
+                    badgeClass = 'badge-danger';
+                    text = `Quá hạn ${Math.abs(diffDays)} ngày`;
+                    style = 'border-left: 4px solid var(--rose-light); background: rgba(244, 63, 94, 0.05);';
+                } else if (diffDays <= 30) {
+                    badgeClass = 'badge-warning';
+                    text = `Còn ${diffDays} ngày`;
+                    style = 'border-left: 4px solid var(--warning); background: rgba(245, 158, 11, 0.05);';
+                }
+                
+                return {
+                    vesselId: v.id,
+                    vesselName: v.name,
+                    label,
+                    date: target.toLocaleDateString('vi-VN'),
+                    text,
+                    badgeClass,
+                    style,
+                    diffDays
+                };
+            };
+            
+            const r1 = getReminderInfo(vConfig.dockingIntermediateDate, 'Lên đà trung gian');
+            const r2 = getReminderInfo(vConfig.dockingPeriodicDate, 'Lên đà định kỳ');
+            const r3 = getReminderInfo(vConfig.registryAnnualDate, 'Đăng kiểm hàng năm');
+            
+            if (r1) reminders.push(r1);
+            if (r2) reminders.push(r2);
+            if (r3) reminders.push(r3);
+        });
+        
+        reminders.sort((a, b) => a.diffDays - b.diffDays);
+        
+        const remindersHtml = reminders.length === 0 
+            ? `<div style="text-align:center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-bell-slash" style="font-size:2rem; margin-bottom:10px; display:block; opacity:0.5;"></i>Chưa cấu hình lịch lên đà / đăng kiểm.</div>`
+            : reminders.map(r => `
+                <div class="glass-panel" style="padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; ${r.style} display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.05);">
+                    <div>
+                        <strong style="color: var(--primary-light); font-size: 0.95rem;">${r.vesselName} (${r.vesselId})</strong>
+                        <div style="font-size: 0.85rem; opacity: 0.8; margin-top: 4px;">${r.label}: <strong>${r.date}</strong></div>
+                    </div>
+                    <span class="badge ${r.badgeClass}" style="font-size: 0.8rem; padding: 4px 8px; border-radius: 4px;">${r.text}</span>
+                </div>
+            `).join('');
+            
+        return `
+            <div class="view-section">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Chi phí Hàng năm & Lịch lên đà</h1>
+                        <p class="page-subtitle">Nhập liệu chi phí cố định theo năm và theo dõi hạn đăng kiểm, lên đà của đội tàu</p>
+                    </div>
+                </div>
+                
+                <div class="grid-2" style="grid-template-columns: 1.1fr 1.9fr; gap: 1.5rem; align-items: start;">
+                    <!-- Left: Docking & Registry Schedule -->
+                    <div>
+                        <div class="glass-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+                            <h3 style="color: var(--accent); margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-bell"></i> Lịch lên đà & Đăng kiểm nhắc nhở
+                            </h3>
+                            <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
+                                ${remindersHtml}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right: Configuration inputs -->
+                    <div class="glass-card" style="padding: 1.5rem;">
+                        <h3 style="color: var(--info); margin: 0 0 1.25rem 0; font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-sliders"></i> Thiết lập cấu hình Chi phí Phân bổ Hàng năm
+                        </h3>
+                        <form onsubmit="event.preventDefault(); app.saveAnnualCosts();">
+                            <div class="grid-2" style="margin-bottom: 1.25rem;">
+                                <div class="form-group">
+                                    <label class="form-label">Chọn năm</label>
+                                    <select class="form-control" id="a-year" onchange="app.loadAnnualCosts()">
+                                        ${[2025, 2026, 2027, 2028, 2029, 2030].map(y => `<option value="${y}" ${y === activeYear ? 'selected' : ''}>Năm ${y}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Chọn tàu</label>
+                                    <select class="form-control" id="a-vessel" onchange="app.loadAnnualCosts()">
+                                        ${vessels.map(v => `<option value="${v.id}" ${v.id === activeVesselId ? 'selected' : ''}>${v.id} - ${v.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Intermediate Docking Section -->
+                            <div style="border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; background: rgba(0,0,0,0.15);">
+                                <h4 style="margin: 0 0 0.75rem 0; color: var(--secondary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-ship"></i> 1. Lên đà trung gian
+                                </h4>
+                                <div class="grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Chi phí (VNĐ)</label><input type="number" class="form-control" id="a-docking-int-cost" value="${config.dockingIntermediateCost || 0}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Năm phân bổ</label><input type="number" step="any" class="form-control" id="a-docking-int-years" value="${config.dockingIntermediateYears || 2.5}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Ngày lên đà tiếp</label><input type="date" class="form-control" id="a-docking-int-date" value="${config.dockingIntermediateDate || ''}"></div>
+                                </div>
+                            </div>
+
+                            <!-- Periodic Docking Section -->
+                            <div style="border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; background: rgba(0,0,0,0.15);">
+                                <h4 style="margin: 0 0 0.75rem 0; color: var(--secondary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-anchor"></i> 2. Lên đà định kỳ
+                                </h4>
+                                <div class="grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Chi phí (VNĐ)</label><input type="number" class="form-control" id="a-docking-per-cost" value="${config.dockingPeriodicCost || 0}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Năm phân bổ</label><input type="number" step="any" class="form-control" id="a-docking-per-years" value="${config.dockingPeriodicYears || 5}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Ngày lên đà tiếp</label><input type="date" class="form-control" id="a-docking-per-date" value="${config.dockingPeriodicDate || ''}"></div>
+                                </div>
+                            </div>
+
+                            <!-- Annual Registry Section -->
+                            <div style="border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; background: rgba(0,0,0,0.15);">
+                                <h4 style="margin: 0 0 0.75rem 0; color: var(--secondary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-file-shield"></i> 3. Đăng kiểm hàng năm
+                                </h4>
+                                <div class="grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Chi phí (VNĐ)</label><input type="number" class="form-control" id="a-registry-ann-cost" value="${config.registryAnnualCost || 0}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Năm phân bổ</label><input type="number" step="any" class="form-control" id="a-registry-ann-years" value="${config.registryAnnualYears || 1}"></div>
+                                    <div class="form-group" style="margin:0;"><label class="form-label">Ngày đăng kiểm tiếp</label><input type="date" class="form-control" id="a-registry-ann-date" value="${config.registryAnnualDate || ''}"></div>
+                                </div>
+                            </div>
+
+                            <!-- Depreciation and Hull Insurance Section -->
+                            <div class="grid-2" style="margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                <div class="form-group" style="margin:0;"><label class="form-label"><i class="fa-solid fa-chart-line-down"></i> 4. Khấu hao năm (VNĐ)</label><input type="number" class="form-control" id="a-depreciation-cost" value="${config.depreciationCost || 0}"></div>
+                                <div class="form-group" style="margin:0;"><label class="form-label"><i class="fa-solid fa-shield-halved"></i> 5. Bảo hiểm thân vỏ năm (VNĐ)</label><input type="number" class="form-control" id="a-hull-ins-cost" value="${config.hullInsuranceCost || 0}"></div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" style="width: 100%; font-weight: 700; height: 42px;">
+                                <i class="fa-solid fa-floppy-disk"></i> LƯU CẤU HÌNH & TÍNH PHÂN BỔ LẠI
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         `;
     }

@@ -3,6 +3,9 @@ temp.zip
 temp_01/
 temp_03/
 temp_excel/
+scratch/
+firebase-debug.log
+
 
 # VS Code directory
 .vscode/
