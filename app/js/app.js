@@ -5292,14 +5292,44 @@ const app = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
         }
 
+        // Temporarily expand container to full content width to avoid right-side clipping
+        const savedWidth        = container.style.width;
+        const savedMinWidth     = container.style.minWidth;
+        const savedOverflow     = container.style.overflow;
+        const savedOverflowX    = container.style.overflowX;
+
+        const fullWidth  = container.scrollWidth;
+        const fullHeight = container.scrollHeight;
+
+        container.style.width     = fullWidth  + 'px';
+        container.style.minWidth  = fullWidth  + 'px';
+        container.style.overflow  = 'visible';
+        container.style.overflowX = 'visible';
+
+        // Also make the modal wrapper non-clipping temporarily
+        const modalWrapper = document.querySelector('#report-modal .modal');
+        const savedModalOverflow = modalWrapper ? modalWrapper.style.overflow : null;
+        if (modalWrapper) modalWrapper.style.overflow = 'visible';
+
         html2canvas(container, {
-            scale: 2.5, // High resolution
+            scale: 2.5,
             useCORS: true,
             backgroundColor: '#ffffff',
+            width:  fullWidth,
+            height: fullHeight,
+            windowWidth:  fullWidth  + 200,
+            windowHeight: fullHeight + 200,
             ignoreElements: (element) => {
                 return element.classList.contains('no-print');
             }
         }).then(canvas => {
+            // Restore original styles
+            container.style.width     = savedWidth;
+            container.style.minWidth  = savedMinWidth;
+            container.style.overflow  = savedOverflow;
+            container.style.overflowX = savedOverflowX;
+            if (modalWrapper && savedModalOverflow !== null) modalWrapper.style.overflow = savedModalOverflow;
+
             const link = document.createElement('a');
             link.download = 'Bao_cao_tong_hop_cong_no.png';
             link.href = canvas.toDataURL('image/png');
@@ -5310,6 +5340,13 @@ const app = {
                 btn.innerHTML = originalText;
             }
         }).catch(err => {
+            // Restore on error too
+            container.style.width     = savedWidth;
+            container.style.minWidth  = savedMinWidth;
+            container.style.overflow  = savedOverflow;
+            container.style.overflowX = savedOverflowX;
+            if (modalWrapper && savedModalOverflow !== null) modalWrapper.style.overflow = savedModalOverflow;
+
             console.error('Error generating image:', err);
             alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
             if (btn) {
