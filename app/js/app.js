@@ -2801,6 +2801,11 @@ const app = {
         this.navigate(this.currentView);
     },
 
+    changeFinancialsTab(tab) {
+        this.currentFinancialsTab = tab;
+        this.navigate('financials');
+    },
+
     navigate(viewName, ...args) {
         this.updateHeaderCompanyInfo();
         if (!Views[viewName]) return;
