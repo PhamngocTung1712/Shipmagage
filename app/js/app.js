@@ -5278,7 +5278,7 @@ const app = {
             alert('Thư viện xuất ảnh chưa được tải xong. Vui lòng thử lại sau vài giây.');
             return;
         }
-        
+
         const container = document.querySelector('#report-modal .print-container');
         if (!container) {
             alert('Không tìm thấy nội dung báo cáo để xuất ảnh!');
@@ -5292,68 +5292,67 @@ const app = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
         }
 
-        // Temporarily expand container to full content width to avoid right-side clipping
-        const savedWidth        = container.style.width;
-        const savedMinWidth     = container.style.minWidth;
-        const savedOverflow     = container.style.overflow;
-        const savedOverflowX    = container.style.overflowX;
+        // Clone the container and render it off-screen at a fixed wide width.
+        // This bypasses the mobile viewport constraint (scrollWidth is limited to ~390px on phones).
+        const CAPTURE_WIDTH = 1500;
 
-        const fullWidth  = container.scrollWidth;
-        const fullHeight = container.scrollHeight;
+        const clone = container.cloneNode(true);
 
-        container.style.width     = fullWidth  + 'px';
-        container.style.minWidth  = fullWidth  + 'px';
-        container.style.overflow  = 'visible';
-        container.style.overflowX = 'visible';
+        // Remove action buttons from the clone
+        clone.querySelectorAll('.no-print').forEach(el => el.remove());
 
-        // Also make the modal wrapper non-clipping temporarily
-        const modalWrapper = document.querySelector('#report-modal .modal');
-        const savedModalOverflow = modalWrapper ? modalWrapper.style.overflow : null;
-        if (modalWrapper) modalWrapper.style.overflow = 'visible';
-
-        html2canvas(container, {
-            scale: 2.5,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            width:  fullWidth,
-            height: fullHeight,
-            windowWidth:  fullWidth  + 200,
-            windowHeight: fullHeight + 200,
-            ignoreElements: (element) => {
-                return element.classList.contains('no-print');
-            }
-        }).then(canvas => {
-            // Restore original styles
-            container.style.width     = savedWidth;
-            container.style.minWidth  = savedMinWidth;
-            container.style.overflow  = savedOverflow;
-            container.style.overflowX = savedOverflowX;
-            if (modalWrapper && savedModalOverflow !== null) modalWrapper.style.overflow = savedModalOverflow;
-
-            const link = document.createElement('a');
-            link.download = 'Bao_cao_tong_hop_cong_no.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-            
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }).catch(err => {
-            // Restore on error too
-            container.style.width     = savedWidth;
-            container.style.minWidth  = savedMinWidth;
-            container.style.overflow  = savedOverflow;
-            container.style.overflowX = savedOverflowX;
-            if (modalWrapper && savedModalOverflow !== null) modalWrapper.style.overflow = savedModalOverflow;
-
-            console.error('Error generating image:', err);
-            alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
+        // Position off-screen at full width
+        Object.assign(clone.style, {
+            position:   'fixed',
+            top:        '-99999px',
+            left:       '-99999px',
+            width:      CAPTURE_WIDTH + 'px',
+            minWidth:   CAPTURE_WIDTH + 'px',
+            maxWidth:   'none',
+            overflow:   'visible',
+            background: '#ffffff',
+            color:      '#000000',
+            zIndex:     '-1',
+            padding:    '2rem',
+            boxSizing:  'border-box',
         });
+
+        document.body.appendChild(clone);
+
+        // Allow layout to settle before capturing
+        setTimeout(() => {
+            const cloneH = clone.scrollHeight;
+
+            html2canvas(clone, {
+                scale:        2.5,
+                useCORS:      true,
+                backgroundColor: '#ffffff',
+                width:        CAPTURE_WIDTH,
+                height:       cloneH,
+                windowWidth:  CAPTURE_WIDTH + 100,
+                windowHeight: cloneH + 100,
+            }).then(canvas => {
+                document.body.removeChild(clone);
+
+                const link = document.createElement('a');
+                link.download = 'Bao_cao_tong_hop_cong_no.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }).catch(err => {
+                if (document.body.contains(clone)) document.body.removeChild(clone);
+                console.error('Error generating image:', err);
+                alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            });
+        }, 300);
     },
 
     updateHeaderCompanyInfo() {
