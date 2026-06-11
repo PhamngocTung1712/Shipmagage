@@ -5,7 +5,7 @@
 const Views = {
     dashboard: (filterMonth = '') => {
         const company = AppData.getCompany();
-        const allShips = AppData.getShipments();
+        const allShips = AppData.getShipments().filter(s => s.contractNo && s.contractNo.trim() !== '');
         
         // Thu thập danh sách các năm, quý, tháng có dữ liệu chuyến hàng
         const yearsSet = new Set();
@@ -471,19 +471,49 @@ const Views = {
     },
 
     financials: (selectedMonth = '', selectedVessel = '', selectedCategory = '', selectedPartner = '') => {
-        const trans = AppData.getTransactions();
+        const currentTab = app.currentFinancialsTab || 'general';
+        let tabContent = '';
+        if (currentTab === 'loans') {
+            tabContent = Views.loanTrackingContent();
+        } else {
+            tabContent = Views.financialsGeneralContent(selectedMonth, selectedVessel, selectedCategory, selectedPartner);
+        }
+        
         return `
             <div class="view-section">
                 <div class="page-header">
                     <div>
                         <h1 class="page-title">Theo dõi Tài chính</h1>
-                        <p class="page-subtitle">Quản lý thu chi hàng ngày theo tài khoản</p>
+                        <p class="page-subtitle">Quản lý thu chi và công nợ vay ngân hàng</p>
                     </div>
+                    ${currentTab === 'loans' ? `
+                    <button class="btn btn-primary" onclick="app.openLoanModal()">
+                        <i class="fa-solid fa-plus"></i> Thêm Hợp đồng Vay
+                    </button>
+                    ` : `
                     <button class="btn btn-primary" onclick="app.openTransactionModal()">
                         <i class="fa-solid fa-plus"></i> Thêm Thu/Chi
                     </button>
+                    `}
                 </div>
 
+                <div class="tabs" style="display:flex; gap:10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                    <button class="btn ${currentTab !== 'loans' ? 'btn-primary' : 'btn-outline'}" onclick="app.changeFinancialsTab('general')">
+                        <i class="fa-solid fa-chart-line"></i> Tổng quan & Dòng tiền
+                    </button>
+                    <button class="btn ${currentTab === 'loans' ? 'btn-primary' : 'btn-outline'}" onclick="app.changeFinancialsTab('loans')">
+                        <i class="fa-solid fa-building-columns"></i> Nợ ngân hàng
+                    </button>
+                </div>
+
+                ${tabContent}
+            </div>
+        `;
+    },
+
+    financialsGeneralContent: (selectedMonth = '', selectedVessel = '', selectedCategory = '', selectedPartner = '') => {
+        const trans = AppData.getTransactions();
+        return `
                 <div class="grid-4" style="margin-bottom: 2rem;">
                     ${['ABbank', 'Viettinbank', 'Tài khoản cá nhân', 'Tiền mặt'].map(acc => {
                         const opening = (AppData.state.company.openingBalances && AppData.state.company.openingBalances[acc]) || 0;
@@ -676,6 +706,7 @@ const Views = {
                     </div>
                     <p style="margin-top: 1rem; font-size: 0.8rem; opacity: 0.6; text-align: right;">* Đơn vị tính: Triệu đồng (M)</p>
                 </div>
+
                 <div class="glass-card" style="margin-bottom: 2rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -788,6 +819,914 @@ const Views = {
                         </table>
                     </div>
                 </div>
+        `;
+    },
+
+    loanTrackingContent: () => {
+        const loans = AppData.getLoans();
+        const vessels = AppData.getVessels();
+        const vesselMap = {};
+        vessels.forEach(v => {
+            vesselMap[v.id] = v.name;
+        });
+
+        const formatShortCurrency = (amount) => {
+            if (!amount) return '0';
+            if (Math.abs(amount) >= 1e9) {
+                return (amount / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' Tỷ';
+            }
+            if (Math.abs(amount) >= 1e6) {
+                return (amount / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' Tr';
+            }
+            return AppData.formatCurrency(amount);
+        };
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        const formatDate = (dateStr) => {
+            if (!dateStr) return '-';
+            try {
+                return dateStr.split('-').reverse().join('/');
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        const alerts = [];
+        
+        const loanItems = loans.map(l => {
+            const payments = l.payments || [];
+            const pPaid = payments.filter(p => p.type === 'Gốc').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const iPaid = payments.filter(p => p.type === 'Lãi').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const balance = l.isPaidOff ? 0 : Math.max(0, (Number(l.loanAmount) || 0) - pPaid);
+            
+            let currentPrincipalDueDate = l.principalDueDate;
+            let currentInterestDueDate = l.interestDueDate;
+            
+            if (balance > 0) {
+                const schedule = AppData.generateRepaymentSchedule(l);
+                if (schedule && schedule.length > 0) {
+                    let runningP = 0;
+                    let runningI = 0;
+                    
+                    const firstUnpaidP = schedule.find(item => {
+                        runningP += item.principalDue;
+                        return item.principalDue > 0 && pPaid < runningP;
+                    });
+                    if (firstUnpaidP) {
+                        currentPrincipalDueDate = firstUnpaidP.dueDate;
+                    } else {
+                        const lastMilestone = schedule[schedule.length - 1];
+                        if (lastMilestone) currentPrincipalDueDate = lastMilestone.dueDate;
+                    }
+                    
+                    const firstUnpaidI = schedule.find(item => {
+                        runningI += item.interestDue;
+                        return item.interestDue > 0 && iPaid < runningI;
+                    });
+                    if (firstUnpaidI) {
+                        currentInterestDueDate = firstUnpaidI.dueDate;
+                    } else {
+                        const lastMilestone = schedule[schedule.length - 1];
+                        if (lastMilestone) currentInterestDueDate = lastMilestone.dueDate;
+                    }
+                }
+                
+                let vesselDisplay = '';
+                if (l.vesselId === 'MULTIPLE') {
+                    const allocs = l.vesselAllocations || {};
+                    const names = Object.keys(allocs).map(vId => {
+                        const vName = vesselMap[vId] || vId;
+                        return 'Tàu ' + vName;
+                    }).join(', ');
+                    vesselDisplay = `Nhiều tàu (${names || 'Chưa phân bổ'})`;
+                } else {
+                    vesselDisplay = l.vesselId === 'VP' ? 'Văn phòng' : 'Tàu ' + (vesselMap[l.vesselId] || l.vesselId);
+                }
+
+                if (currentPrincipalDueDate) {
+                    const pDate = new Date(currentPrincipalDueDate);
+                    pDate.setHours(0,0,0,0);
+                    const diffP = Math.ceil((pDate - today) / (1000 * 60 * 60 * 24));
+                    if (diffP <= 10) {
+                        if (diffP < 0) {
+                            alerts.push(`HĐ <strong>${l.contractNo}</strong> (${l.lender}) phân bổ <strong>${vesselDisplay}</strong> đã quá hạn trả gốc <strong>${Math.abs(diffP)} ngày</strong> (Hạn: ${formatDate(currentPrincipalDueDate)})`);
+                        } else {
+                            alerts.push(`HĐ <strong>${l.contractNo}</strong> (${l.lender}) phân bổ <strong>${vesselDisplay}</strong> sắp đến hạn trả gốc sau <strong>${diffP} ngày</strong> (Hạn: ${formatDate(currentPrincipalDueDate)})`);
+                        }
+                    }
+                }
+                if (currentInterestDueDate) {
+                    const iDate = new Date(currentInterestDueDate);
+                    iDate.setHours(0,0,0,0);
+                    const diffI = Math.ceil((iDate - today) / (1000 * 60 * 60 * 24));
+                    if (diffI <= 10) {
+                        if (diffI < 0) {
+                            alerts.push(`HĐ <strong>${l.contractNo}</strong> (${l.lender}) phân bổ <strong>${vesselDisplay}</strong> đã quá hạn trả lãi <strong>${Math.abs(diffI)} ngày</strong> (Hạn: ${formatDate(currentInterestDueDate)})`);
+                        } else {
+                            alerts.push(`HĐ <strong>${l.contractNo}</strong> (${l.lender}) phân bổ <strong>${vesselDisplay}</strong> sắp đến hạn trả lãi sau <strong>${diffI} ngày</strong> (Hạn: ${formatDate(currentInterestDueDate)})`);
+                        }
+                    }
+                }
+            }
+            
+            return {
+                loan: l,
+                balance: balance,
+                pPaid: pPaid,
+                iPaid: iPaid,
+                principalDueDate: currentPrincipalDueDate,
+                interestDueDate: currentInterestDueDate
+            };
+        });
+
+        // Tách riêng theo loại hợp đồng
+        const shortTermLoans = loanItems.filter(item => item.loan.type === 'Ngắn hạn');
+        const mediumTermLoans = loanItems.filter(item => item.loan.type === 'Trung hạn');
+        const longTermLoans = loanItems.filter(item => item.loan.type === 'Dài hạn');
+        const otherLoans = loanItems.filter(item => !['Ngắn hạn', 'Trung hạn', 'Dài hạn'].includes(item.loan.type));
+        if (otherLoans.length > 0) {
+            longTermLoans.push(...otherLoans);
+        }
+
+        const renderCompactSummaryCard = (title, items, iconClass, colorClass) => {
+            const limit = items.reduce((sum, item) => sum + (Number(item.loan.loanAmount) || 0), 0);
+            const remaining = items.reduce((sum, item) => sum + item.balance, 0);
+            const interestPaid = items.reduce((sum, item) => sum + item.iPaid, 0);
+            const totalCount = items.length;
+            const activeCount = items.filter(item => item.balance > 0).length;
+
+            const hasOverdue = items.some(item => {
+                const isOverdueP = item.principalDueDate && new Date(item.principalDueDate) < today && item.balance > 0;
+                const isOverdueI = item.interestDueDate && new Date(item.interestDueDate) < today && item.balance > 0;
+                return isOverdueP || isOverdueI;
+            });
+
+            return `
+                <div class="glass-card" style="padding: 1rem; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01); display: flex; flex-direction: column; gap: 0.8rem;">
+                    <!-- Card Header -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <i class="${iconClass}" style="color: ${colorClass}; font-size: 1.1rem;"></i>
+                            <span style="font-weight: 600; color: var(--text-main); font-size: 0.95rem;">${title}</span>
+                        </div>
+                        <span class="badge badge-outline" style="border-color: ${colorClass}; color: ${colorClass}; font-size: 0.7rem; padding: 2px 6px;">${totalCount} HĐ</span>
+                    </div>
+                    
+                    <!-- KPI subgrid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <!-- Hạn mức -->
+                        <div style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 10px;" title="Tổng hạn mức giải ngân: ${AppData.formatCurrency(limit)}">
+                            <div style="font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+                                <i class="fa-solid fa-wallet" style="color: var(--primary-light); font-size: 0.75rem;"></i> Hạn mức
+                            </div>
+                            <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                                ${formatShortCurrency(limit)}
+                            </div>
+                        </div>
+                        
+                        <!-- Dư nợ -->
+                        <div style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 10px;" title="Tổng dư nợ gốc còn lại: ${AppData.formatCurrency(remaining)}">
+                            <div style="font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+                                <i class="fa-solid fa-file-invoice-dollar" style="color: ${hasOverdue ? 'var(--accent)' : 'var(--orange-light)'}; font-size: 0.75rem;"></i> Dư nợ
+                            </div>
+                            <div style="font-size: 0.95rem; font-weight: 600; color: ${hasOverdue ? 'var(--accent)' : 'var(--text-main)'}; margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                                ${formatShortCurrency(remaining)}
+                            </div>
+                        </div>
+                        
+                        <!-- Lãi đã trả -->
+                        <div style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 10px;" title="Tổng lãi đã trả thực tế: ${AppData.formatCurrency(interestPaid)}">
+                            <div style="font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+                                <i class="fa-solid fa-hand-holding-dollar" style="color: var(--secondary); font-size: 0.75rem;"></i> Lãi đã trả
+                            </div>
+                            <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                                ${formatShortCurrency(interestPaid)}
+                            </div>
+                        </div>
+                        
+                        <!-- Số HĐ -->
+                        <div style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 10px;" title="Số hợp đồng đang vay / Tổng số hợp đồng">
+                            <div style="font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+                                <i class="fa-solid fa-file-contract" style="color: var(--info); font-size: 0.75rem;"></i> Số HĐ
+                            </div>
+                            <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                                ${activeCount} / ${totalCount}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderLoanTableSection = (title, items, iconClass, colorClass) => {
+            return `
+                <div class="glass-card" style="margin-bottom: 2.5rem; padding: 1.5rem;">
+                    <!-- Section Header -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="${iconClass}" style="color: ${colorClass}; font-size: 1.3rem;"></i>
+                            <h3 style="margin: 0; color: var(--text-main); font-size: 1.2rem;">${title}</h3>
+                        </div>
+                        <span class="badge badge-outline" style="border-color: ${colorClass}; color: ${colorClass}; font-weight: 600;">${items.length} HĐ</span>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Phân bổ</th>
+                                    <th>Mã HĐ</th>
+                                    <th>Ngân hàng</th>
+                                    <th>Loại HĐ</th>
+                                    <th style="text-align: right;">Hạn mức / Dư nợ</th>
+                                    <th style="text-align: center;">Lãi suất</th>
+                                    <th style="text-align: center;">Ngày giải ngân</th>
+                                    <th style="text-align: center;">Hạn trả gốc</th>
+                                    <th style="text-align: center;">Hạn trả lãi</th>
+                                    <th style="text-align: center;">Trạng thái</th>
+                                    <th style="text-align: center; width: 180px;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.length === 0 ? `
+                                    <tr>
+                                        <td colspan="11" style="text-align: center; padding: 3rem; color: var(--text-muted); font-style: italic;">Không có hợp đồng nào thuộc nhóm này.</td>
+                                    </tr>
+                                ` : items.map(item => {
+                                    const l = item.loan;
+                                    const isOverdueP = item.principalDueDate && new Date(item.principalDueDate) < today && item.balance > 0;
+                                    const isOverdueI = item.interestDueDate && new Date(item.interestDueDate) < today && item.balance > 0;
+                                    
+                                    return `
+                                        <tr style="${l.status === 'Đã tất toán' ? 'opacity: 0.6;' : ''}">
+                                            <td style="vertical-align: top; padding-top: 12px;">
+                                                ${(() => {
+                                                    if (l.vesselId === 'MULTIPLE') {
+                                                        const allocs = l.vesselAllocations || {};
+                                                        const badges = Object.entries(allocs).map(([vId, val]) => {
+                                                            const vName = vesselMap[vId] || vId;
+                                                            return `<span class="badge badge-primary" style="margin: 2px; display: inline-block; white-space: nowrap;">Tàu ${vName} (${formatShortCurrency(val)})</span>`;
+                                                        }).join(' ');
+                                                        return badges || `<span class="badge badge-warning">Chưa phân bổ</span>`;
+                                                    } else {
+                                                        return `<span class="badge ${l.vesselId === 'VP' ? 'badge-outline' : 'badge-primary'}">${l.vesselId === 'VP' ? 'Văn phòng' : 'Tàu ' + (vesselMap[l.vesselId] || l.vesselId)}</span>`;
+                                                    }
+                                                })()}
+                                            </td>
+                                            <td style="vertical-align: top; padding-top: 12px;"><strong>${l.contractNo}</strong></td>
+                                            <td style="vertical-align: top; padding-top: 12px;">${l.lender}</td>
+                                            <td style="vertical-align: top; padding-top: 12px;">
+                                                ${l.type}
+                                                ${l.termYears ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${l.termYears} năm</div>` : ''}
+                                            </td>
+                                            <td style="text-align: right; vertical-align: top; padding-top: 12px;">
+                                                <div style="font-weight: 600;">${AppData.formatCurrency(l.loanAmount)}</div>
+                                                <div style="font-weight: 700; color: ${item.balance > 0 ? 'var(--rose-light)' : 'var(--secondary)'}; margin-top: 2px;">${AppData.formatCurrency(item.balance)}</div>
+                                                ${(() => {
+                                                    if (l.vesselId === 'MULTIPLE' && l.vesselAllocations && Object.keys(l.vesselAllocations).length > 0) {
+                                                        const allocs = l.vesselAllocations || {};
+                                                        const totalAllocated = Object.values(allocs).reduce((sum, val) => sum + (Number(val) || 0), 0) || l.loanAmount || 1;
+                                                        const breakdowns = Object.entries(allocs).map(([vId, val]) => {
+                                                            const ratio = val / totalAllocated;
+                                                            const vBalance = Math.round(item.balance * ratio);
+                                                            const vName = vesselMap[vId] || vId;
+                                                            return `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Tàu ${vName}: ${AppData.formatCurrency(val)} / ${AppData.formatCurrency(vBalance)}</div>`;
+                                                        }).join('');
+                                                        return `<div style="border-top: 1px dashed rgba(255,255,255,0.06); margin-top: 6px; padding-top: 4px;">${breakdowns}</div>`;
+                                                    }
+                                                    return '';
+                                                })()}
+                                            </td>
+                                            <td style="text-align: center; vertical-align: top; padding-top: 12px;">
+                                                <span class="badge badge-outline" style="color: var(--secondary); border-color: var(--secondary); font-weight: 600;">${l.interestRate}</span>
+                                                ${l.changedInterestRate ? `
+                                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 2px;">
+                                                        Thay đổi: <strong>${l.changedInterestRate}</strong>
+                                                        ${l.interestChangeDate ? `<br>(${formatDate(l.interestChangeDate)})` : ''}
+                                                    </div>
+                                                ` : ''}
+                                            </td>
+                                            <td style="text-align: center; vertical-align: top; padding-top: 12px;">${formatDate(l.disbursementDate)}</td>
+                                            <td style="text-align: center; ${isOverdueP ? 'color: var(--accent); font-weight: 700;' : ''}; vertical-align: top; padding-top: 12px;">${formatDate(item.principalDueDate)}</td>
+                                            <td style="text-align: center; ${isOverdueI ? 'color: var(--accent); font-weight: 700;' : ''}; vertical-align: top; padding-top: 12px;">${formatDate(item.interestDueDate)}</td>
+                                            <td style="text-align: center; vertical-align: top; padding-top: 12px;">
+                                                <span class="badge" style="background: ${l.status === 'Đang vay' ? 'rgba(235, 94, 85, 0.15)' : 'rgba(40, 167, 69, 0.15)'}; color: ${l.status === 'Đang vay' ? 'var(--accent)' : 'var(--secondary)'}; border: 1px solid ${l.status === 'Đang vay' ? 'var(--accent)' : 'var(--secondary)'};">
+                                                    ${l.status}
+                                                </span>
+                                            </td>
+                                            <td style="text-align: center; vertical-align: top; padding-top: 12px;">
+                                                <div style="display: flex; gap: 4px; justify-content: center;">
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" onclick="app.openLoanPaymentModal('${l.id}')" title="Trả gốc/lãi" ${l.status === 'Đã tất toán' ? 'disabled' : ''}>
+                                                        <i class="fa-solid fa-hand-holding-dollar" style="color: var(--secondary);"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" onclick="app.openLoanScheduleModal('${l.id}')" title="Kỳ phải trả & Lịch trình">
+                                                        <i class="fa-solid fa-calendar-days" style="color: var(--warning);"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" onclick="app.openLoanHistoryModal('${l.id}')" title="Lịch sử trả nợ">
+                                                        <i class="fa-solid fa-clock-rotate-left" style="color: var(--info);"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" onclick="app.openLoanModal('${l.id}')" title="Sửa">
+                                                        <i class="fa-solid fa-pen" style="color: var(--info);"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" onclick="app.deleteLoan('${l.id}')" title="Xóa">
+                                                        <i class="fa-solid fa-trash" style="color: var(--accent);"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        };
+
+        return `
+            <!-- Alerts Section -->
+            ${alerts.length > 0 ? `
+                <div class="glass-card" style="border-left: 4px solid var(--accent); background: rgba(235, 94, 85, 0.1); margin-bottom: 2rem; padding: 1.2rem 1.5rem;">
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color: var(--accent); font-size: 1.4rem; margin-top: 2px;"></i>
+                        <div>
+                            <strong style="color: var(--accent); font-size: 1.05rem; display: block; margin-bottom: 6px;">CẢNH BÁO NỢ ĐẾN HẠN (TRONG VÒNG 10 NGÀY HOẶC QUÁ HẠN)</strong>
+                            <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem; line-height: 1.6; color: var(--text-main);">
+                                ${alerts.map(a => `<li>${a}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
+            
+            <!-- Compact Summaries Row at the Top -->
+            <div class="grid-3" style="margin-bottom: 2rem; gap: 15px;">
+                ${renderCompactSummaryCard("Vay Ngắn hạn", shortTermLoans, "fa-solid fa-business-time", "var(--primary-light)")}
+                ${renderCompactSummaryCard("Vay Trung hạn", mediumTermLoans, "fa-solid fa-clock", "var(--warning)")}
+                ${renderCompactSummaryCard("Vay Dài hạn", longTermLoans, "fa-solid fa-calendar-days", "var(--secondary)")}
+            </div>
+            
+            <!-- Loan Sections -->
+            ${renderLoanTableSection("Hợp đồng Vay Ngắn hạn", shortTermLoans, "fa-solid fa-business-time", "var(--primary-light)")}
+            ${renderLoanTableSection("Hợp đồng Vay Trung hạn", mediumTermLoans, "fa-solid fa-clock", "var(--warning)")}
+            ${renderLoanTableSection("Hợp đồng Vay Dài hạn", longTermLoans, "fa-solid fa-calendar-days", "var(--secondary)")}
+        `;
+    },
+
+
+    loanModal: (loan = null) => {
+        const title = loan ? 'Sửa Hợp đồng Vay' : 'Thêm Hợp đồng Vay Mới';
+        const vessels = AppData.getVessels();
+        return `
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-building-columns"></i> ${title}</h3>
+                <button class="modal-close" onclick="app.closeModal('loan-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="event.preventDefault(); app.saveLoan();">
+                    <input type="hidden" id="l-id" value="${loan ? loan.id : ''}">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Mã hợp đồng <span style="color:var(--accent)">*</span></label>
+                            <input type="text" class="form-control" id="l-contractNo" value="${loan ? loan.contractNo : ''}" required placeholder="Nhập mã HĐ...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Ngân hàng cho vay <span style="color:var(--accent)">*</span></label>
+                            <input type="text" class="form-control" id="l-lender" value="${loan ? loan.lender : ''}" required placeholder="Tên ngân hàng...">
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Phân bổ cho Tàu / Bộ phận <span style="color:var(--accent)">*</span></label>
+                            <select class="form-control" id="l-vesselId" required onchange="app.onLoanVesselChange()">
+                                <option value="">-- Chọn tàu hoặc văn phòng --</option>
+                                <option value="VP" ${loan && loan.vesselId === 'VP' ? 'selected' : ''}>VP (Văn phòng)</option>
+                                <option value="MULTIPLE" ${loan && loan.vesselId === 'MULTIPLE' ? 'selected' : ''}>-- Phân bổ cho nhiều tàu --</option>
+                                ${vessels.map(v => `<option value="${v.id}" ${loan && loan.vesselId === v.id ? 'selected' : ''}>Tàu ${v.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Loại Hợp đồng <span style="color:var(--accent)">*</span></label>
+                            <select class="form-control" id="l-type" required>
+                                <option value="Ngắn hạn" ${loan && loan.type === 'Ngắn hạn' ? 'selected' : ''}>Ngắn hạn</option>
+                                <option value="Trung hạn" ${loan && loan.type === 'Trung hạn' ? 'selected' : ''}>Trung hạn</option>
+                                <option value="Dài hạn" ${loan && loan.type === 'Dài hạn' ? 'selected' : ''}>Dài hạn</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Số năm vay</label>
+                            <input type="number" step="any" class="form-control" id="l-termYears" value="${loan ? (loan.termYears || '') : ''}" placeholder="VD: 5">
+                        </div>
+                    </div>
+                    
+                    ${(() => {
+                        const allocs = loan && loan.vesselAllocations ? loan.vesselAllocations : {};
+                        return `
+                        <div class="form-group" id="l-multiple-vessels-container" style="display: ${loan && loan.vesselId === 'MULTIPLE' ? 'block' : 'none'}; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; margin-top: -0.5rem; margin-bottom: 1rem;">
+                            <label class="form-label" style="margin-bottom: 0.75rem; display: block; font-weight: 600; color: var(--primary-light);">Nhập số tiền phân bổ cho từng tàu:</label>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                                ${vessels.map(v => {
+                                    const hasAlloc = allocs[v.id] !== undefined;
+                                    const allocVal = hasAlloc ? allocs[v.id] : '';
+                                    return `
+                                        <div style="display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                                            <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0; user-select: none; color: var(--text-main);">
+                                                <input type="checkbox" class="l-vessel-checkbox" data-vessel-id="${v.id}" ${hasAlloc ? 'checked' : ''} onchange="app.toggleVesselAllocation('${v.id}')" style="width: 16px; height: 16px; cursor: pointer;">
+                                                Tàu ${v.name}
+                                            </label>
+                                            <input type="number" class="form-control l-vessel-alloc-input" id="l-alloc-${v.id}" value="${allocVal}" placeholder="Số tiền (VND)" style="display: ${hasAlloc ? 'block' : 'none'}; margin-top: 6px;" oninput="app.calculateTotalAllocation()">
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div style="margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem;">
+                                <div>Tổng số tiền phân bổ: <strong id="l-total-alloc-display" style="color: var(--secondary); font-weight: 700;">0</strong> VND</div>
+                                <div>Chưa phân bổ: <strong id="l-unalloc-display" style="color: var(--warning); font-weight: 700;">0</strong> VND</div>
+                            </div>
+                        </div>
+                        `;
+                    })()}
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Kỳ trả nợ Gốc <span style="color:var(--accent)">*</span></label>
+                            <select class="form-control" id="l-principalPeriod" required>
+                                <option value="monthly" ${loan && loan.principalPeriod === 'monthly' ? 'selected' : ''}>Hàng tháng</option>
+                                <option value="quarterly" ${!loan || loan.principalPeriod === 'quarterly' ? 'selected' : ''}>Hàng quý (Mặc định)</option>
+                                <option value="half-yearly" ${loan && loan.principalPeriod === 'half-yearly' ? 'selected' : ''}>Hàng 6 tháng</option>
+                                <option value="yearly" ${loan && loan.principalPeriod === 'yearly' ? 'selected' : ''}>Hàng năm</option>
+                                <option value="end-of-term" ${loan && loan.principalPeriod === 'end-of-term' ? 'selected' : ''}>Cuối kỳ tất toán</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Kỳ trả nợ Lãi <span style="color:var(--accent)">*</span></label>
+                            <select class="form-control" id="l-interestPeriod" required>
+                                <option value="monthly" ${!loan || loan.interestPeriod === 'monthly' ? 'selected' : ''}>Hàng tháng (Mặc định)</option>
+                                <option value="quarterly" ${loan && loan.interestPeriod === 'quarterly' ? 'selected' : ''}>Hàng quý</option>
+                                <option value="half-yearly" ${loan && loan.interestPeriod === 'half-yearly' ? 'selected' : ''}>Hàng 6 tháng</option>
+                                <option value="yearly" ${loan && loan.interestPeriod === 'yearly' ? 'selected' : ''}>Hàng năm</option>
+                                <option value="end-of-term" ${loan && loan.interestPeriod === 'end-of-term' ? 'selected' : ''}>Cuối kỳ tất toán</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid-2" style="border-top: 1px dashed rgba(255,255,255,0.1); margin-top: 0.5rem; padding-top: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-clock" style="color: var(--warning);"></i>
+                                Số tháng ân hạn gốc
+                                <span style="font-weight: 400; font-size: 0.8rem; color: var(--text-muted);">(Thời gian đầu chỉ trả lãi)</span>
+                            </label>
+                            <input type="number" min="0" step="1" class="form-control" id="l-gracePeriodMonths" value="${loan ? (loan.gracePeriodMonths || 0) : 0}" placeholder="0 = không có ân hạn">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-money-bill-wave" style="color: var(--secondary);"></i>
+                                Tiền gốc trả cố định mỗi kỳ (VND)
+                                <span style="font-weight: 400; font-size: 0.8rem; color: var(--text-muted);">(Để trống nếu tự động chia đều)</span>
+                            </label>
+                            <input type="number" min="0" step="any" class="form-control" id="l-fixedPrincipalAmount" value="${loan && loan.fixedPrincipalAmount ? loan.fixedPrincipalAmount : ''}" placeholder="Nhập số tiền gốc trả cố định...">
+                        </div>
+                    </div>
+                    <div style="background: rgba(255,200,50,0.07); border: 1px solid rgba(255,200,50,0.2); border-radius: 6px; padding: 10px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+                        <i class="fa-solid fa-circle-info" style="color: var(--warning); margin-right: 4px;"></i>
+                        <strong style="color: var(--warning);">Lưu ý:</strong> Ngày trả mỗi kỳ sẽ dùng <strong>ngày</strong> lấy từ trường <em>Hạn trả gốc</em> và <em>Hạn trả lãi</em> bên dưới. Vui lòng nhập chính xác ngày của tháng (VD: 20/01/2025).
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Số tiền vay (VND) <span style="color:var(--accent)">*</span></label>
+                            <input type="number" step="any" class="form-control" id="l-loanAmount" value="${loan ? loan.loanAmount : ''}" required placeholder="Nhập số tiền...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Lãi suất ban đầu <span style="color:var(--accent)">*</span></label>
+                            <input type="text" class="form-control" id="l-interestRate" value="${loan ? loan.interestRate : ''}" required placeholder="VD: 7.5%/năm">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Trạng thái <span style="color:var(--accent)">*</span></label>
+                            <select class="form-control" id="l-status" required onchange="document.getElementById('l-isPaidOff').checked = (this.value === 'Đã tất toán');">
+                                <option value="Đang vay" ${loan && loan.status === 'Đang vay' ? 'selected' : ''}>Đang vay</option>
+                                <option value="Đã tất toán" ${loan && loan.status === 'Đã tất toán' ? 'selected' : ''}>Đã tất toán</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; background: rgba(0,255,100,0.05); padding: 10px; border-radius: 6px; border: 1px solid rgba(0,255,100,0.15);">
+                        <input type="checkbox" id="l-isPaidOff" ${loan && loan.isPaidOff ? 'checked' : ''} onchange="document.getElementById('l-status').value = this.checked ? 'Đã tất toán' : 'Đang vay';" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="l-isPaidOff" style="cursor: pointer; font-weight: 600; color: var(--secondary); margin: 0; font-size: 0.9rem;">
+                            Đã trả đủ gốc, lãi (Hệ thống tự động đưa Dư nợ gốc về 0 và chuyển trạng thái Đã tất toán)
+                        </label>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Ngày thay đổi lãi suất</label>
+                            <input type="date" class="form-control" id="l-interestChangeDate" value="${loan ? (loan.interestChangeDate || '') : ''}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Lãi suất thay đổi</label>
+                            <input type="text" class="form-control" id="l-changedInterestRate" value="${loan ? (loan.changedInterestRate || '') : ''}" placeholder="VD: 8.5%/năm">
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Ngày giải ngân <span style="color:var(--accent)">*</span></label>
+                            <input type="date" class="form-control" id="l-disbursementDate" value="${loan ? loan.disbursementDate : ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Hạn trả gốc tiếp theo <span style="color:var(--accent)">*</span></label>
+                            <input type="date" class="form-control" id="l-principalDueDate" value="${loan ? loan.principalDueDate : ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Hạn trả lãi tiếp theo <span style="color:var(--accent)">*</span></label>
+                            <input type="date" class="form-control" id="l-interestDueDate" value="${loan ? loan.interestDueDate : ''}" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Ghi chú</label>
+                        <input type="text" class="form-control" id="l-note" value="${loan ? (loan.note || '') : ''}" placeholder="Ghi chú khác...">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline" onclick="app.closeModal('loan-modal')">Hủy</button>
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+                    </div>
+                </form>
+            </div>
+        `;
+    },
+
+    loanPaymentModal: (loan) => {
+        return `
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-hand-holding-dollar"></i> Thanh toán nợ - HĐ: ${loan.contractNo}</h3>
+                <button class="modal-close" onclick="app.closeModal('loan-payment-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="event.preventDefault(); app.saveLoanPayment();">
+                    <input type="hidden" id="lp-loanId" value="${loan.id}">
+                    <div class="form-group">
+                        <label class="form-label">Ngày thanh toán <span style="color:var(--accent)">*</span></label>
+                        <input type="date" class="form-control" id="lp-date" value="${new Date().toISOString().substring(0, 10)}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Loại thanh toán <span style="color:var(--accent)">*</span></label>
+                        <select class="form-control" id="lp-type" required>
+                            <option value="Gốc">Trả nợ gốc</option>
+                            <option value="Lãi">Trả tiền lãi</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Số tiền thanh toán (VND) <span style="color:var(--accent)">*</span></label>
+                        <input type="number" step="any" class="form-control" id="lp-amount" required placeholder="Nhập số tiền...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Ghi chú</label>
+                        <input type="text" class="form-control" id="lp-note" placeholder="Nhập ghi chú...">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline" onclick="app.closeModal('loan-payment-modal')">Hủy</button>
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Xác nhận</button>
+                    </div>
+                </form>
+            </div>
+        `;
+    },
+
+    loanHistoryModal: (loan) => {
+        const payments = loan.payments || [];
+        const principalPaid = payments.filter(p => p.type === 'Gốc').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const interestPaid = payments.filter(p => p.type === 'Lãi').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        
+        const formatDate = (dateStr) => {
+            if (!dateStr) return '-';
+            try {
+                return dateStr.split('-').reverse().join('/');
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        return `
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử trả nợ - HĐ: ${loan.contractNo}</h3>
+                <button class="modal-close" onclick="app.closeModal('loan-history-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="grid-3" style="margin-bottom: 1.5rem; gap: 15px;">
+                    <div class="glass-card" style="padding: 1rem; text-align: center;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--primary-light);">${AppData.formatCurrency(loan.loanAmount)}</div>
+                        <div class="stat-label" style="font-size: 0.8rem;">Hạn mức vay ban đầu</div>
+                    </div>
+                    <div class="glass-card" style="padding: 1rem; text-align: center;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--secondary);">${AppData.formatCurrency(principalPaid)}</div>
+                        <div class="stat-label" style="font-size: 0.8rem;">Đã trả gốc</div>
+                    </div>
+                    <div class="glass-card" style="padding: 1rem; text-align: center;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--info);">${AppData.formatCurrency(interestPaid)}</div>
+                        <div class="stat-label" style="font-size: 0.8rem;">Đã trả lãi</div>
+                    </div>
+                </div>
+                
+                <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-list" style="margin-right: 5px;"></i>Danh sách các đợt thanh toán</h4>
+                <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Ngày</th>
+                                <th>Phân loại</th>
+                                <th style="text-align: right;">Số tiền</th>
+                                <th>Ghi chú</th>
+                                <th style="text-align: center;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${payments.length === 0 ? `
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem;">Chưa ghi nhận đợt thanh toán nào.</td>
+                                </tr>
+                            ` : payments.map(p => `
+                                <tr>
+                                    <td>${formatDate(p.date)}</td>
+                                    <td>
+                                        <span class="badge" style="background: ${p.type === 'Gốc' ? 'rgba(40, 167, 69, 0.15)' : 'rgba(23, 162, 184, 0.15)'}; color: ${p.type === 'Gốc' ? 'var(--secondary)' : 'var(--info)'}; border: 1px solid ${p.type === 'Gốc' ? 'var(--secondary)' : 'var(--info)'};">
+                                            ${p.type === 'Gốc' ? 'Trả Gốc' : 'Trả Lãi'}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right; font-weight: 600; color: ${p.type === 'Gốc' ? 'var(--secondary)' : 'var(--text-main)'};">${AppData.formatCurrency(p.amount)}</td>
+                                    <td>${p.note || ''}</td>
+                                    <td style="text-align: center;">
+                                        <button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" onclick="app.deleteLoanPayment('${loan.id}', '${p.id}')" title="Xóa đợt thanh toán">
+                                            <i class="fa-solid fa-trash" style="color: var(--accent);"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="app.closeModal('loan-history-modal')">Đóng</button>
+            </div>
+        `;
+    },
+
+    loanScheduleModal: (loan) => {
+        const schedule = AppData.generateRepaymentSchedule(loan);
+        const payments = loan.payments || [];
+        const actualPrincipalPaid = payments.filter(p => p.type === 'Gốc').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const actualInterestPaid = payments.filter(p => p.type === 'Lãi').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+        const vessels = AppData.getVessels();
+        const vesselMap = {};
+        vessels.forEach(v => {
+            vesselMap[v.id] = v.name;
+        });
+
+        const allocs = loan.vesselAllocations || {};
+        const totalAllocated = Object.values(allocs).reduce((sum, val) => sum + (Number(val) || 0), 0) || loan.loanAmount || 1;
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayStr = AppData.formatDateLocal(today);
+
+        let scheduledPrincipalDueUpToToday = 0;
+        let scheduledInterestDueUpToToday = 0;
+
+        schedule.forEach(item => {
+            if (item.dueDate <= todayStr) {
+                scheduledPrincipalDueUpToToday += item.principalDue;
+                scheduledInterestDueUpToToday += item.interestDue;
+            }
+        });
+
+        const formatDate = (dateStr) => {
+            if (!dateStr) return '-';
+            try {
+                return dateStr.split('-').reverse().join('/');
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        let runningScheduledPrincipal = 0;
+        let runningScheduledInterest = 0;
+
+        const tableRows = schedule.map((item, index) => {
+            runningScheduledPrincipal += item.principalDue;
+            runningScheduledInterest += item.interestDue;
+
+            const isPrincipalPaid = item.principalDue === 0 ? true : actualPrincipalPaid >= runningScheduledPrincipal;
+            const isInterestPaid = actualInterestPaid >= runningScheduledInterest;
+            const isFuture = item.dueDate > todayStr;
+            const isGrace = item.isGracePeriod;
+
+            let statusText = '';
+            let statusStyle = '';
+            if (isGrace) {
+                if (isInterestPaid) {
+                    statusText = 'Đã trả lãi';
+                    statusStyle = 'background: rgba(40,167,69,0.15); color: var(--secondary); border: 1px solid var(--secondary);';
+                } else if (isFuture) {
+                    statusText = 'Ân hạn gốc';
+                    statusStyle = 'background: rgba(255,200,50,0.12); color: var(--warning); border: 1px solid var(--warning);';
+                } else {
+                    statusText = 'Chưa trả lãi';
+                    statusStyle = 'background: rgba(235,94,85,0.15); color: var(--accent); border: 1px solid var(--accent);';
+                }
+            } else if (isPrincipalPaid && isInterestPaid) {
+                statusText = 'Đã trả đủ';
+                statusStyle = 'background: rgba(40, 167, 69, 0.15); color: var(--secondary); border: 1px solid var(--secondary);';
+            } else if (isFuture) {
+                statusText = 'Trong hạn';
+                statusStyle = 'background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color);';
+            } else {
+                statusText = 'Chưa trả đủ';
+                statusStyle = 'background: rgba(235, 94, 85, 0.15); color: var(--accent); border: 1px solid var(--accent);';
+            }
+
+            const rowStyle = isGrace
+                ? 'background: rgba(255,200,50,0.04); border-left: 2px solid rgba(255,200,50,0.4);'
+                : (isPrincipalPaid && isInterestPaid ? 'opacity: 0.75;' : '');
+
+            let principalCell = '';
+            if (isGrace) {
+                principalCell = `<span style="color: var(--warning); font-size: 0.75rem;">Ân hạn</span>`;
+            } else {
+                principalCell = `<div>${AppData.formatCurrency(item.principalDue)}</div>`;
+                if (loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0) {
+                    const breakdown = Object.entries(allocs).map(([vId, val]) => {
+                        const ratio = val / totalAllocated;
+                        const vPrincipal = Math.round(item.principalDue * ratio);
+                        const vName = vesselMap[vId] || vId;
+                        return `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 1px;">Tàu ${vName}: ${AppData.formatCurrency(vPrincipal)}</div>`;
+                    }).join('');
+                    principalCell += `<div style="border-top: 1px dashed rgba(255,255,255,0.06); margin-top: 4px; padding-top: 2px;">${breakdown}</div>`;
+                }
+            }
+
+            let interestCell = `<div>${AppData.formatCurrency(item.interestDue)}</div>`;
+            if (loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0) {
+                const breakdown = Object.entries(allocs).map(([vId, val]) => {
+                    const ratio = val / totalAllocated;
+                    const vInterest = Math.round(item.interestDue * ratio);
+                    const vName = vesselMap[vId] || vId;
+                    return `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 1px;">Tàu ${vName}: ${AppData.formatCurrency(vInterest)}</div>`;
+                }).join('');
+                interestCell += `<div style="border-top: 1px dashed rgba(255,255,255,0.06); margin-top: 4px; padding-top: 2px;">${breakdown}</div>`;
+            }
+
+            let totalCell = `<div>${AppData.formatCurrency(item.totalDue)}</div>`;
+            if (loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0) {
+                const breakdown = Object.entries(allocs).map(([vId, val]) => {
+                    const ratio = val / totalAllocated;
+                    const vTotal = Math.round(item.totalDue * ratio);
+                    const vName = vesselMap[vId] || vId;
+                    return `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 1px;">Tàu ${vName}: ${AppData.formatCurrency(vTotal)}</div>`;
+                }).join('');
+                totalCell += `<div style="border-top: 1px dashed rgba(255,255,255,0.06); margin-top: 4px; padding-top: 2px;">${breakdown}</div>`;
+            }
+
+            let balanceCell = `<div>${AppData.formatCurrency(item.balanceAfter)}</div>`;
+            if (loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0) {
+                const breakdown = Object.entries(allocs).map(([vId, val]) => {
+                    const ratio = val / totalAllocated;
+                    const vBalance = Math.round(item.balanceAfter * ratio);
+                    const vName = vesselMap[vId] || vId;
+                    return `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 1px;">Tàu ${vName}: ${AppData.formatCurrency(vBalance)}</div>`;
+                }).join('');
+                balanceCell += `<div style="border-top: 1px dashed rgba(255,255,255,0.06); margin-top: 4px; padding-top: 2px;">${breakdown}</div>`;
+            }
+
+            return `
+                <tr style="${rowStyle}">
+                    <td style="text-align: center; vertical-align: top; padding-top: 12px;">${index + 1}</td>
+                    <td style="text-align: center; font-weight: 500; vertical-align: top; padding-top: 12px;">${formatDate(item.dueDate)}</td>
+                    <td style="text-align: center; font-weight: 500; color: var(--text-main); vertical-align: top; padding-top: 12px;">${item.actualDays || 0}</td>
+                    <td style="text-align: right; font-weight: 500; vertical-align: top; padding-top: 12px;">${principalCell}</td>
+                    <td style="text-align: right; font-weight: 500; vertical-align: top; padding-top: 12px;">${interestCell}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--info); vertical-align: top; padding-top: 12px;">${totalCell}</td>
+                    <td style="text-align: right; font-weight: 500; opacity: 0.8; vertical-align: top; padding-top: 12px;">${balanceCell}</td>
+                    <td style="text-align: center; vertical-align: top; padding-top: 12px;">
+                        <span class="badge" style="${statusStyle}">
+                            ${statusText}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        return `
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-calendar-days"></i> Lịch trình thanh toán - HĐ: ${loan.contractNo}</h3>
+                <button class="modal-close" onclick="app.closeModal('loan-schedule-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: rgba(0,0,0,0.2); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <strong style="color: var(--secondary); font-size: 1rem; display: block; margin-bottom: 4px;">TỰ ĐỘNG THẦN TỐC CẬP NHẬT TRẢ NỢ ĐẾN NAY</strong>
+                        <span style="font-size: 0.82rem; color: var(--text-muted); display: block; max-width: 600px;">
+                            Nếu bạn vẫn trả gốc lãi đều đặn đúng hạn đến hôm nay, nhấn nút bên phải để hệ thống tự động ghi nhận các khoản trả nợ gốc và lãi lũy kế tương ứng từ ngày giải ngân đến hiện tại.
+                        </span>
+                    </div>
+                    <button class="btn btn-primary" onclick="app.autoPayLoanUpToToday('${loan.id}')" style="background: var(--secondary); border-color: var(--secondary); white-space: nowrap;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Đã trả đủ gốc, lãi đến nay
+                    </button>
+                </div>
+
+                <div class="grid-4" style="margin-bottom: 1.5rem; gap: 15px;">
+                    <div class="glass-card" style="padding: 0.8rem; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="stat-value" style="font-size: 1.05rem; color: var(--text-main);">${AppData.formatCurrency(scheduledPrincipalDueUpToToday)}</div>
+                            <div class="stat-label" style="font-size: 0.75rem;">Gốc phải trả đến nay</div>
+                        </div>
+                        ${loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0 ? `
+                            <div style="font-size: 0.72rem; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 6px; text-align: left; display: block;">
+                                ${Object.entries(allocs).map(([vId, val]) => `<div>Tàu ${(vesselMap[vId] || vId)}: ${AppData.formatCurrency(Math.round(scheduledPrincipalDueUpToToday * (val / totalAllocated)))}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="glass-card" style="padding: 0.8rem; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="stat-value" style="font-size: 1.05rem; color: var(--text-main);">${AppData.formatCurrency(scheduledInterestDueUpToToday)}</div>
+                            <div class="stat-label" style="font-size: 0.75rem;">Lãi phải trả đến nay</div>
+                        </div>
+                        ${loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0 ? `
+                            <div style="font-size: 0.72rem; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 6px; text-align: left; display: block;">
+                                ${Object.entries(allocs).map(([vId, val]) => `<div>Tàu ${(vesselMap[vId] || vId)}: ${AppData.formatCurrency(Math.round(scheduledInterestDueUpToToday * (val / totalAllocated)))}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="glass-card" style="padding: 0.8rem; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="stat-value" style="font-size: 1.05rem; color: var(--secondary);">${AppData.formatCurrency(actualPrincipalPaid)}</div>
+                            <div class="stat-label" style="font-size: 0.75rem;">Gốc đã trả thực tế</div>
+                        </div>
+                        ${loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0 ? `
+                            <div style="font-size: 0.72rem; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 6px; text-align: left; display: block;">
+                                ${Object.entries(allocs).map(([vId, val]) => `<div>Tàu ${(vesselMap[vId] || vId)}: ${AppData.formatCurrency(Math.round(actualPrincipalPaid * (val / totalAllocated)))}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="glass-card" style="padding: 0.8rem; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="stat-value" style="font-size: 1.05rem; color: var(--info);">${AppData.formatCurrency(actualInterestPaid)}</div>
+                            <div class="stat-label" style="font-size: 0.75rem;">Lãi đã trả thực tế</div>
+                        </div>
+                        ${loan.vesselId === 'MULTIPLE' && Object.keys(allocs).length > 0 ? `
+                            <div style="font-size: 0.72rem; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 6px; text-align: left; display: block;">
+                                ${Object.entries(allocs).map(([vId, val]) => `<div>Tàu ${(vesselMap[vId] || vId)}: ${AppData.formatCurrency(Math.round(actualInterestPaid * (val / totalAllocated)))}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                ${loan.gracePeriodMonths > 0 ? `
+                <div style="display:flex; align-items:center; gap:10px; padding: 0.6rem 1rem; background: rgba(255,200,50,0.07); border: 1px solid rgba(255,200,50,0.25); border-radius: var(--radius-md); margin-bottom: 1rem; font-size:0.85rem;">
+                    <i class="fa-solid fa-hourglass-half" style="color:var(--warning);"></i>
+                    <span><strong style="color:var(--warning);">Ân hạn gốc: ${loan.gracePeriodMonths} tháng</strong> đầu — trong thời gian này chỉ phải trả <strong>lãi</strong>, chưa trả gốc. Các hàng màu vàng nhạt là kỳ ân hạn.</span>
+                </div>` : ''}
+
+                ${loan.fixedPrincipalAmount > 0 ? `
+                <div style="display:flex; align-items:center; gap:10px; padding: 0.6rem 1rem; background: rgba(0,255,100,0.05); border: 1px solid rgba(0,255,100,0.15); border-radius: var(--radius-md); margin-bottom: 1rem; font-size:0.85rem;">
+                    <i class="fa-solid fa-circle-check" style="color:var(--secondary);"></i>
+                    <span><strong style="color:var(--secondary);">Gốc trả cố định:</strong> Trả gốc cố định <strong>${AppData.formatCurrency(loan.fixedPrincipalAmount)} VND</strong> mỗi kỳ (đến khi trả hết dư nợ).</span>
+                </div>` : ''}
+
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom: 0.8rem;">
+                    <h4 style="margin:0; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-list-ol"></i> Chi tiết các kỳ thanh toán theo kế hoạch
+                    </h4>
+                    <div style="display:flex; align-items:center; gap:10px; font-size:0.78rem; color:var(--text-muted);">
+                        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(40,167,69,0.4);border-radius:2px;margin-right:4px;"></span>Đã trả đủ</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(255,200,50,0.3);border-radius:2px;margin-right:4px;"></span>Ân hạn gốc</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(235,94,85,0.3);border-radius:2px;margin-right:4px;"></span>Chưa trả đủ</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(255,255,255,0.06);border-radius:2px;margin-right:4px;"></span>Trong hạn</span>
+                    </div>
+                </div>
+                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: center; width: 60px;">Kỳ thứ</th>
+                                <th style="text-align: center; width: 110px;">Hạn trả</th>
+                                <th style="text-align: center; width: 80px;">Số ngày</th>
+                                <th style="text-align: right;">Gốc phải trả</th>
+                                <th style="text-align: right;">Lãi phải trả</th>
+                                <th style="text-align: right;">Tổng cộng kỳ</th>
+                                <th style="text-align: right;">Dư nợ gốc còn lại</th>
+                                <th style="text-align: center; width: 120px;">Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows.length === 0 ? `
+                                <tr>
+                                    <td colspan="8" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem;">Không tạo được lịch trình. Vui lòng kiểm tra lại ngày giải ngân và số năm vay.</td>
+                                </tr>
+                            ` : tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="app.closeModal('loan-schedule-modal')">Đóng</button>
             </div>
         `;
     },
@@ -1630,9 +2569,20 @@ const Views = {
         const allShips = AppData.getShipments()
             .slice()
             .sort((a, b) => {
+                const hasA = a.contractNo && a.contractNo.trim() !== '';
+                const hasB = b.contractNo && b.contractNo.trim() !== '';
+                
+                if (!hasA && hasB) return -1;
+                if (hasA && !hasB) return 1;
+                if (!hasA && !hasB) {
+                    const dateA = a.dateStart || '';
+                    const dateB = b.dateStart || '';
+                    return dateB.localeCompare(dateA); // Mới nhất lên đầu
+                }
+                
                 const numA = parseInt((a.contractNo || '').replace(/\D/g, '')) || 0;
                 const numB = parseInt((b.contractNo || '').replace(/\D/g, '')) || 0;
-                return numB - numA; // Giảm dần: HD52 lên đầu
+                return numB - numA; // Giảm dần
             });
 
         // 1. Extract years dynamically
@@ -1791,7 +2741,7 @@ const Views = {
                 <form onsubmit="event.preventDefault(); app.saveShipment();">
                     <input type="hidden" id="s-id">
                     <div class="grid-3">
-                        <div class="form-group"><label class="form-label">Mã Hợp đồng</label><input type="text" class="form-control" id="s-contract-no" required></div>
+                        <div class="form-group"><label class="form-label">Mã Hợp đồng</label><input type="text" class="form-control" id="s-contract-no"></div>
                         <div class="form-group"><label class="form-label">Chuyến số (Ví dụ: C1)</label><input type="text" class="form-control" id="s-voy-no" required oninput="app.syncShipmentFuel()"></div>
                         <div class="form-group"><label class="form-label">Tàu</label><select class="form-control" id="s-vessel-id" onchange="app.handleShipmentVesselChange()">${AppData.getVessels().map(v => `<option value="${v.id}">${v.name}</option>`).join('')}</select></div>
                     </div>
@@ -2520,10 +3470,18 @@ const Views = {
                 // Shipments summary
                 let totalRealRevenue = 0;
                 let totalInvoiceRevenue = 0;
+                let totalInvoiceRevenueCompleted = 0;
+                let totalInvoiceRevenueIncomplete = 0;
                 let totalRefundAmount = 0;
                 custShipments.forEach(s => {
                     totalRealRevenue += Number(s.revenueReal) || 0;
-                    totalInvoiceRevenue += Number(s.revenueInvoice) || 0;
+                    const val = Number(s.revenueInvoice) || 0;
+                    totalInvoiceRevenue += val;
+                    if (s.contractNo && s.contractNo.trim() !== '') {
+                        totalInvoiceRevenueCompleted += val;
+                    } else {
+                        totalInvoiceRevenueIncomplete += val;
+                    }
                     totalRefundAmount += Number(s.refundAmount) || 0;
                 });
 
@@ -2539,7 +3497,9 @@ const Views = {
 
                 // Calculations
                 const openingDebt = AppData.state.company.customerOpeningDebts ? (Number(AppData.state.company.customerOpeningDebts[custName]) || 0) : 0;
-                const invoiceDebt = openingDebt + totalInvoiceRevenue - totalPaid;
+                const invoiceDebtCompleted = openingDebt + totalInvoiceRevenueCompleted - totalPaid;
+                const invoiceDebtIncomplete = totalInvoiceRevenueIncomplete;
+                const invoiceDebt = invoiceDebtCompleted + invoiceDebtIncomplete;
                 const unpaidRefund = totalRefundAmount - totalReturned;
                 const netReceived = totalPaid - totalReturned;
                 const actualDebt = openingDebt + totalRealRevenue - netReceived;
@@ -2550,10 +3510,14 @@ const Views = {
                     openingDebt,
                     totalRealRevenue,
                     totalInvoiceRevenue,
+                    totalInvoiceRevenueCompleted,
+                    totalInvoiceRevenueIncomplete,
                     totalRefundAmount,
                     totalPaid,
                     totalReturned,
                     invoiceDebt,
+                    invoiceDebtCompleted,
+                    invoiceDebtIncomplete,
                     unpaidRefund,
                     netReceived,
                     actualDebt,
@@ -2569,6 +3533,8 @@ const Views = {
             let sysTotalPaid = 0;
             let sysTotalReturned = 0;
             let sysTotalOpeningDebt = 0;
+            let sysInvoiceDebtCompleted = 0;
+            let sysInvoiceDebtIncomplete = 0;
             customersDebtData.forEach(c => {
                 sysTotalReal += c.totalRealRevenue;
                 sysTotalInvoice += c.totalInvoiceRevenue;
@@ -2576,16 +3542,20 @@ const Views = {
                 sysTotalPaid += c.totalPaid;
                 sysTotalReturned += c.totalReturned;
                 sysTotalOpeningDebt += c.openingDebt;
+                sysInvoiceDebtCompleted += c.invoiceDebtCompleted;
+                sysInvoiceDebtIncomplete += c.invoiceDebtIncomplete;
             });
-            const sysInvoiceDebt = sysTotalOpeningDebt + sysTotalInvoice - sysTotalPaid;
+            const sysInvoiceDebt = sysInvoiceDebtCompleted + sysInvoiceDebtIncomplete;
             const sysUnpaidRefund = sysTotalRefund - sysTotalReturned;
             const sysNetReceived = sysTotalPaid - sysTotalReturned;
             const sysActualDebt = sysTotalOpeningDebt + sysTotalReal - sysNetReceived;
 
             // Get details of the currently selected customer
             const selectedData = customersDebtData.find(c => c.name === app.selectedDebtCustomer) || customersDebtData[0] || {
-                name: '', shipmentsCount: 0, openingDebt: 0, totalRealRevenue: 0, totalInvoiceRevenue: 0, totalRefundAmount: 0,
-                totalPaid: 0, totalReturned: 0, invoiceDebt: 0, unpaidRefund: 0, actualDebt: 0, shipments: [], transactions: []
+                name: '', shipmentsCount: 0, openingDebt: 0, totalRealRevenue: 0, totalInvoiceRevenue: 0,
+                totalInvoiceRevenueCompleted: 0, totalInvoiceRevenueIncomplete: 0, totalRefundAmount: 0,
+                totalPaid: 0, totalReturned: 0, invoiceDebt: 0, invoiceDebtCompleted: 0, invoiceDebtIncomplete: 0,
+                unpaidRefund: 0, actualDebt: 0, shipments: [], transactions: []
             };
 
             // Compute monthly breakdown for selected customer
@@ -2634,7 +3604,11 @@ const Views = {
                     <div class="glass-card stat-card" style="border-left: 4px solid var(--accent);">
                         <span class="stat-label">Tổng Công Nợ Phải Thu</span>
                         <div class="stat-value" style="font-size: 1.6rem; color: var(--accent);">${AppData.formatCurrency(sysInvoiceDebt)}</div>
-                        <div class="stat-label" style="font-size: 0.8rem; margin-top: 4px;">Đầu kỳ: ${AppData.formatCurrency(sysTotalOpeningDebt)}</div>
+                        <div class="stat-label" style="font-size: 0.8rem; margin-top: 4px;">
+                            Đầu kỳ: ${AppData.formatCurrency(sysTotalOpeningDebt)}<br>
+                            HT: <span style="color: #10b981; font-weight: 600;">${AppData.formatCurrency(sysInvoiceDebtCompleted)}</span> | 
+                            Chưa HT: <span style="color: #fbbf24; font-weight: 600;">${AppData.formatCurrency(sysInvoiceDebtIncomplete)}</span>
+                        </div>
                     </div>
                     <div class="glass-card stat-card" style="border-left: 4px solid var(--warning);">
                         <span class="stat-label">Quỹ Tiền Gửi Còn Lại</span>
@@ -2680,7 +3654,13 @@ const Views = {
                                         <div>Tiền gửi dư:</div>
                                         <div style="text-align: right; font-weight: 600; color: var(--warning);">${(cust.unpaidRefund / 1e6).toFixed(1)}M</div>
 
-                                        <div style="border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; padding-top: 4px; font-weight: bold;">Công nợ:</div>
+                                        <div>Nợ HT:</div>
+                                        <div style="text-align: right; font-weight: 600; color: #10b981;">${(cust.invoiceDebtCompleted / 1e6).toFixed(1)}M</div>
+
+                                        <div>Nợ Chưa HT:</div>
+                                        <div style="text-align: right; font-weight: 600; color: #fbbf24;">${(cust.invoiceDebtIncomplete / 1e6).toFixed(1)}M</div>
+
+                                        <div style="border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; padding-top: 4px; font-weight: bold;">Tổng công nợ:</div>
                                         <div style="border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; padding-top: 4px; text-align: right; font-weight: bold; color: var(--accent);">${(cust.invoiceDebt / 1e6).toFixed(1)}M</div>
                                     </div>
                                 </div>
@@ -2694,6 +3674,8 @@ const Views = {
                                 const combinedPaid = (hq?.totalPaid || 0) + (na?.totalPaid || 0);
                                 const combinedRefund = (hq?.unpaidRefund || 0) + (na?.unpaidRefund || 0);
                                 const combinedDebt = (hq?.invoiceDebt || 0) + (na?.invoiceDebt || 0);
+                                const combinedDebtCompleted = (hq?.invoiceDebtCompleted || 0) + (na?.invoiceDebtCompleted || 0);
+                                const combinedDebtIncomplete = (hq?.invoiceDebtIncomplete || 0) + (na?.invoiceDebtIncomplete || 0);
                                 const combinedRealRev = (hq?.totalRealRevenue || 0) + (na?.totalRealRevenue || 0);
                                 return `
                                     <div class="glass-card" style="grid-column: span 2; border: 2px dashed rgba(255, 255, 255, 0.2); padding: 1.2rem; background: rgba(14, 165, 233, 0.05);">
@@ -2713,6 +3695,12 @@ const Views = {
                                             
                                             <div style="text-align: right;">Tiền gửi dư:</div>
                                             <div style="text-align: right; font-weight: 600; color: var(--warning); font-size: 1rem;">${(combinedRefund / 1e6).toFixed(1)}M</div>
+
+                                            <div>Nợ HT:</div>
+                                            <div style="font-weight: 600; color: #10b981; font-size: 1rem;">${(combinedDebtCompleted / 1e6).toFixed(1)}M</div>
+
+                                            <div style="text-align: right;">Nợ Chưa HT:</div>
+                                            <div style="text-align: right; font-weight: 600; color: #fbbf24; font-size: 1rem;">${(combinedDebtIncomplete / 1e6).toFixed(1)}M</div>
 
                                             <div style="grid-column: span 3; text-align: right; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; padding-top: 8px;">Tổng Công nợ:</div>
                                             <div style="text-align: right; font-weight: bold; color: var(--accent); font-size: 1rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; padding-top: 8px;">${(combinedDebt / 1e6).toFixed(1)}M</div>
@@ -2750,7 +3738,7 @@ const Views = {
                                     </button>
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 1.5rem; text-align: right;">
+                            <div style="display: flex; gap: 1.5rem; text-align: right; align-items: center;">
                                 <div>
                                     <small class="stat-label">Nợ Đầu Kỳ</small>
                                     <div style="font-weight: 700; color: #f59e0b;">${AppData.formatCurrency(selectedData.openingDebt)}</div>
@@ -2763,9 +3751,13 @@ const Views = {
                                     <small class="stat-label">Đã Trả (Thu)</small>
                                     <div style="font-weight: 700; color: var(--secondary);">${AppData.formatCurrency(selectedData.totalPaid)}</div>
                                 </div>
-                                <div style="border-left: 1px solid var(--border-color); padding-left: 1.5rem;">
+                                <div style="border-left: 1px solid var(--border-color); padding-left: 1.5rem; display: flex; flex-direction: column; justify-content: center;">
                                     <small class="stat-label">Công Nợ Còn Lại</small>
-                                    <div style="font-weight: 700; color: var(--accent);">${AppData.formatCurrency(selectedData.invoiceDebt)}</div>
+                                    <div style="font-weight: 700; color: var(--accent); line-height: 1.2;">${AppData.formatCurrency(selectedData.invoiceDebt)}</div>
+                                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">
+                                        HT: <span style="color: #10b981; font-weight: 600;">${AppData.formatCurrency(selectedData.invoiceDebtCompleted)}</span> | 
+                                        Chưa HT: <span style="color: #fbbf24; font-weight: 600;">${AppData.formatCurrency(selectedData.invoiceDebtIncomplete)}</span>
+                                    </div>
                                 </div>
                                 <div style="border-left: 1px solid var(--border-color); padding-left: 1.5rem;">
                                     <small class="stat-label">Tiền Gửi (Còn lại)</small>
@@ -2879,11 +3871,19 @@ const Views = {
                                                 let remainingRefund = refundAmt - returnedForThis;
                                                 totalRemainingRefund += remainingRefund;
                                                 
+                                                const hasContract = s.contractNo && s.contractNo.trim() !== '';
+                                                const badgeHtml = hasContract
+                                                    ? `<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px; margin-left: 6px;">Đã hoàn thành</span>`
+                                                    : `<span class="badge badge-warning" style="font-size: 0.7rem; padding: 2px 6px; margin-left: 6px;">Chưa hoàn thành</span>`;
+
                                                 return `
                                                     <tr onclick="app.editShipment('${s.id}')" title="Click để nhập liệu/chỉnh sửa chuyến hàng" style="cursor: pointer;">
                                                         <td>${idx + 1}</td>
                                                         <td><strong>${vessel ? vessel.name : s.vesselId}</strong> <span class="badge badge-outline">Chuyến ${s.voyageNo}</span></td>
-                                                        <td><code style="font-size: 1.1rem; font-weight: bold; padding: 4px 8px; color: var(--primary-light); background: rgba(255,255,255,0.08); border-radius: 4px;">${s.contractNo || '---'}</code></td>
+                                                        <td>
+                                                            <code style="font-size: 1.1rem; font-weight: bold; padding: 4px 8px; color: var(--primary-light); background: rgba(255,255,255,0.08); border-radius: 4px;">${s.contractNo || '---'}</code>
+                                                            ${badgeHtml}
+                                                        </td>
                                                         <td><strong>${AppData.calcDays(s.dateStart, s.dateEnd)}</strong> ngày</td>
                                                         <td style="text-align: right; font-weight: 500;">${s.qty ? s.qty.toLocaleString('vi-VN') : 0}</td>
                                                         <td style="text-align: right;">${s.rate ? s.rate.toLocaleString('vi-VN') : '0'}</td>
@@ -3082,6 +4082,11 @@ const Views = {
                     <div>
                         <h1 class="page-title"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--primary-light); margin-right:0.5rem;"></i>Báo Cáo Công Nợ</h1>
                         <p class="page-subtitle">Quản lý, đối chiếu công nợ thực tế của khách hàng và nhà cung cấp</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-primary" onclick="app.printAllCustomersDebtReport()">
+                            <i class="fa-solid fa-file-pdf"></i> Xuất Báo Cáo Tổng Hợp
+                        </button>
                     </div>
                 </div>
 
@@ -3463,7 +4468,7 @@ const Views = {
         `;
     },
 
-    reports: (currentTab = 'voyage', filterMonth = '', filterVessel = '', filterVesselMonthly = '', filterMonthMonthly = '') => {
+    reports: (currentTab = 'voyage', filterMonth = '', filterVessel = '', filterVesselMonthly = '', filterMonthMonthly = '', filterYearSummary = '', filterPeriodPersonal = '') => {
         let content = '';
 
         if (currentTab === 'monthly') {
@@ -3471,8 +4476,8 @@ const Views = {
             const vessels = AppData.getVessels();
             const firstVesselId = vessels[0] ? vessels[0].id : '';
 
-            // Build available months from shipments
-            const ships = AppData.getShipments();
+            // Build available months from shipments (completed only)
+            const ships = AppData.getShipments().filter(s => s.contractNo && s.contractNo.trim() !== '');
             const monthsSet = new Set();
             ships.forEach(s => {
                 const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
@@ -3535,33 +4540,48 @@ const Views = {
                 const materialTxs = txs.filter(t => t.category === '9.Vật Tư');
                 const totalMaterial = materialTxs.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
 
-                // Bảo hiểm
-                const daysInMonth = new Date(year, month, 0).getDate();
-                const annualConfig = AppData.getAnnualCosts(year, fvm);
-                const hullInsurance = Math.round(daysInMonth * (annualConfig.hullInsuranceDaily || 0));
-                const socialInsurance = monthlyCost.insurance || 0;
-                const totalInsurance = hullInsurance + socialInsurance;
-
-                // VAT từ chuyến (tính tự động)
-                const autoVat = shipments.reduce((sum, s) => sum + (Number(s.costs?.vat) || 0), 0);
-
                 // Inputs lưu trữ (dư đầu tháng, chi phí văn phòng, VAT tùy chỉnh)
                 const inputs = app.getMonthlyVesselReportInputs(fvm, fmm);
                 const openingBalance = Number(inputs.openingBalance) || 0;
                 let customTotal = 0;
                 inputs.customExpenses.forEach(exp => { customTotal += Number(exp.amount) || 0; });
+                const overrides = inputs.overrides || {};
+
+                // Bảo hiểm
+                const daysInMonth = new Date(year, month, 0).getDate();
+                const annualConfig = AppData.getAnnualCosts(year, fvm);
+                const hullInsurance = Math.round(daysInMonth * (annualConfig.hullInsuranceDaily || 0));
+                const socialInsurance = monthlyCost.insurance || 0;
+                const hullInsuranceVal = overrides.hullInsurance !== undefined ? Number(overrides.hullInsurance) : hullInsurance;
+                const socialInsuranceVal = overrides.socialInsurance !== undefined ? Number(overrides.socialInsurance) : socialInsurance;
+                let totalInsurance = hullInsuranceVal + socialInsuranceVal;
+                if (overrides.hullInsurance === undefined && overrides.socialInsurance === undefined && overrides.insurance !== undefined) {
+                    totalInsurance = Number(overrides.insurance);
+                }
+
+                // VAT từ chuyến (tính tự động)
+                const autoVat = shipments.reduce((sum, s) => sum + (Number(s.costs?.vat) || 0), 0);
+                const vatVal = overrides.vat !== undefined ? Number(overrides.vat) : autoVat;
+
+                const doCostVal = overrides.doCost !== undefined ? Number(overrides.doCost) : doCost;
+                const loCostVal = overrides.loCost !== undefined ? Number(overrides.loCost) : loCost;
+                const advancesVal = overrides.advances !== undefined ? Number(overrides.advances) : vesselAdvances;
+                const salaryVal = overrides.salary !== undefined ? Number(overrides.salary) : crewSalary;
+                const interestVal = overrides.interest !== undefined ? Number(overrides.interest) : totalInterest;
+                const agentVal = overrides.agent !== undefined ? Number(overrides.agent) : totalAgent;
+                const materialVal = overrides.material !== undefined ? Number(overrides.material) : totalMaterial;
 
                 // Doanh thu
                 const totalRevenueSum = shipments.reduce((sum, s) => {
                     let sTotal = Number(s.revenueReal || 0);
                     if (s.revenueInvoice > s.revenueReal) {
-                        sTotal += Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * 0.28);
+                        const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+                        sTotal += Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
                     }
                     return sum + sTotal;
                 }, 0);
 
-                const vatForCost = autoVat;
-                const totalCostSum = doCost + loCost + vesselAdvances + crewSalary + totalInterest + totalAgent + totalMaterial + totalInsurance + vatForCost + customTotal;
+                const totalCostSum = doCostVal + loCostVal + advancesVal + salaryVal + interestVal + agentVal + materialVal + totalInsurance + vatVal + customTotal;
                 const finalBalance = openingBalance + totalRevenueSum - totalCostSum;
 
                 reportHTML = `
@@ -3593,8 +4613,8 @@ const Views = {
                              data-interest="${totalInterest}"
                              data-agent="${totalAgent}"
                              data-material="${totalMaterial}"
-                             data-insurance="${totalInsurance}"
-                             data-vat="${vatForCost}"
+                             data-insurance="${hullInsurance + socialInsurance}"
+                             data-vat="${autoVat}"
                              data-revenue="${totalRevenueSum}"
                              id="monthly-report-data">
                             <table class="report-print-table" style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
@@ -3612,13 +4632,19 @@ const Views = {
                                 <tbody>
                                     <!-- Dư đầu tháng -->
                                     <tr style="background: rgba(148,163,184,0.15); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${inputs.isManualOpening ? `
+                                                <button class="no-print" title="Khôi phục tồn đầu tự động" onclick="app.resetMIOpeningField()" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Tồn tháng trước chuyển sang</td>
                                         <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568;">
                                             <input type="number" id="mi-rep-opening" class="print-input print-input-amount"
                                                 value="${openingBalance}"
                                                 oninput="app.recalcInlineMonthlyReport()"
-                                                style="font-weight:bold; text-align:right; width:100%; background:transparent; border:none; color:inherit; font-size:inherit;">
+                                                style="font-weight:bold; text-align:right; width:100%; color:inherit; font-size:inherit; box-sizing:border-box;">
                                         </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
@@ -3633,7 +4659,8 @@ const Views = {
                                         const details = `HĐ ${s.contractNo || ''} ${vesselName} ${s.portLoad || ''} - ${s.portDischarge || ''} (${s.customer || ''}) ${qtyStr} * ${rateStr}`;
                                         let vatRow = '';
                                         if (s.revenueInvoice > s.revenueReal) {
-                                            const vatAmt = Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * 0.28);
+                                            const rate = s.commissionRate !== undefined ? s.commissionRate / 100 : ((s.contractNo === 'HD25' || s.contractNo === 'HD54') ? 0.20 : 0.28);
+                                            const vatAmt = Math.round((s.revenueInvoice - s.revenueReal) / 1.08 * rate);
                                             vatRow = `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                                                 <td style="text-align: center; padding: 6px 4px; border: 1px solid #4a5568;"></td>
                                                 <td style="padding: 6px 8px 6px 24px; border: 1px solid #4a5568; color: #94a3b8;">VAT tính thêm chuyến này</td>
@@ -3658,55 +4685,115 @@ const Views = {
 
                                     <!-- DẦU DO -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold; border-top: 1px solid #4a5568;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.doCost !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('doCost', ${doCost})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Dầu DO</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(doCost)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-doCost"
+                                                data-field="doCost" data-auto="${doCost}"
+                                                value="${doCostVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.doCost !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
 
                                     <!-- DẦU LO -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.loCost !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('loCost', ${loCost})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Dầu LO</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(loCost)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-loCost"
+                                                data-field="loCost" data-auto="${loCost}"
+                                                value="${loCostVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.loCost !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
 
                                     <!-- TÀU CHI -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.advances !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('advances', ${vesselAdvances})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Tàu chi (Tiền ứng trong tháng)</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(vesselAdvances)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-advances"
+                                                data-field="advances" data-auto="${vesselAdvances}"
+                                                value="${advancesVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.advances !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
 
                                     <!-- LƯƠNG -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.salary !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('salary', ${crewSalary})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Lương</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(crewSalary)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-salary"
+                                                data-field="salary" data-auto="${crewSalary}"
+                                                value="${salaryVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.salary !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
 
                                     <!-- LÃI VAY -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.interest !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('interest', ${totalInterest})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Lãi vay (Trong và ngoài ngân hàng)</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalInterest)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-interest"
+                                                data-field="interest" data-auto="${totalInterest}"
+                                                value="${interestVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.interest !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
@@ -3723,11 +4810,23 @@ const Views = {
 
                                     <!-- CHI PHÍ CẢNG -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.agent !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('agent', ${totalAgent})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Chi phí cảng</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalAgent)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-agent"
+                                                data-field="agent" data-auto="${totalAgent}"
+                                                value="${agentVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.agent !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
@@ -3744,11 +4843,23 @@ const Views = {
 
                                     <!-- VẬT TƯ -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.material !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('material', ${totalMaterial})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Vật tư</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalMaterial)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-material"
+                                                data-field="material" data-auto="${totalMaterial}"
+                                                value="${materialVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.material !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
@@ -3765,40 +4876,84 @@ const Views = {
 
                                     <!-- BẢO HIỂM -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;" id="mi-insurance-action">
+                                            ${(overrides.insurance !== undefined && overrides.hullInsurance === undefined && overrides.socialInsurance === undefined) ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('insurance', ${hullInsurance + socialInsurance})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-shield-halved" style="color: #64748b; opacity: 0.8;" title="Nhóm bảo hiểm"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">Bảo hiểm</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">${AppData.formatCurrency(totalInsurance)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;">
+                                            <span id="mi-display-insurance" style="color:${(overrides.hullInsurance !== undefined || overrides.socialInsurance !== undefined || overrides.insurance !== undefined) ? '#fbbf24' : 'inherit'}">${AppData.formatCurrency(totalInsurance)}</span>
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.hullInsurance !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('hullInsurance', ${hullInsurance})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 5px 8px 5px 24px; border: 1px solid #4a5568; color: #94a3b8;">Bảo hiểm tàu (Phân bổ tháng - ${daysInMonth} ngày)</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568;">${AppData.formatCurrency(hullInsurance)}</td>
+                                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-hullInsurance"
+                                                data-field="hullInsurance" data-auto="${hullInsurance}"
+                                                value="${hullInsuranceVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.hullInsurance !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 5px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.socialInsurance !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('socialInsurance', ${socialInsurance})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 5px 8px 5px 24px; border: 1px solid #4a5568; color: #94a3b8;">Bảo hiểm xã hội tháng</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568;">${AppData.formatCurrency(socialInsurance)}</td>
+                                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-socialInsurance"
+                                                data-field="socialInsurance" data-auto="${socialInsurance}"
+                                                value="${socialInsuranceVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.socialInsurance !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
 
                                     <!-- VAT -->
                                     <tr style="background: rgba(148,163,184,0.1); font-weight: bold;">
-                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;"></td>
+                                        <td style="text-align: center; padding: 7px 4px; border: 1px solid #4a5568;">
+                                            ${overrides.vat !== undefined ? `
+                                                <button class="no-print" title="Khôi phục tính tự động" onclick="app.resetMICostField('vat', ${autoVat})" style="background:none; border:none; color:#fbbf24; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i></button>
+                                            ` : `
+                                                <i class="fa-solid fa-calculator" style="color: #10b981; opacity: 0.8;" title="Tính tự động"></i>
+                                            `}
+                                        </td>
                                         <td style="padding: 7px 8px; border: 1px solid #4a5568;">VAT (các chuyến phát sinh trong tháng)</td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
-                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; color: #f87171; font-weight: bold;" id="mi-rep-vat-display">${AppData.formatCurrency(vatForCost)}</td>
+                                        <td style="text-align: right; padding: 7px 8px; border: 1px solid #4a5568; font-weight: bold;">
+                                            <input type="number" class="print-input mi-cost-input" id="mi-cost-vat"
+                                                data-field="vat" data-auto="${autoVat}"
+                                                value="${vatVal}"
+                                                oninput="app.recalcInlineMonthlyReport()"
+                                                style="font-weight:bold; text-align:right; width:100%; color:${overrides.vat !== undefined ? '#fbbf24' : 'inherit'}; font-size:inherit; box-sizing:border-box;">
+                                        </td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                         <td style="border: 1px solid #4a5568;"></td>
                                     </tr>
@@ -3815,12 +4970,12 @@ const Views = {
                                                 <button class="btn-delete-row no-print" style="background:none;border:none;cursor:pointer;color:#f87171;" onclick="app.deleteMICustomRow(this)"><i class="fa-solid fa-trash"></i></button>
                                             </td>
                                             <td style="padding: 6px 8px 6px 24px; border: 1px solid #4a5568; color: #94a3b8;">
-                                                <input type="text" class="mi-custom-desc" value="${exp.desc || ''}" placeholder="Nhập tên chi phí..." oninput="app.recalcInlineMonthlyReport()" style="width:100%;background:transparent;border:none;color:inherit;font-size:inherit;">
+                                                <input type="text" class="mi-custom-desc print-input-desc" value="${exp.desc || ''}" placeholder="Nhập tên chi phí..." oninput="app.recalcInlineMonthlyReport()" style="width:100%;color:inherit;font-size:inherit;box-sizing:border-box;">
                                             </td>
                                             <td style="border: 1px solid #4a5568;"></td>
                                             <td style="border: 1px solid #4a5568;"></td>
                                             <td style="text-align: right; padding: 6px 8px; border: 1px solid #4a5568; color: #f87171;">
-                                                <input type="number" class="mi-custom-amount" value="${exp.amount || 0}" oninput="app.recalcInlineMonthlyReport()" style="text-align:right;width:100%;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:bold;">
+                                                <input type="number" class="mi-custom-amount print-input" value="${exp.amount || 0}" oninput="app.recalcInlineMonthlyReport()" style="text-align:right;width:100%;color:inherit;font-size:inherit;font-weight:bold;box-sizing:border-box;">
                                             </td>
                                             <td style="border: 1px solid #4a5568;"></td>
                                             <td style="border: 1px solid #4a5568;"></td>
@@ -4006,9 +5161,532 @@ const Views = {
                     ${fuelHTML}
                 </div>
             `;
+        } else if (currentTab === 'personal') {
+            const trans = AppData.getTransactions() || [];
+            const personalTrans = trans.filter(t => t.account === 'Tài khoản cá nhân');
+            
+            // Collect all available months
+            const monthsSet = new Set();
+            personalTrans.forEach(t => {
+                if (t.date) monthsSet.add(t.date.substring(0, 7));
+            });
+            const availableMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+            
+            if (!filterPeriodPersonal) {
+                if (availableMonths.length > 0) {
+                    filterPeriodPersonal = availableMonths[0];
+                } else {
+                    filterPeriodPersonal = new Date().toISOString().substring(0, 7);
+                }
+            }
+            
+            const selectedPeriod = filterPeriodPersonal;
+            
+            // Sort chronologically by date
+            personalTrans.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+            
+            const initialOpening = (AppData.state.company.openingBalances && AppData.state.company.openingBalances['Tài khoản cá nhân']) || 0;
+            
+            let periodOpening = initialOpening;
+            let periodTrans = [];
+            
+            if (selectedPeriod !== 'all') {
+                const preTrans = personalTrans.filter(t => t.date && t.date.substring(0, 7) < selectedPeriod);
+                const preThu = preTrans.reduce((sum, t) => sum + (Number(t.thu) || 0), 0);
+                const preChi = preTrans.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+                periodOpening = initialOpening + preThu - preChi;
+                
+                periodTrans = personalTrans.filter(t => t.date && t.date.substring(0, 7) === selectedPeriod);
+            } else {
+                periodTrans = personalTrans;
+            }
+            
+            let runningBalance = periodOpening;
+            let totalThu = 0;
+            let totalChi = 0;
+            
+            let tableRowsHTML = '';
+            
+            // Add Dư đầu kỳ row
+            tableRowsHTML += `
+                <tr style="background: rgba(148,163,184,0.08); font-weight: bold;">
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="border: 1px solid #4a5568; padding: 7px 8px; font-weight: bold; color: var(--text-muted);">Dư đầu kỳ chuyển sang</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; color: var(--secondary);">-</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; color: var(--accent);">-</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; font-weight: bold; color: var(--info);">${AppData.formatCurrency(periodOpening)}</td>
+                </tr>
+            `;
+            
+            periodTrans.forEach((t, idx) => {
+                const thuAmt = Number(t.thu) || 0;
+                const chiAmt = Number(t.chi) || 0;
+                runningBalance = runningBalance + thuAmt - chiAmt;
+                totalThu += thuAmt;
+                totalChi += chiAmt;
+                
+                tableRowsHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">${idx + 1}</td>
+                        <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">${t.date ? t.date.split('-').reverse().join('/') : ''}</td>
+                        <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px; font-weight: 500;">${t.vessel || '-'}</td>
+                        <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">${t.category || '-'}</td>
+                        <td style="border: 1px solid #4a5568; padding: 7px 8px;">${t.partner || '-'}</td>
+                        <td style="border: 1px solid #4a5568; padding: 7px 8px;">${t.content || '-'}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; color: var(--secondary); font-weight: 500;">${thuAmt > 0 ? AppData.formatCurrency(thuAmt) : '-'}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; color: var(--accent); font-weight: 500;">${chiAmt > 0 ? AppData.formatCurrency(chiAmt) : '-'}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; font-weight: 500; color: var(--info);">${AppData.formatCurrency(runningBalance)}</td>
+                    </tr>
+                `;
+            });
+            
+            // Add Total row
+            tableRowsHTML += `
+                <tr class="summary-row" style="background: rgba(79, 70, 229, 0.1); font-weight: bold; border-top: 2px solid #4a5568;">
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="text-align: center; border: 1px solid #4a5568; padding: 7px 4px;">-</td>
+                    <td style="border: 1px solid #4a5568; padding: 7px 8px;">TỔNG CỘNG PHÁT SINH</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; color: var(--secondary);">${AppData.formatCurrency(totalThu)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; color: var(--accent);">${AppData.formatCurrency(totalChi)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; padding: 7px 8px; color: var(--info); font-size: 1.05rem;">${AppData.formatCurrency(runningBalance)}</td>
+                </tr>
+            `;
+            
+            content = `
+                <div class="glass-card" style="margin-bottom: 1.5rem; padding: 1.25rem 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <label style="font-weight: bold; color: var(--text-main); white-space: nowrap;">Kỳ báo cáo:</label>
+                                <select class="form-control" style="width: 160px;" onchange="app.navigate('reports', 'personal', '', '', '', '', '', this.value)">
+                                    <option value="all" ${selectedPeriod === 'all' ? 'selected' : ''}>-- Tất cả thời gian --</option>
+                                    ${availableMonths.map(m => `<option value="${m}" ${m === selectedPeriod ? 'selected' : ''}>Tháng ${m.split('-')[1]}/${m.split('-')[0]}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.75rem; width: 320px;">
+                                <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted);"></i>
+                                <input type="text" class="form-control" placeholder="Tìm kiếm theo nội dung, đối tác, tàu..." oninput="app.filterPersonalReportTable(this.value)" style="width: 100%;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button class="btn btn-outline" style="border-color: #10b981; color: #10b981;" onclick="app.exportPersonalAccountReport('${selectedPeriod}')">
+                                <i class="fa-solid fa-file-excel"></i> Xuất Excel
+                            </button>
+                            <button class="btn btn-primary" onclick="window.print()">
+                                <i class="fa-solid fa-print"></i> In Báo Cáo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid-4" style="margin-bottom: 1.5rem;">
+                    <div class="glass-card stat-card" style="padding: 1rem 1.25rem;">
+                        <div class="stat-header">
+                            <div class="stat-icon icon-blue" style="font-size: 1rem; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-arrow-right-to-bracket"></i></div>
+                            <span class="badge badge-outline">Dư đầu kỳ</span>
+                        </div>
+                        <div class="stat-value" style="font-size: 1.25rem; margin-top: 0.5rem;">${AppData.formatCurrency(periodOpening)}</div>
+                    </div>
+                    <div class="glass-card stat-card" style="padding: 1rem 1.25rem;">
+                        <div class="stat-header">
+                            <div class="stat-icon icon-green" style="font-size: 1rem; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                            <span class="badge badge-outline" style="color: var(--secondary); border-color: var(--secondary);">Tổng Thu</span>
+                        </div>
+                        <div class="stat-value" style="font-size: 1.25rem; margin-top: 0.5rem; color: var(--secondary);">${AppData.formatCurrency(totalThu)}</div>
+                    </div>
+                    <div class="glass-card stat-card" style="padding: 1rem 1.25rem;">
+                        <div class="stat-header">
+                            <div class="stat-icon icon-red" style="font-size: 1rem; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                            <span class="badge badge-outline" style="color: var(--accent); border-color: var(--accent);">Tổng Chi</span>
+                        </div>
+                        <div class="stat-value" style="font-size: 1.25rem; margin-top: 0.5rem; color: var(--accent);">${AppData.formatCurrency(totalChi)}</div>
+                    </div>
+                    <div class="glass-card stat-card" style="padding: 1rem 1.25rem;">
+                        <div class="stat-header">
+                            <div class="stat-icon icon-purple" style="font-size: 1rem; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-wallet"></i></div>
+                            <span class="badge badge-outline" style="color: var(--info); border-color: var(--info);">Dư cuối kỳ</span>
+                        </div>
+                        <div class="stat-value" style="font-size: 1.25rem; margin-top: 0.5rem; color: var(--info);">${AppData.formatCurrency(runningBalance)}</div>
+                    </div>
+                </div>
+                
+                <div class="glass-card" id="personal-report-inline" style="padding: 1.5rem; overflow-x: auto;">
+                    <style>
+                    @media print {
+                        #personal-report-inline {
+                            display: block !important;
+                            background: #ffffff !important;
+                            color: #000000 !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            border-radius: 0 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                        }
+                        #personal-report-inline table {
+                            border-collapse: collapse !important;
+                            width: 100% !important;
+                            border: 2px solid #000000 !important;
+                        }
+                        #personal-report-inline th,
+                        #personal-report-inline td {
+                            border: 1px solid #000000 !important;
+                            padding: 6px 8px !important;
+                            font-size: 0.8rem !important;
+                            color: #000000 !important;
+                            background: transparent !important;
+                        }
+                        #personal-report-inline thead tr {
+                            background-color: #cbd5e1 !important;
+                            font-weight: bold !important;
+                        }
+                        #personal-report-inline tr.summary-row {
+                            background-color: #cbd5e1 !important;
+                            font-weight: bold !important;
+                        }
+                        .grid-4 {
+                            display: none !important;
+                        }
+                    }
+                    </style>
+                    <div style="text-align: center; margin-bottom: 1.5rem; color: var(--text-main);">
+                        <h2 style="font-weight: 700; text-transform: uppercase; margin: 0 0 0.25rem 0; font-size: 1.35rem;">Sổ Chi Tiết Quỹ Tàu - Tài Khoản Cá Nhân</h2>
+                        <h3 style="font-weight: 600; text-transform: uppercase; font-size: 1rem; color: var(--text-muted); margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
+                            ${selectedPeriod === 'all' ? 'TẤT CẢ THỜI GIAN' : `THÁNG ${selectedPeriod.split('-')[1]}/${selectedPeriod.split('-')[0]}`}
+                        </h3>
+                        <div style="text-align: right; font-style: italic; font-size: 0.88rem; color: var(--text-muted); padding-right: 5px;">ĐVT: VNĐ</div>
+                    </div>
+                    
+                    <table class="report-print-table" style="width: 100%; border-collapse: collapse; font-size: 0.88rem; border: 1px solid #4a5568;">
+                        <thead>
+                            <tr style="background: #2d3a4a; color: #e2e8f0; font-weight: bold;">
+                                <th style="width: 50px; text-align: center; border: 1px solid #4a5568; padding: 8px 4px;">STT</th>
+                                <th style="width: 100px; text-align: center; border: 1px solid #4a5568; padding: 8px 4px;">NGÀY</th>
+                                <th style="width: 80px; text-align: center; border: 1px solid #4a5568; padding: 8px 4px;">TÀU</th>
+                                <th style="width: 110px; text-align: center; border: 1px solid #4a5568; padding: 8px 4px;">HẠNG MỤC</th>
+                                <th style="width: 160px; text-align: left; border: 1px solid #4a5568; padding: 8px;">ĐỐI TÁC</th>
+                                <th style="text-align: left; border: 1px solid #4a5568; padding: 8px;">NỘI DUNG CHI TIẾT</th>
+                                <th style="width: 130px; text-align: right; border: 1px solid #4a5568; padding: 8px;">THU (VND)</th>
+                                <th style="width: 130px; text-align: right; border: 1px solid #4a5568; padding: 8px;">CHI (VND)</th>
+                                <th style="width: 140px; text-align: right; border: 1px solid #4a5568; padding: 8px;">SỐ DƯ (VND)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="personal-report-tbody">
+                            ${tableRowsHTML}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else if (currentTab === 'summary') {
+            const vessels = AppData.getVessels();
+            const ships = AppData.getShipments().filter(s => s.contractNo && s.contractNo.trim() !== '');
+            
+            // Build available years
+            const yearsSet = new Set();
+            ships.forEach(s => {
+                const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                if (m && m.includes('-')) {
+                    yearsSet.add(m.split('-')[0]);
+                }
+            });
+            if (yearsSet.size === 0) yearsSet.add(new Date().getFullYear().toString());
+            const availableYears = Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
+            
+            if (!filterYearSummary && availableYears.length > 0) {
+                filterYearSummary = availableYears[0];
+            }
+            const selectedYear = filterYearSummary;
+            
+            const formatVal1000 = (val) => {
+                if (val === undefined || val === null || val === '') return '-';
+                const num = Math.round(Number(val) / 1000);
+                if (num === 0) return '-';
+                if (num < 0) {
+                    return `(${Math.abs(num).toLocaleString('vi-VN')})`;
+                }
+                return num.toLocaleString('vi-VN');
+            };
+            
+            let tableRowsHTML = '';
+            
+            // Dòng Năm X
+            tableRowsHTML += `
+                <tr class="print-bold-row" style="background: rgba(148,163,184,0.15); font-weight: bold;">
+                    <td></td>
+                    <td style="border: 1px solid #4a5568;">Năm ${selectedYear}</td>
+                    <td colspan="13" style="border: 1px solid #4a5568;"></td>
+                </tr>
+            `;
+            
+            // Track grand totals
+            let yearTotalRevenue = 0;
+            let yearTotalDO = 0;
+            let yearTotalLO = 0;
+            let yearTotalAgent = 0;
+            let yearTotalAdvances = 0;
+            let yearTotalSalary = 0;
+            let yearTotalInterest = 0;
+            let yearTotalInsurance = 0;
+            let yearTotalVat = 0;
+            let yearTotalMaterial = 0;
+            let yearTotalOther = 0;
+            let yearTotalCost = 0;
+            
+            let lastMonthWithDataStr = '';
+            const activeMonths = [];
+            
+            for (let m = 1; m <= 12; m++) {
+                const monthStr = `${selectedYear}-${String(m).padStart(2, '0')}`;
+                let hasData = false;
+                vessels.forEach(v => {
+                    const shipments = ships.some(s => {
+                        const sm = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+                        return s.vesselId === v.id && sm === monthStr;
+                    });
+                    if (shipments) hasData = true;
+                    const txs = (AppData.state.transactions || []).some(t => t.vessel === v.id && t.date && t.date.substring(0, 7) === monthStr);
+                    if (txs) hasData = true;
+                    const fuel = AppData.state.fuelVoyages.some(fv => fv.vesselId === v.id && AppData.parseYearMonth(fv.fuelDate) === monthStr);
+                    if (fuel) hasData = true;
+                    const monthlyCost = AppData.getMonthlyCosts(monthStr, v.id);
+                    if (monthlyCost && (monthlyCost.salary || monthlyCost.insurance)) hasData = true;
+                    const key = `monthly_vessel_report_inputs_${v.id}_${monthStr}`;
+                    if (localStorage.getItem(key)) hasData = true;
+                });
+                
+                if (hasData) {
+                    activeMonths.push({ monthNum: m, monthStr });
+                    lastMonthWithDataStr = monthStr;
+                }
+            }
+            
+            activeMonths.forEach(({ monthNum, monthStr }) => {
+                let monthSubRevenue = 0;
+                let monthSubDO = 0;
+                let monthSubLO = 0;
+                let monthSubAgent = 0;
+                let monthSubAdvances = 0;
+                let monthSubSalary = 0;
+                let monthSubInterest = 0;
+                let monthSubInsurance = 0;
+                let monthSubVat = 0;
+                let monthSubMaterial = 0;
+                let monthSubOther = 0;
+                let monthSubCost = 0;
+                let monthSubClosing = 0;
+                
+                vessels.forEach((v, idx) => {
+                    const breakdown = app.getMonthlyVesselReportBreakdown(v.id, monthStr);
+                    
+                    monthSubRevenue += breakdown.revenue;
+                    monthSubDO += breakdown.doCost;
+                    monthSubLO += breakdown.loCost;
+                    monthSubAgent += breakdown.agent;
+                    monthSubAdvances += breakdown.advances;
+                    monthSubSalary += breakdown.salary;
+                    monthSubInterest += breakdown.interest;
+                    monthSubInsurance += breakdown.insurance;
+                    monthSubVat += breakdown.vat;
+                    monthSubMaterial += breakdown.material;
+                    monthSubOther += breakdown.other;
+                    monthSubCost += breakdown.totalCost;
+                    monthSubClosing += breakdown.closingBalance;
+                    
+                    tableRowsHTML += `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            ${idx === 0 ? `<td rowspan="5" style="text-align: center; vertical-align: middle; font-weight: bold; background: rgba(148,163,184,0.08); border: 1px solid #4a5568;">T${monthNum}</td>` : ''}
+                            <td style="font-weight: 500; border: 1px solid #4a5568; padding-left: 10px;">${v.id}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568; color: var(--secondary); font-weight: 500;">${formatVal1000(breakdown.revenue)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.doCost)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.loCost)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.agent)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.advances)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.salary)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.interest)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.insurance)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568; color: ${breakdown.vat < 0 ? 'var(--accent)' : 'inherit'};">${formatVal1000(breakdown.vat)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.material)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(breakdown.other)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568; font-weight: 500;">${formatVal1000(breakdown.totalCost)}</td>
+                            <td style="text-align: right; border: 1px solid #4a5568; font-weight: 500; color: var(--info);">${formatVal1000(breakdown.closingBalance)}</td>
+                        </tr>
+                    `;
+                });
+                
+                // Subtotal Row
+                tableRowsHTML += `
+                    <tr class="print-sub-bold-row" style="background: rgba(16, 185, 129, 0.1); font-weight: bold; border-top: 2px solid #4a5568;">
+                        <td></td>
+                        <td style="border: 1px solid #4a5568; padding-left: 10px;">Cộng tháng ${monthNum}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568; color: var(--secondary);">${formatVal1000(monthSubRevenue)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubDO)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubLO)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubAgent)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubAdvances)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubSalary)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubInterest)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubInsurance)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568; color: ${monthSubVat < 0 ? 'var(--accent)' : 'inherit'};">${formatVal1000(monthSubVat)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubMaterial)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubOther)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(monthSubCost)}</td>
+                        <td style="text-align: right; border: 1px solid #4a5568; color: var(--info);">${formatVal1000(monthSubClosing)}</td>
+                    </tr>
+                `;
+                
+                yearTotalRevenue += monthSubRevenue;
+                yearTotalDO += monthSubDO;
+                yearTotalLO += monthSubLO;
+                yearTotalAgent += monthSubAgent;
+                yearTotalAdvances += monthSubAdvances;
+                yearTotalSalary += monthSubSalary;
+                yearTotalInterest += monthSubInterest;
+                yearTotalInsurance += monthSubInsurance;
+                yearTotalVat += monthSubVat;
+                yearTotalMaterial += monthSubMaterial;
+                yearTotalOther += monthSubOther;
+                yearTotalCost += monthSubCost;
+            });
+            
+            // Year total closing balance is the sum of closing balances of last active month
+            let yearClosingBalance = 0;
+            if (lastMonthWithDataStr) {
+                vessels.forEach(v => {
+                    const breakdown = app.getMonthlyVesselReportBreakdown(v.id, lastMonthWithDataStr);
+                    yearClosingBalance += breakdown.closingBalance;
+                });
+            }
+            
+            // Grand Total Row
+            tableRowsHTML += `
+                <tr class="print-bold-row" style="background: rgba(79, 70, 229, 0.15); font-weight: bold; border-top: 2px solid #4a5568;">
+                    <td></td>
+                    <td style="border: 1px solid #4a5568; padding-left: 10px;">TỔNG CỘNG NĂM</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; color: var(--secondary);">${formatVal1000(yearTotalRevenue)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalDO)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalLO)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalAgent)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalAdvances)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalSalary)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalInterest)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalInsurance)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; color: ${yearTotalVat < 0 ? 'var(--accent)' : 'inherit'};">${formatVal1000(yearTotalVat)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalMaterial)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalOther)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568;">${formatVal1000(yearTotalCost)}</td>
+                    <td style="text-align: right; border: 1px solid #4a5568; color: var(--info); font-size: 1.05rem;">${formatVal1000(yearClosingBalance)}</td>
+                </tr>
+            `;
+            
+            content = `
+                <div class="glass-card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <label style="font-weight: bold; color: var(--text-main);">Lọc theo năm:</label>
+                            <select class="form-control" style="width: 150px;" onchange="app.navigate('reports', 'summary', '', '', '', '', this.value)">
+                                ${availableYears.map(y => `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>Năm ${y}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button class="btn btn-outline" style="border-color: #10b981; color: #10b981;" onclick="app.exportYearSummaryReport('${selectedYear}')">
+                                <i class="fa-solid fa-file-excel"></i> Xuất Excel
+                            </button>
+                            <button class="btn btn-primary" onclick="window.print()">
+                                <i class="fa-solid fa-print"></i> In Báo Cáo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card" id="summary-report-inline" style="padding: 1.5rem; overflow-x: auto;">
+                    <style>
+                    @media print {
+                        #summary-report-inline {
+                            display: block !important;
+                            background: #ffffff !important;
+                            color: #000000 !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            border-radius: 0 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                        }
+                        #summary-report-inline table {
+                            border-collapse: collapse !important;
+                            width: 100% !important;
+                            border: 2px solid #000000 !important;
+                        }
+                        #summary-report-inline th,
+                        #summary-report-inline td {
+                            border: 1px solid #000000 !important;
+                            padding: 6px 8px !important;
+                            font-size: 0.82rem !important;
+                            color: #000000 !important;
+                            background: transparent !important;
+                        }
+                        #summary-report-inline thead tr,
+                        #summary-report-inline tr.print-header-row {
+                            background-color: #cbd5e1 !important;
+                            font-weight: bold !important;
+                        }
+                        #summary-report-inline tr.print-bold-row {
+                            background-color: #cbd5e1 !important;
+                            font-weight: bold !important;
+                        }
+                        #summary-report-inline tr.print-sub-bold-row {
+                            background-color: #f1f5f9 !important;
+                            font-weight: bold !important;
+                        }
+                    }
+                    </style>
+                    <div style="text-align: center; margin-bottom: 1.5rem; color: var(--text-main);">
+                        <h2 style="font-weight: 700; text-transform: uppercase; margin: 0 0 0.25rem 0; font-size: 1.4rem;">Bảng Tổng Hợp Doanh Thu - Chi Phí Năm ${selectedYear}</h2>
+                        <h3 style="font-weight: 600; text-transform: uppercase; font-size: 1.05rem; color: var(--text-muted); margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">Tàu Vũ Gia 05 - Vũ Gia 09 - Vũ Gia 15 - Vũ Gia 18 - Vũ Gia 36</h3>
+                        <div style="text-align: right; font-style: italic; font-size: 0.88rem; color: var(--text-muted); padding-right: 5px;">ĐVT: 1.000Đ</div>
+                    </div>
+                    
+                    <table class="report-print-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem; border: 1px solid #4a5568;">
+                        <thead>
+                            <tr style="background: #2d3a4a; color: #e2e8f0; font-weight: bold;">
+                                <th rowspan="3" style="width: 60px; text-align: center; border: 1px solid #4a5568;">STT</th>
+                                <th rowspan="3" style="width: 80px; text-align: center; border: 1px solid #4a5568;">TÀU</th>
+                                <th rowspan="3" style="width: 110px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">DOANH THU</th>
+                                <th colspan="10" style="text-align: center; border: 1px solid #4a5568;">CHI PHÍ</th>
+                                <th rowspan="3" style="width: 110px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Cộng chi</th>
+                                <th rowspan="3" style="width: 120px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">TỒN CUỐI THÁNG</th>
+                            </tr>
+                            <tr style="background: #2d3a4a; color: #e2e8f0; font-weight: bold;">
+                                <th colspan="2" style="text-align: center; border: 1px solid #4a5568;">Nhiên liệu</th>
+                                <th rowspan="2" style="width: 90px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Đại lý</th>
+                                <th rowspan="2" style="width: 90px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Chi tàu</th>
+                                <th rowspan="2" style="width: 95px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Chi lương</th>
+                                <th rowspan="2" style="width: 90px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Lãi NH</th>
+                                <th rowspan="2" style="width: 90px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Bảo hiểm</th>
+                                <th rowspan="2" style="width: 90px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">VAT</th>
+                                <th rowspan="2" style="width: 130px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Sửa chữa /<br>Hoán cải / Vật tư</th>
+                                <th rowspan="2" style="width: 100px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">Chi phí khác</th>
+                            </tr>
+                            <tr style="background: #2d3a4a; color: #e2e8f0; font-weight: bold;">
+                                <th style="width: 80px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">DO</th>
+                                <th style="width: 80px; text-align: right; border: 1px solid #4a5568; padding-right: 8px;">LO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHTML}
+                        </tbody>
+                    </table>
+                </div>
+            `;
         } else {
             // VOYAGE REPORT (Mặc định)
-            const ships = AppData.getShipments();
+            const ships = AppData.getShipments().filter(s => s.contractNo && s.contractNo.trim() !== '');
             
             // Xây dựng danh sách các tháng có dữ liệu
             const monthsSet = new Set();
@@ -4160,6 +5838,12 @@ const Views = {
                     </button>
                     <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'monthly' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'monthly' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'monthly', '', '', '', '')">
                         <i class="fa-solid fa-file-invoice-dollar"></i> Báo cáo Tháng
+                    </button>
+                    <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'summary' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'summary' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'summary', '', '', '', '', '')">
+                        <i class="fa-solid fa-list-check"></i> Báo cáo Tổng hợp
+                    </button>
+                    <button class="btn btn-outline" style="border:none; border-bottom:2px solid ${currentTab === 'personal' ? 'var(--primary-light)' : 'transparent'}; border-radius:0; font-weight: ${currentTab === 'personal' ? 'bold' : 'normal'};" onclick="app.navigate('reports', 'personal', '', '', '', '', '', '')">
+                        <i class="fa-solid fa-user-shield"></i> Sổ quỹ Cá nhân
                     </button>
                 </div>
 

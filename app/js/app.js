@@ -3995,7 +3995,16 @@ const app = {
     },
 
     openModal(id) { document.getElementById(id).classList.add('active'); },
-    closeModal(id) { document.getElementById(id).classList.remove('active'); },
+    closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        if (id === 'report-modal') {
+            const m = document.querySelector('#report-modal .modal');
+            if (m) {
+                m.style.maxWidth = '';
+                m.style.width = '';
+            }
+        }
+    },
 
     hrTab: 'all',
 
@@ -4958,6 +4967,351 @@ const app = {
         if(!s) return;
         document.getElementById('report-content').innerHTML = Views.report(s);
         this.openModal('report-modal');
+    },
+
+    printAllCustomersDebtReport() {
+        const debtsData = AppData.getCustomerDebts();
+        const customers = debtsData.list;
+        const vessels = AppData.getVessels();
+        const vesselMap = {};
+        vessels.forEach(v => {
+            vesselMap[v.id] = v.name;
+        });
+
+        const normalizeName = (name) => {
+            if (!name) return 'KHÁC';
+            return name.trim().toUpperCase().replace(/\s+/g, ' ');
+        };
+
+        const matchCustomer = (t, custName) => {
+            if (!t.partner) return false;
+            return normalizeName(t.partner) === custName;
+        };
+
+        let grandTotalRevCompleted = 0;
+        let grandTotalPaid = 0;
+        let grandTotalIncomplete = 0;
+        let grandTotalDebt = 0;
+
+        const rows = customers.map((c, idx) => {
+            const shipments = AppData.getShipments().filter(s => normalizeName(s.customer) === c.name);
+            const transactions = AppData.getTransactions().filter(t => matchCustomer(t, c.name));
+
+            const sortedShipments = [...shipments].sort((a, b) => {
+                const dateA = a.dateStart || '';
+                const dateB = b.dateStart || '';
+                if (dateA !== dateB) return dateA.localeCompare(dateB);
+                return (a.contractNo || '').localeCompare(b.contractNo || '', undefined, {numeric: true, sensitivity: 'base'});
+            });
+
+            // Explicit payments/refunds mapped to shipments
+            const explicitPaidMap = {};
+            sortedShipments.forEach(s => {
+                explicitPaidMap[s.id] = 0;
+            });
+            let unallocatedPaid = 0;
+
+            transactions.forEach(t => {
+                if (t.category === 'CVC') {
+                    const matchedShipment = sortedShipments.find(s => s.contractNo && s.contractNo === t.contractNo);
+                    if (matchedShipment) {
+                        explicitPaidMap[matchedShipment.id] = (explicitPaidMap[matchedShipment.id] || 0) + (Number(t.thu) || 0);
+                    } else {
+                        unallocatedPaid += (Number(t.thu) || 0);
+                    }
+                }
+            });
+
+            const openingDebt = c.openingDebt;
+            let remainingPaid = unallocatedPaid;
+            let openingDebtRemaining = 0;
+
+            if (remainingPaid >= openingDebt) {
+                remainingPaid -= openingDebt;
+                openingDebtRemaining = 0;
+            } else {
+                openingDebtRemaining = openingDebt - remainingPaid;
+                remainingPaid = 0;
+            }
+
+            const contractDebts = [];
+            if (openingDebtRemaining > 0) {
+                contractDebts.push({ contractNo: 'Nợ đầu kỳ', debt: openingDebtRemaining });
+            }
+
+            sortedShipments.forEach((s, sIdx) => {
+                const hasContract = s.contractNo && s.contractNo.trim() !== '';
+                if (!hasContract) return;
+
+                let invoiceAmt = Number(s.revenueInvoice) || 0;
+                let explicitPaid = explicitPaidMap[s.id] || 0;
+                let paidForThis = explicitPaid;
+                
+                if (remainingPaid > 0) {
+                    if (sIdx === sortedShipments.length - 1) {
+                        paidForThis += remainingPaid;
+                        remainingPaid = 0;
+                    } else if (invoiceAmt > paidForThis) {
+                        let gap = invoiceAmt - paidForThis;
+                        let add = Math.min(remainingPaid, gap);
+                        paidForThis += add;
+                        remainingPaid -= add;
+                    }
+                }
+                let remainingDebt = invoiceAmt - paidForThis;
+                if (remainingDebt > 0) {
+                    const rawName = vesselMap[s.vesselId] || s.vesselId;
+                    const vName = rawName.replace(/Vũ\s*Gia|VU\s*GIA/gi, 'VG').replace(/\s+/g, '').trim();
+                    contractDebts.push({
+                        contractNo: s.contractNo,
+                        vesselName: vName,
+                        voyageNo: s.voyageNo,
+                        debt: remainingDebt
+                    });
+                }
+            });
+
+            const totalInvoiceRevenueCompleted = c.totalInvoiceRevenueCompleted;
+            const totalPaid = c.totalPaid;
+            const totalInvoiceRevenueIncomplete = c.totalInvoiceRevenueIncomplete;
+            const totalDebt = c.invoiceDebt;
+
+            grandTotalRevCompleted += totalInvoiceRevenueCompleted;
+            grandTotalPaid += totalPaid;
+            grandTotalIncomplete += totalInvoiceRevenueIncomplete;
+            grandTotalDebt += totalDebt;
+
+            let contractDebtsHtml = '<em>Không có nợ HĐ</em>';
+            if (contractDebts.length > 0) {
+                contractDebtsHtml = contractDebts.map(cd => {
+                    if (cd.contractNo === 'Nợ đầu kỳ') {
+                        return `<div style="margin-bottom: 2px;">• Nợ đầu kỳ: <strong>${AppData.formatCurrency(cd.debt)}</strong></div>`;
+                    }
+                    return `<div style="margin-bottom: 2px;">• ${cd.contractNo} (Tàu ${cd.vesselName || ''} C.${cd.voyageNo || ''}): <strong>${AppData.formatCurrency(cd.debt)}</strong></div>`;
+                }).join('');
+            }
+
+            return `
+                <tr style="border: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top;">${idx + 1}</td>
+                    <td style="border: 1px solid #000; padding: 8px; vertical-align: top;"><strong>${c.name}</strong></td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #1d4ed8;">${AppData.formatCurrency(totalInvoiceRevenueCompleted)}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #15803d;">${AppData.formatCurrency(totalPaid)}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: left; vertical-align: top; font-size: 0.9rem; line-height: 1.4;">${contractDebtsHtml}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #b45309;">${AppData.formatCurrency(totalInvoiceRevenueIncomplete)}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; font-weight: bold; color: #b91c1c;">${AppData.formatCurrency(totalDebt)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const summaryRow = `
+            <tr style="background: #e2e8f0; font-weight: bold; border: 1px solid #000;">
+                <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center;">TỔNG CỘNG KHÁCH HÀNG</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #1d4ed8;">${AppData.formatCurrency(grandTotalRevCompleted)}</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #15803d;">${AppData.formatCurrency(grandTotalPaid)}</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: left;">-</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #b45309;">${AppData.formatCurrency(grandTotalIncomplete)}</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #b91c1c;">${AppData.formatCurrency(grandTotalDebt)}</td>
+            </tr>
+        `;
+
+        // Supplier Debts Calculation
+        const supplierDebts = AppData.getSupplierDebts();
+        const sortedSuppliers = [...supplierDebts].sort((a, b) => b.debt - a.debt);
+
+        let grandSupplierPurchased = 0;
+        let grandSupplierPaid = 0;
+        let grandSupplierDebt = 0;
+
+        const supplierRows = sortedSuppliers.map((s, idx) => {
+            grandSupplierPurchased += s.totalPurchased;
+            grandSupplierPaid += s.totalPaid;
+            grandSupplierDebt += s.debt;
+
+            return `
+                <tr style="border: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top;">${idx + 1}</td>
+                    <td style="border: 1px solid #000; padding: 8px; vertical-align: top;"><strong>${s.name}</strong></td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #1d4ed8;">${AppData.formatCurrency(s.totalPurchased)}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #15803d;">${AppData.formatCurrency(s.totalPaid)}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; font-weight: bold; color: #b91c1c;">${AppData.formatCurrency(s.debt)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const supplierSummaryRow = `
+            <tr style="background: #e2e8f0; font-weight: bold; border: 1px solid #000;">
+                <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center;">TỔNG CỘNG NHÀ CUNG CẤP</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #1d4ed8;">${AppData.formatCurrency(grandSupplierPurchased)}</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #15803d;">${AppData.formatCurrency(grandSupplierPaid)}</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #b91c1c;">${AppData.formatCurrency(grandSupplierDebt)}</td>
+            </tr>
+        `;
+
+        const html = `
+            <div class="print-container" style="color: #000000 !important; background: #ffffff !important; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <style>
+                    /* Force high-contrast black text for screen and print inside print-container */
+                    .print-container {
+                        color: #000000 !important;
+                    }
+                    .print-container h2 {
+                        color: #000000 !important;
+                    }
+                    .print-container p {
+                        color: #333333 !important;
+                    }
+                    .print-container th {
+                        color: #000000 !important;
+                    }
+                    .print-container td {
+                        color: #000000; /* Fallback */
+                    }
+                    .print-container td div {
+                        color: #000000 !important;
+                    }
+                    .print-container td strong {
+                        color: #000000 !important;
+                    }
+                    .print-container td em {
+                        color: #666666 !important;
+                    }
+                    .print-footer-section,
+                    .print-footer-section div {
+                        color: #000000 !important;
+                    }
+                    @media print {
+                        @page {
+                            size: A4 landscape;
+                            margin: 1cm 1.5cm;
+                        }
+                        body {
+                            background: #fff !important;
+                            color: #000 !important;
+                        }
+                        .print-container {
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            box-shadow: none !important;
+                            background: #fff !important;
+                            color: #000 !important;
+                        }
+                    }
+                </style>
+                <div class="print-actions no-print" style="margin-bottom: 1.5rem; text-align: right; display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                    <button class="btn" onclick="app.closeModal('report-modal')" style="background-color: #ef4444 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-xmark"></i> Đóng Báo Cáo</button>
+                    <button class="btn" onclick="app.exportReportAsImage()" style="background-color: #0ea5e9 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-file-image"></i> Tải Ảnh Báo Cáo</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #10b981 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-print"></i> In Báo Cáo / Xuất PDF</button>
+                </div>
+                <div class="print-header" style="text-align: center; margin-bottom: 1.5rem;">
+                    <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; text-transform: uppercase; color: #000000 !important;">BÁO CÁO TỔNG HỢP CÔNG NỢ KHÁCH HÀNG & NHÀ CUNG CẤP</h2>
+                    <p style="margin: 4px 0; font-size: 0.9rem; color: #333333 !important;">Chi tiết công nợ vận chuyển của khách hàng và công nợ nhiên liệu của nhà cung cấp dầu</p>
+                </div>
+                
+                <h3 style="font-size: 1.1rem; font-weight: bold; margin-top: 1.5rem; margin-bottom: 0.5rem; color: #000000 !important; border-left: 4px solid #2563eb; padding-left: 8px; text-align: left;">I. CÔNG NỢ KHÁCH HÀNG (VẬN CHUYỂN)</h3>
+                <table class="report-print-table" style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; border: 1px solid #000; font-size: 0.9rem; color: #000;">
+                    <thead>
+                        <tr style="background: #cbd5e1; font-weight: bold; border: 1px solid #000;">
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; width: 40px;">STT</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: left; min-width: 150px;">Đối Tác / Khách Hàng</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 150px;">Doanh Thu đã HT (VNĐ)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 140px;">Tổng Đã Thu (VNĐ)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: left; width: 380px;">Dư Nợ Còn Lại theo HĐ</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 150px;">Doanh Thu Dở Dang (VNĐ)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 150px;">Tổng Công Nợ (VNĐ)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                        ${summaryRow}
+                    </tbody>
+                </table>
+
+                <h3 style="font-size: 1.1rem; font-weight: bold; margin-top: 2rem; margin-bottom: 0.5rem; color: #000000 !important; border-left: 4px solid #10b981; padding-left: 8px; text-align: left;">II. CÔNG NỢ NHÀ CUNG CẤP (NHIÊN LIỆU DẦU)</h3>
+                <table class="report-print-table" style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; border: 1px solid #000; font-size: 0.9rem; color: #000;">
+                    <thead>
+                        <tr style="background: #cbd5e1; font-weight: bold; border: 1px solid #000;">
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; width: 40px;">STT</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: left;">Nhà Cung Cấp Nhiên Liệu</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 220px;">Tổng Tiền Mua Dầu (VNĐ)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 220px;">Đã Thanh Toán (VNĐ)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 220px;">Còn Nợ (VNĐ)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${supplierRows}
+                        ${supplierSummaryRow}
+                    </tbody>
+                </table>
+                
+                <div class="print-footer-section" style="margin-top: 3rem; display: flex; justify-content: space-between; font-size: 0.9rem; color: #000000 !important;">
+                    <div>
+                        Người Lập Biểu
+                        <div style="margin-top: 4rem; font-weight: bold;">(Ký, ghi rõ họ tên)</div>
+                    </div>
+                    <div style="text-align: right;">
+                        Ngày xuất báo cáo: ${String(new Date().getDate()).padStart(2, '0')}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}
+                        <div style="margin-top: 4.5rem; font-weight: bold; font-style: italic; color: #666;">Hệ thống quản lý đội tàu ShipManage</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('report-content').innerHTML = html;
+        const modalEl = document.querySelector('#report-modal .modal');
+        if (modalEl) {
+            modalEl.style.maxWidth = '1300px';
+            modalEl.style.width = '95%';
+        }
+        this.openModal('report-modal');
+    },
+
+    exportReportAsImage() {
+        if (typeof html2canvas === 'undefined') {
+            alert('Thư viện xuất ảnh chưa được tải xong. Vui lòng thử lại sau vài giây.');
+            return;
+        }
+        
+        const container = document.querySelector('#report-modal .print-container');
+        if (!container) {
+            alert('Không tìm thấy nội dung báo cáo để xuất ảnh!');
+            return;
+        }
+
+        const btn = document.querySelector('button[onclick="app.exportReportAsImage()"]');
+        const originalText = btn ? btn.innerHTML : 'Tải Ảnh Báo Cáo';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
+        }
+
+        html2canvas(container, {
+            scale: 2.5, // High resolution
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            ignoreElements: (element) => {
+                return element.classList.contains('no-print');
+            }
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'Bao_cao_tong_hop_cong_no.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }).catch(err => {
+            console.error('Error generating image:', err);
+            alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
     },
 
     updateHeaderCompanyInfo() {

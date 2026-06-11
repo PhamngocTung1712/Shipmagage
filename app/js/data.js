@@ -9891,7 +9891,8 @@ const DEFAULT_STATE = {
         }
     ],
     "timesheets": [],
-    "annualCosts": []
+    "annualCosts": [],
+    "loans": []
 };
 
 const DB_KEY = 'shipManageDB_v2';
@@ -9899,11 +9900,45 @@ const DB_KEY = 'shipManageDB_v2';
 const AppData = {
     state: null,
 
+    formatDateLocal(d) {
+        if (!d || isNaN(d.getTime())) return '';
+        const y = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${mm}-${dd}`;
+    },
+
+    parseLocalDate(dateStr) {
+        if (!dateStr) return null;
+        const parts = String(dateStr).trim().split(/[-/]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                const y = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10) - 1;
+                const d = parseInt(parts[2], 10);
+                return new Date(y, m, d, 0, 0, 0, 0);
+            }
+            if (parts[2].length === 4) {
+                const d = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10) - 1;
+                const y = parseInt(parts[2], 10);
+                return new Date(y, m, d, 0, 0, 0, 0);
+            }
+        }
+        const d = new Date(dateStr);
+        d.setHours(0,0,0,0);
+        return d;
+    },
+
     init() {
         const stored = localStorage.getItem(DB_KEY);
         if (stored) {
             try {
                 this.state = JSON.parse(stored);
+                if (!this.state.loans) {
+                    this.state.loans = [];
+                    this.save();
+                }
 
                 
                 // === Transaction Safety Migration v276 ===
@@ -10921,10 +10956,18 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
             const custTrans = transactions.filter(t => matchCustomer(t, custName));
 
             let totalInvoiceRevenue = 0;
+            let totalInvoiceRevenueCompleted = 0;
+            let totalInvoiceRevenueIncomplete = 0;
             let totalRealRevenue = 0;
             let totalRefundAmount = 0;
             custShipments.forEach(s => {
-                totalInvoiceRevenue += Number(s.revenueInvoice) || 0;
+                const val = Number(s.revenueInvoice) || 0;
+                totalInvoiceRevenue += val;
+                if (s.contractNo && s.contractNo.trim() !== '') {
+                    totalInvoiceRevenueCompleted += val;
+                } else {
+                    totalInvoiceRevenueIncomplete += val;
+                }
                 totalRealRevenue += Number(s.revenueReal) || 0;
                 totalRefundAmount += Number(s.refundAmount) || 0;
             });
@@ -10939,18 +10982,24 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
             });
 
             const openingDebt = this.state.company.customerOpeningDebts ? (Number(this.state.company.customerOpeningDebts[custName]) || 0) : 0;
-            const invoiceDebt = openingDebt + totalInvoiceRevenue - totalPaid;
+            const invoiceDebtCompleted = openingDebt + totalInvoiceRevenueCompleted - totalPaid;
+            const invoiceDebtIncomplete = totalInvoiceRevenueIncomplete;
+            const invoiceDebt = invoiceDebtCompleted + invoiceDebtIncomplete;
             totalCustomerDebt += invoiceDebt;
 
             return {
                 name: custName,
                 openingDebt,
                 totalInvoiceRevenue,
+                totalInvoiceRevenueCompleted,
+                totalInvoiceRevenueIncomplete,
                 totalRealRevenue,
                 totalRefundAmount,
                 totalPaid,
                 totalReturned,
-                invoiceDebt
+                invoiceDebt,
+                invoiceDebtCompleted,
+                invoiceDebtIncomplete
             };
         });
 
@@ -11563,6 +11612,24 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         this.state.shipments = this.state.shipments.filter(t => t.id !== id);
         this.save();
     },
+    getLoans() {
+        if (!this.state.loans) this.state.loans = [];
+        return this.state.loans;
+    },
+    addLoan(l) {
+        if (!this.state.loans) this.state.loans = [];
+        l.id = l.id || ('L' + Date.now());
+        l.payments = l.payments || [];
+        const idx = this.state.loans.findIndex(x => x.id === l.id);
+        if (idx >= 0) this.state.loans[idx] = l;
+        else this.state.loans.push(l);
+        this.save();
+    },
+    deleteLoan(id) {
+        if (!this.state.loans) this.state.loans = [];
+        this.state.loans = this.state.loans.filter(l => l.id !== id);
+        this.save();
+    },
     
     syncShipmentFromFuelVoyage(vesselId, voyageNo) {
         const shipmentIdx = this.state.shipments.findIndex(s => s.vesselId === vesselId && s.voyageNo === voyageNo);
@@ -11876,6 +11943,177 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         }
         // Formula: (Diff) - (Diff / 1.08 * rate)
         return diff - (diff / 1.08 * rate);
+    },
+
+    parseInterestRate(rateStr) {
+        if (!rateStr) return 0.08;
+        const num = parseFloat(String(rateStr).replace(/[^0-9.]/g, ''));
+        if (isNaN(num)) return 0.08;
+        if (String(rateStr).toLowerCase().includes('tháng') || String(rateStr).toLowerCase().includes('/tháng')) {
+            return (num / 100) * 12;
+        }
+        return num / 100;
+    },
+
+    generateRepaymentSchedule(loan) {
+        const amount = Number(loan.loanAmount) || 0;
+        const termYears = Number(loan.termYears) || 1;
+        const disbursementDateStr = loan.disbursementDate;
+        if (!disbursementDateStr || amount <= 0) return [];
+
+        const annualRate = this.parseInterestRate(loan.interestRate);
+        // Use actual/365 day-count convention (phổ biến tại Việt Nam)
+        const dailyRate = annualRate / 365;
+
+        // Parse disbursement date (midnight local)
+        const disbDate = this.parseLocalDate(disbursementDateStr);
+        if (!disbDate) return [];
+        const totalMonths = Math.round(termYears * 12);
+
+        const principalPeriod = loan.principalPeriod || 'monthly';
+        const interestPeriod  = loan.interestPeriod  || 'monthly';
+        const gracePeriodMonths = Number(loan.gracePeriodMonths) || 0;
+
+        // --- Extract anchor day-of-month from principalDueDate / interestDueDate ---
+        let principalDueDay = disbDate.getDate();
+        let interestDueDay  = disbDate.getDate();
+        if (loan.principalDueDate) {
+            try { const d = this.parseLocalDate(loan.principalDueDate); if (d && !isNaN(d.getTime())) principalDueDay = d.getDate(); } catch(e) {}
+        }
+        if (loan.interestDueDate) {
+            try { const d = this.parseLocalDate(loan.interestDueDate);  if (d && !isNaN(d.getTime())) interestDueDay  = d.getDate(); } catch(e) {}
+        }
+
+        // --- If Sat → next Mon (+2), if Sun → next Mon (+1) ---
+        const adjustWeekend = (d) => {
+            const w = d.getDay();
+            if (w === 6) d.setDate(d.getDate() + 2);
+            else if (w === 0) d.setDate(d.getDate() + 1);
+            return d;
+        };
+
+        // Build the actual calendar due date for month-offset m, adjusted for weekends
+        const buildDueDate = (monthOffset, anchorDay) => {
+            const d = new Date(disbDate);
+            d.setDate(1);                                              // avoid month-overflow
+            d.setMonth(disbDate.getMonth() + monthOffset);
+            const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+            d.setDate(Math.min(anchorDay, lastDay));
+            d.setHours(0,0,0,0);
+            return adjustWeekend(d);
+        };
+
+        const getIntervalMonths = (p) => {
+            if (p === 'monthly')     return 1;
+            if (p === 'quarterly')   return 3;
+            if (p === 'half-yearly') return 6;
+            if (p === 'yearly')      return 12;
+            return 999999; // end-of-term
+        };
+
+        const pInterval = getIntervalMonths(principalPeriod);
+        const iInterval = getIntervalMonths(interestPeriod);
+
+        // --- Calculate starting month offset ---
+        let startPMonthOffset = 1;
+        let startIMonthOffset = 1;
+
+        if (loan.principalDueDate) {
+            try {
+                const pDate = this.parseLocalDate(loan.principalDueDate);
+                if (pDate && !isNaN(pDate.getTime())) {
+                    startPMonthOffset = (pDate.getFullYear() - disbDate.getFullYear()) * 12 + (pDate.getMonth() - disbDate.getMonth());
+                }
+            } catch(e) {}
+        }
+        if (loan.interestDueDate) {
+            try {
+                const iDate = this.parseLocalDate(loan.interestDueDate);
+                if (iDate && !isNaN(iDate.getTime())) {
+                    startIMonthOffset = (iDate.getFullYear() - disbDate.getFullYear()) * 12 + (iDate.getMonth() - disbDate.getMonth());
+                }
+            } catch(e) {}
+        }
+
+        const startMonth = Math.min(startPMonthOffset, startIMonthOffset);
+        const endMonth = totalMonths + startMonth - 1;
+
+        // How many principal installments after the grace period?
+        const principalMonths   = totalMonths - gracePeriodMonths;
+        const numPInstallments  = pInterval >= principalMonths ? 1 : Math.floor(principalMonths / pInterval);
+        
+        let pInstallmentAmt;
+        if (loan.fixedPrincipalAmount && Number(loan.fixedPrincipalAmount) > 0) {
+            pInstallmentAmt = Number(loan.fixedPrincipalAmount);
+        } else {
+            pInstallmentAmt = numPInstallments > 0 ? Math.round(amount / numPInstallments) : amount;
+        }
+
+        const MS_PER_DAY = 86400000;
+        const schedule = [];
+        let remainingPrincipal = amount;
+        let accumulatedInterest = 0;
+
+        // prevPeriodDate tracks from where we count days for the next period.
+        // Starts at disbursement.
+        let prevPeriodDate = new Date(disbDate);
+
+        for (let m = startMonth; m <= endMonth; m++) {
+            if (remainingPrincipal <= 0) break;
+            const afterGrace      = m >= (gracePeriodMonths + startMonth);
+            const isPMilestone    = afterGrace && (
+                (m - startPMonthOffset >= 0 && (m - startPMonthOffset) % pInterval === 0) || 
+                (m === endMonth && remainingPrincipal > 0)
+            );
+            const isIMilestone    = (m - startIMonthOffset >= 0 && (m - startIMonthOffset) % iInterval === 0) || (m === endMonth);
+
+            if (!isPMilestone && !isIMilestone) continue;
+
+            // Due date: prefer principal anchor when both are due the same month
+            const anchorDay  = isPMilestone ? principalDueDay : interestDueDay;
+            const dueDateObj = buildDueDate(m, anchorDay);
+
+            // ── Actual days from previous period date to this due date ──────────
+            const actualDays = Math.round((dueDateObj.getTime() - prevPeriodDate.getTime()) / MS_PER_DAY);
+
+            // Interest accrued over these actual days at the CURRENT remaining principal
+            accumulatedInterest += remainingPrincipal * dailyRate * actualDays;
+
+            let pDue = 0;
+            let iDue = 0;
+
+            if (isPMilestone) {
+                pDue = (m === endMonth) ? remainingPrincipal : Math.min(remainingPrincipal, pInstallmentAmt);
+            }
+            if (isIMilestone) {
+                iDue = Math.round(accumulatedInterest);
+            }
+
+            schedule.push({
+                monthIndex:    m,
+                dueDate:       this.formatDateLocal(dueDateObj),
+                actualDays,                       // số ngày thực tế của kỳ này
+                principalDue:  pDue,
+                interestDue:   iDue,
+                totalDue:      pDue + iDue,
+                balanceBefore: remainingPrincipal,
+                balanceAfter:  remainingPrincipal - pDue,
+                isGracePeriod: !afterGrace
+            });
+
+            // Deduct principal AFTER recording the row (interest was on old balance)
+            remainingPrincipal -= pDue;
+
+            // Advance the previous period date to the current due date for the next period's day calculation
+            prevPeriodDate = new Date(dueDateObj);
+
+            // Reset interest accumulator after each interest payment
+            if (isIMilestone) {
+                accumulatedInterest = 0;
+            }
+        }
+
+        return schedule;
     },
 
     formatCurrency(amount) {
