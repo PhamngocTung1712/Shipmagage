@@ -2336,7 +2336,22 @@ const app = {
         const interestVal = overrides.interest !== undefined ? overrides.interest : totalInterest;
         const agentVal = overrides.agent !== undefined ? overrides.agent : totalAgent;
         const materialVal = overrides.material !== undefined ? overrides.material : totalMaterial;
-        const insuranceVal = overrides.insurance !== undefined ? overrides.insurance : totalInsurance;
+        // Tính tổng bảo hiểm: nếu nhập tay hullInsurance hoặc socialInsurance thì cộng 2 ô con;
+        // nếu nhập tay trực tiếp ô insurance (tổng) thì dùng giá trị đó; ngược lại dùng giá trị tự động.
+        const hullInsInput   = document.getElementById('mi-cost-hullInsurance');
+        const socialInsInput = document.getElementById('mi-cost-socialInsurance');
+        const autoHullIns   = hullInsInput   ? (Number(hullInsInput.getAttribute('data-auto'))   || 0) : 0;
+        const autoSocialIns = socialInsInput ? (Number(socialInsInput.getAttribute('data-auto')) || 0) : 0;
+        const hullInsVal    = overrides.hullInsurance   !== undefined ? overrides.hullInsurance   : autoHullIns;
+        const socialInsVal  = overrides.socialInsurance !== undefined ? overrides.socialInsurance : autoSocialIns;
+        let insuranceVal;
+        if (overrides.insurance !== undefined) {
+            insuranceVal = overrides.insurance;
+        } else if (overrides.hullInsurance !== undefined || overrides.socialInsurance !== undefined) {
+            insuranceVal = hullInsVal + socialInsVal;
+        } else {
+            insuranceVal = totalInsurance;
+        }
         const vatVal = overrides.vat !== undefined ? overrides.vat : vatForCost;
 
         const openingInput = document.getElementById('mi-rep-opening');
@@ -2382,12 +2397,15 @@ const app = {
         const totalCostSum = doCostVal + loCostVal + advancesVal + salaryVal + interestVal + agentVal + materialVal + insuranceVal + vatVal + customTotal;
         const finalBalance = opening + totalRevenueSum - totalCostSum;
 
-        const elOpening = document.getElementById('mi-rep-total-opening');
-        const elCost = document.getElementById('mi-rep-total-cost');
-        const elBalance = document.getElementById('mi-rep-total-balance');
-        if (elOpening) elOpening.innerText = AppData.formatCurrency(opening);
-        if (elCost) elCost.innerText = AppData.formatCurrency(totalCostSum);
-        if (elBalance) elBalance.innerText = AppData.formatCurrency(finalBalance);
+        const elOpening   = document.getElementById('mi-rep-total-opening');
+        const elCost      = document.getElementById('mi-rep-total-cost');
+        const elBalance   = document.getElementById('mi-rep-total-balance');
+        const elInsurance = document.getElementById('mi-display-insurance');
+        if (elOpening)   elOpening.innerText   = AppData.formatCurrency(opening);
+        if (elCost)      elCost.innerText      = AppData.formatCurrency(totalCostSum);
+        if (elBalance)   elBalance.innerText   = AppData.formatCurrency(finalBalance);
+        // Cập nhật dòng tổng Bảo hiểm theo giá trị vừa tính
+        if (elInsurance) elInsurance.innerText = AppData.formatCurrency(insuranceVal);
     },
 
     resetMICostField(fieldId, autoVal) {
