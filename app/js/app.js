@@ -5208,7 +5208,7 @@ const app = {
                 <div class="print-actions no-print" style="margin-bottom: 1.5rem; text-align: right; display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                     <button class="btn" onclick="app.closeModal('report-modal')" style="background-color: #ef4444 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-xmark"></i> Đóng Báo Cáo</button>
                     <button class="btn" onclick="app.exportReportAsImage()" style="background-color: #0ea5e9 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-file-image"></i> Tải Ảnh Báo Cáo</button>
-                    <button class="btn" onclick="window.print()" style="background-color: #10b981 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-print"></i> In Báo Cáo / Xuất PDF</button>
+                    <button class="btn" onclick="app.printDebtReport()" style="background-color: #10b981 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-print"></i> In Báo Cáo / Xuất PDF</button>
                 </div>
                 <div class="print-header" style="text-align: center; margin-bottom: 1.5rem;">
                     <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; text-transform: uppercase; color: #000000 !important;">BÁO CÁO TỔNG HỢP CÔNG NỢ KHÁCH HÀNG & NHÀ CUNG CẤP</h2>
@@ -5292,67 +5292,84 @@ const app = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
         }
 
-        // Clone the container and render it off-screen at a fixed wide width.
-        // This bypasses the mobile viewport constraint (scrollWidth is limited to ~390px on phones).
+        // Use onclone to manipulate the internal clone that html2canvas uses.
+        // windowWidth=1500 forces all CSS media-queries to compute at 1500px
+        // (bypasses the mobile viewport of ~390px) so no columns are clipped.
         const CAPTURE_WIDTH = 1500;
 
-        const clone = container.cloneNode(true);
+        html2canvas(container, {
+            scale:           2,
+            useCORS:         true,
+            backgroundColor: '#ffffff',
+            width:           CAPTURE_WIDTH,
+            windowWidth:     CAPTURE_WIDTH,
+            onclone: (clonedDoc, clonedEl) => {
+                // Remove action buttons
+                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
+                // Force container to full capture width
+                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
+                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
+                clonedEl.style.maxWidth = 'none';
+                clonedEl.style.overflow = 'visible';
+                clonedEl.style.padding  = '2rem';
+                // Force tables to be at least 1300px wide so all columns show
+                clonedEl.querySelectorAll('table').forEach(t => {
+                    t.style.width    = '100%';
+                    t.style.minWidth = '1300px';
+                });
+            }
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'Bao_cao_tong_hop_cong_no.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+        }).catch(err => {
+            console.error('Error generating image:', err);
+            alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+        });
+    },
 
-        // Remove action buttons from the clone
+    // Open a dedicated print window for landscape PDF - mobile browsers ignore
+    // @page{size:landscape} inside window.print(), but a new window with its
+    // own <style> block is respected reliably on both Android and iOS.
+    printDebtReport() {
+        const container = document.querySelector('#report-modal .print-container');
+        if (!container) return;
+
+        const clone = container.cloneNode(true);
         clone.querySelectorAll('.no-print').forEach(el => el.remove());
 
-        // Position off-screen at full width
-        Object.assign(clone.style, {
-            position:   'fixed',
-            top:        '-99999px',
-            left:       '-99999px',
-            width:      CAPTURE_WIDTH + 'px',
-            minWidth:   CAPTURE_WIDTH + 'px',
-            maxWidth:   'none',
-            overflow:   'visible',
-            background: '#ffffff',
-            color:      '#000000',
-            zIndex:     '-1',
-            padding:    '2rem',
-            boxSizing:  'border-box',
-        });
+        const pw = window.open('', '_blank', 'width=1200,height=800');
+        if (!pw) {
+            alert('Trình duyệt đã chặn cửa sổ popup. Vui lòng cho phép popup để in báo cáo.');
+            return;
+        }
 
-        document.body.appendChild(clone);
-
-        // Allow layout to settle before capturing
-        setTimeout(() => {
-            const cloneH = clone.scrollHeight;
-
-            html2canvas(clone, {
-                scale:        2.5,
-                useCORS:      true,
-                backgroundColor: '#ffffff',
-                width:        CAPTURE_WIDTH,
-                height:       cloneH,
-                windowWidth:  CAPTURE_WIDTH + 100,
-                windowHeight: cloneH + 100,
-            }).then(canvas => {
-                document.body.removeChild(clone);
-
-                const link = document.createElement('a');
-                link.download = 'Bao_cao_tong_hop_cong_no.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                }
-            }).catch(err => {
-                if (document.body.contains(clone)) document.body.removeChild(clone);
-                console.error('Error generating image:', err);
-                alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                }
-            });
-        }, 300);
+        pw.document.write(`<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200, initial-scale=1">
+  <title>Báo Cáo Tổng Hợp Công Nợ</title>
+  <style>
+    @page { size: A4 landscape; margin: 1cm 1.5cm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background:#fff !important; color:#000 !important; font-family:Arial,sans-serif; margin:0; padding:1rem; }
+    table { border-collapse:collapse; width:100%; min-width:900px; }
+    th, td { border:1px solid #000 !important; padding:6px 8px; color:#000 !important; font-size:0.88rem; }
+    th { background:#cbd5e1 !important; font-weight:bold; }
+    h2, h3, p, div { color:#000 !important; }
+    .print-actions { display:none !important; }
+  </style>
+</head>
+<body>
+${clone.outerHTML}
+<script>window.onload=function(){window.focus();window.print();};<\/script>
+</body>
+</html>`);
+        pw.document.close();
     },
 
     updateHeaderCompanyInfo() {
