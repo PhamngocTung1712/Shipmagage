@@ -8145,121 +8145,117 @@ const Views = {
             </div>
             <div class="modal-body" style="max-height: 80vh; overflow-y: auto; padding-right: 10px;">
                 <!-- Selectors -->
-                <div class="compare-selectors" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
-                    <div class="form-group" style="margin: 0; flex: 1; min-width: 250px;">
+                <div class="compare-selectors" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                         <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem; font-weight:600; color:var(--primary-light);">Chuyến thứ nhất</label>
-                        <select class="form-control" id="compare-s1" style="height:38px;" onchange="app.updateComparisonSelection()">
-                            ${allShipments.map(s => `<option value="${s.id}" ${s.id === id1 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || '---'}) - ${s.customer || ''}</option>`).join('')}
+                        <select class="form-control" id="compare-s1" style="height:38px; font-size:0.85rem;" onchange="app.updateComparisonSelection()">
+                            ${allShipments.map(s => `<option value="${s.id}" ${s.id === id1 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || 'Không HĐ'})</option>`).join('')}
                         </select>
                     </div>
-                    <div class="form-group" style="margin: 0; flex: 1; min-width: 250px;">
+                    <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                         <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem; font-weight:600; color:var(--warning);">Chuyến thứ hai</label>
-                        <select class="form-control" id="compare-s2" style="height:38px;" onchange="app.updateComparisonSelection()">
-                            ${allShipments.map(s => `<option value="${s.id}" ${s.id === id2 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || '---'}) - ${s.customer || ''}</option>`).join('')}
+                        <select class="form-control" id="compare-s2" style="height:38px; font-size:0.85rem;" onchange="app.updateComparisonSelection()">
+                            ${allShipments.map(s => `<option value="${s.id}" ${s.id === id2 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || 'Không HĐ'})</option>`).join('')}
                         </select>
                     </div>
-                    <div class="form-group" style="margin: 0; flex: 1; min-width: 250px;">
+                    <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                         <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem; font-weight:600; color:var(--secondary);">Chuyến thứ ba (Tùy chọn)</label>
-                        <select class="form-control" id="compare-s3" style="height:38px;" onchange="app.updateComparisonSelection()">
+                        <select class="form-control" id="compare-s3" style="height:38px; font-size:0.85rem;" onchange="app.updateComparisonSelection()">
                             <option value="">-- Không chọn --</option>
-                            ${allShipments.map(s => `<option value="${s.id}" ${s.id === id3 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || '---'}) - ${s.customer || ''}</option>`).join('')}
+                            ${allShipments.map(s => `<option value="${s.id}" ${s.id === id3 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || 'Không HĐ'})</option>`).join('')}
                         </select>
                     </div>
                 </div>
 
-                <!-- Info summary row -->
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 1.5rem;">
-                    <div class="glass-card" style="padding: 10px 15px; border-left: 3px solid var(--primary-light);">
-                        <div style="font-size:0.75rem; color:var(--text-muted);">HĐ ${s1.contractNo || s1.voyageNo} (Tàu ${s1.vesselId})</div>
-                        <div style="font-size:0.8rem; font-weight:bold; color:var(--text-main); margin-top:2px;">Tuyến: ${s1.pLoad || '---'} &rarr; ${s1.pDis || '---'}</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Hàng: ${s1.cargo || '---'} (${s1.qty} Tấn)</div>
-                    </div>
-                    <div class="glass-card" style="padding: 10px 15px; border-left: 3px solid var(--warning);">
-                        <div style="font-size:0.75rem; color:var(--text-muted);">HĐ ${s2.contractNo || s2.voyageNo} (Tàu ${s2.vesselId})</div>
-                        <div style="font-size:0.8rem; font-weight:bold; color:var(--text-main); margin-top:2px;">Tuyến: ${s2.pLoad || '---'} &rarr; ${s2.pDis || '---'}</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Hàng: ${s2.cargo || '---'} (${s2.qty} Tấn)</div>
-                    </div>
-                    ${s3 ? `
-                    <div class="glass-card" style="padding: 10px 15px; border-left: 3px solid var(--secondary);">
-                        <div style="font-size:0.75rem; color:var(--text-muted);">HĐ ${s3.contractNo || s3.voyageNo} (Tàu ${s3.vesselId})</div>
-                        <div style="font-size:0.8rem; font-weight:bold; color:var(--text-main); margin-top:2px;">Tuyến: ${s3.pLoad || '---'} &rarr; ${s3.pDis || '---'}</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Hàng: ${s3.cargo || '---'} (${s3.qty} Tấn)</div>
-                    </div>
-                    ` : ''}
-                </div>
-
-                <!-- Key Metrics side-by-side -->
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                    <div class="glass-card" style="padding: 1rem; border-left: 4px solid var(--info); display:flex; flex-direction:column; justify-content:center;">
-                        <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--text-muted);">Doanh thu thực</span>
-                        <div style="display:flex; flex-direction:column; gap:4px; margin-top:8px;">
-                            <div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s1.contractNo || s1.voyageNo}:</span><span style="font-weight:700; color:var(--info);">${AppData.formatCurrency(s1.revenueReal)}</span></div>
-                            <div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s2.contractNo || s2.voyageNo}:</span><span style="font-weight:700; color:var(--info);">${AppData.formatCurrency(s2.revenueReal)}</span></div>
-                            ${s3 ? `<div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s3.contractNo || s3.voyageNo}:</span><span style="font-weight:700; color:var(--info);">${AppData.formatCurrency(s3.revenueReal)}</span></div>` : ''}
-                        </div>
-                    </div>
-                    <div class="glass-card" style="padding: 1rem; border-left: 4px solid var(--warning); display:flex; flex-direction:column; justify-content:center;">
-                        <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--text-muted);">Tổng Chi Phí (+VAT)</span>
-                        <div style="display:flex; flex-direction:column; gap:4px; margin-top:8px;">
-                            <div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s1.contractNo || s1.voyageNo}:</span><span style="font-weight:700; color:var(--warning);">${AppData.formatCurrency(f1.costSum + f1.vat)}</span></div>
-                            <div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s2.contractNo || s2.voyageNo}:</span><span style="font-weight:700; color:var(--warning);">${AppData.formatCurrency(f2.costSum + f2.vat)}</span></div>
-                            ${s3 ? `<div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s3.contractNo || s3.voyageNo}:</span><span style="font-weight:700; color:var(--warning);">${AppData.formatCurrency(f3.costSum + f3.vat)}</span></div>` : ''}
-                        </div>
-                    </div>
-                    <div class="glass-card" style="padding: 1rem; border-left: 4px solid var(--secondary); display:flex; flex-direction:column; justify-content:center;">
-                        <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--text-muted);">Lợi nhuận ròng</span>
-                        <div style="display:flex; flex-direction:column; gap:4px; margin-top:8px;">
-                            <div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s1.contractNo || s1.voyageNo}:</span><span style="font-weight:700; color:${f1.profit >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(f1.profit)}</span></div>
-                            <div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s2.contractNo || s2.voyageNo}:</span><span style="font-weight:700; color:${f2.profit >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(f2.profit)}</span></div>
-                            ${s3 ? `<div style="display:flex; justify-content:space-between;"><span style="font-size:0.8rem;">HĐ ${s3.contractNo || s3.voyageNo}:</span><span style="font-weight:700; color:${f3.profit >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(f3.profit)}</span></div>` : ''}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Days and Profit/Day row -->
-                <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                    <div class="glass-card" style="padding: 1rem 1.5rem; border-left: 4px solid #3b82f6;">
-                        <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:10px;">Số ngày đi biển</span>
-                        <div style="display:flex; justify-content:space-around; align-items:center;">
-                            <div style="text-align:center;">
-                                <div style="font-size:1.3rem; font-weight:bold; color:#3b82f6;">${days1} ngày</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">HĐ ${s1.contractNo || s1.voyageNo}</div>
-                            </div>
-                            <div style="border-left: 1px solid rgba(255,255,255,0.05); height:30px;"></div>
-                            <div style="text-align:center;">
-                                <div style="font-size:1.3rem; font-weight:bold; color:#3b82f6;">${days2} ngày</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">HĐ ${s2.contractNo || s2.voyageNo}</div>
-                            </div>
-                            ${s3 ? `
-                            <div style="border-left: 1px solid rgba(255,255,255,0.05); height:30px;"></div>
-                            <div style="text-align:center;">
-                                <div style="font-size:1.3rem; font-weight:bold; color:#3b82f6;">${days3} ngày</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">HĐ ${s3.contractNo || s3.voyageNo}</div>
-                            </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                    <div class="glass-card" style="padding: 1rem 1.5rem; border-left: 4px solid #a855f7;">
-                        <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:10px;">Hiệu quả ròng trung bình / Ngày chạy biển</span>
-                        <div style="display:flex; justify-content:space-around; align-items:center;">
-                            <div style="text-align:center;">
-                                <div style="font-size:1.3rem; font-weight:bold; color:${profitPerDay1 >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(profitPerDay1)}</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">HĐ ${s1.contractNo || s1.voyageNo}</div>
-                            </div>
-                            <div style="border-left: 1px solid rgba(255,255,255,0.05); height:30px;"></div>
-                            <div style="text-align:center;">
-                                <div style="font-size:1.3rem; font-weight:bold; color:${profitPerDay2 >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(profitPerDay2)}</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">HĐ ${s2.contractNo || s2.voyageNo}</div>
-                            </div>
-                            ${s3 ? `
-                            <div style="border-left: 1px solid rgba(255,255,255,0.05); height:30px;"></div>
-                            <div style="text-align:center;">
-                                <div style="font-size:1.3rem; font-weight:bold; color:${profitPerDay3 >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(profitPerDay3)}</div>
-                                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">HĐ ${s3.contractNo || s3.voyageNo}</div>
-                            </div>
-                            ` : ''}
-                        </div>
-                    </div>
+                <!-- Side-by-side Comparative Table -->
+                <div class="glass-card" style="padding: 1.2rem; overflow-x: auto; margin-bottom: 1.5rem;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-table-list" style="color: var(--accent);"></i> So Sánh Chỉ Tiêu Khai Thác & Tài Chính
+                    </h4>
+                    <table class="table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border-color); background: rgba(255, 255, 255, 0.02);">
+                                <th style="padding: 10px; text-align: left; color: var(--text-muted); font-weight: 600;">Thông số</th>
+                                <th style="padding: 10px; text-align: right; color: var(--primary-light); font-weight: 700; width: 25%;">HĐ ${s1.contractNo || s1.voyageNo} (${s1.vesselId})</th>
+                                <th style="padding: 10px; text-align: right; color: var(--warning); font-weight: 700; width: 25%;">HĐ ${s2.contractNo || s2.voyageNo} (${s2.vesselId})</th>
+                                ${s3 ? `<th style="padding: 10px; text-align: right; color: var(--secondary); font-weight: 700; width: 25%;">HĐ ${s3.contractNo || s3.voyageNo} (${s3.vesselId})</th>` : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Khách hàng</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s1.customer || '---'}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s2.customer || '---'}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s3.customer || '---'}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Cảng xếp (Đi)</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s1.portLoad || '---'}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s2.portLoad || '---'}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s3.portLoad || '---'}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Cảng dỡ (Đến)</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s1.portDischarge || '---'}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s2.portDischarge || '---'}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s3.portDischarge || '---'}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Hàng hóa</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s1.cargo || '---'}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s2.cargo || '---'}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${s3.cargo || '---'}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Khối lượng</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${Number(s1.qty || 0).toLocaleString()} Tấn</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${Number(s2.qty || 0).toLocaleString()} Tấn</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${Number(s3.qty || 0).toLocaleString()} Tấn</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Đơn giá cước</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${AppData.formatCurrency(s1.rate)} / Tấn</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${AppData.formatCurrency(s2.rate)} / Tấn</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-main);">${AppData.formatCurrency(s3.rate)} / Tấn</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Thời gian chạy</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 500; font-size: 0.8rem; color: var(--text-main);">${s1.dateStart} &rarr; ${s1.dateEnd}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 500; font-size: 0.8rem; color: var(--text-main);">${s2.dateStart} &rarr; ${s2.dateEnd}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 500; font-size: 0.8rem; color: var(--text-main);">${s3.dateStart} &rarr; ${s3.dateEnd}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; color: var(--text-muted);">Số ngày chạy biển</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: #3b82f6;">${days1} ngày</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: #3b82f6;">${days2} ngày</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 600; color: #3b82f6;">${days3} ngày</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); background: rgba(14, 165, 233, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-main);">DOANH THU THỰC</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--info);">${AppData.formatCurrency(s1.revenueReal)}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--info);">${AppData.formatCurrency(s2.revenueReal)}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--info);">${AppData.formatCurrency(s3.revenueReal)}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); background: rgba(244, 63, 94, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-main);">TỔNG CHI PHÍ (+VAT)</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--warning);">${AppData.formatCurrency(f1.costSum + f1.vat)}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--warning);">${AppData.formatCurrency(f2.costSum + f2.vat)}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--warning);">${AppData.formatCurrency(f3.costSum + f3.vat)}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); background: rgba(16, 185, 129, 0.03); border-top: 1px solid var(--border-color);">
+                                <td style="padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-main);">LỢI NHUẬN RÒNG</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${f1.profit >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(f1.profit)}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${f2.profit >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(f2.profit)}</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${f3.profit >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(f3.profit)}</td>` : ''}
+                            </tr>
+                            <tr style="border-bottom: 2px solid var(--border-color); background: rgba(168, 85, 247, 0.03);">
+                                <td style="padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-main);">HIỆU QUẢ RÒNG TRUNG BÌNH / NGÀY</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${profitPerDay1 >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(profitPerDay1)} / ngày</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${profitPerDay2 >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(profitPerDay2)} / ngày</td>
+                                ${s3 ? `<td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${profitPerDay3 >= 0 ? '#10b981' : '#ef4444'};">${AppData.formatCurrency(profitPerDay3)} / ngày</td>` : ''}
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <!-- Charts row -->
