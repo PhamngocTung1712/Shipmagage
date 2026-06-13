@@ -8145,22 +8145,22 @@ const Views = {
             </div>
             <div class="modal-body" style="max-height: 80vh; overflow-y: auto; padding-right: 10px;">
                 <!-- Selectors -->
-                <div class="compare-selectors" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div class="compare-selectors" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
                     <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                         <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem; font-weight:600; color:var(--primary-light);">Chuyến thứ nhất</label>
-                        <select class="form-control" id="compare-s1" style="height:38px; font-size:0.85rem;" onchange="app.updateComparisonSelection()">
+                        <select class="form-control" id="compare-s1" style="height:46px; padding: 6px 12px; font-size:0.95rem; line-height: 1.5; box-sizing: border-box;" onchange="app.updateComparisonSelection()">
                             ${allShipments.map(s => `<option value="${s.id}" ${s.id === id1 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || 'Không HĐ'})</option>`).join('')}
                         </select>
                     </div>
                     <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                         <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem; font-weight:600; color:var(--warning);">Chuyến thứ hai</label>
-                        <select class="form-control" id="compare-s2" style="height:38px; font-size:0.85rem;" onchange="app.updateComparisonSelection()">
+                        <select class="form-control" id="compare-s2" style="height:46px; padding: 6px 12px; font-size:0.95rem; line-height: 1.5; box-sizing: border-box;" onchange="app.updateComparisonSelection()">
                             ${allShipments.map(s => `<option value="${s.id}" ${s.id === id2 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || 'Không HĐ'})</option>`).join('')}
                         </select>
                     </div>
                     <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                         <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem; font-weight:600; color:var(--secondary);">Chuyến thứ ba (Tùy chọn)</label>
-                        <select class="form-control" id="compare-s3" style="height:38px; font-size:0.85rem;" onchange="app.updateComparisonSelection()">
+                        <select class="form-control" id="compare-s3" style="height:46px; padding: 6px 12px; font-size:0.95rem; line-height: 1.5; box-sizing: border-box;" onchange="app.updateComparisonSelection()">
                             <option value="">-- Không chọn --</option>
                             ${allShipments.map(s => `<option value="${s.id}" ${s.id === id3 ? 'selected' : ''}>Tàu ${s.vesselId} - Chuyến ${s.voyageNo} (HĐ: ${s.contractNo || 'Không HĐ'})</option>`).join('')}
                         </select>
