@@ -3921,7 +3921,7 @@ const Views = {
                                                         remainingPaid -= add;
                                                     }
                                                 }
-                                                let remainingDebt = invoiceAmt - paidForThis;
+                                                let remainingDebt = Math.max(0, Math.round(invoiceAmt - paidForThis));
                                                 totalRemainingDebt += remainingDebt;
                                                 totalPaidForThis += paidForThis;
                                                 
@@ -3940,7 +3940,7 @@ const Views = {
                                                         remainingReturned -= add;
                                                     }
                                                 }
-                                                let remainingRefund = refundAmt - returnedForThis;
+                                                let remainingRefund = Math.max(0, Math.round(refundAmt - returnedForThis));
                                                 totalRemainingRefund += remainingRefund;
                                                 
                                                 const hasContract = s.contractNo && s.contractNo.trim() !== '';
@@ -7682,7 +7682,7 @@ const Views = {
                         remainingPaid -= add;
                     }
                 }
-                let remainingDebt = invoiceAmt - paidForThis;
+                let remainingDebt = Math.max(0, Math.round(invoiceAmt - paidForThis));
                 if (remainingDebt > 0) {
                     const rawName = vesselMap[s.vesselId] || s.vesselId;
                     const vName = rawName.replace(/Vũ\s*Gia|VU\s*GIA/gi, 'VG').replace(/\s+/g, '').trim();

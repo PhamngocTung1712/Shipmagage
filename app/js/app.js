@@ -4394,7 +4394,7 @@ const app = {
                         }
                     }
                     if (curr.id === shipment.id) {
-                        targetDebt = invoiceAmt - paidForThis;
+                        targetDebt = Math.max(0, Math.round(invoiceAmt - paidForThis));
                         break;
                     }
                 }
@@ -5252,7 +5252,7 @@ const app = {
                         remainingPaid -= add;
                     }
                 }
-                let remainingDebt = invoiceAmt - paidForThis;
+                let remainingDebt = Math.max(0, Math.round(invoiceAmt - paidForThis));
                 if (remainingDebt > 0) {
                     const rawName = vesselMap[s.vesselId] || s.vesselId;
                     const vName = rawName.replace(/Vũ\s*Gia|VU\s*GIA/gi, 'VG').replace(/\s+/g, '').trim();
