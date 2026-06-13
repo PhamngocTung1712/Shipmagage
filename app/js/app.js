@@ -3056,6 +3056,7 @@ const app = {
         }
         if (viewName === 'shipments') {
             this.initDoubleScroll('shipments-scroll-wrapper');
+            this.updateSelectedComparisonCount();
         }
         if (viewName === 'debts') {
             this.initDoubleScroll('debts-voyages-scroll-wrapper');
@@ -7379,6 +7380,242 @@ const app = {
         const closingBalance = openingBalance + revenue - totalCost;
 
         return { revenue, doCost, loCost, agent, advances, salary, interest, insurance, vat, material, other, totalCost, closingBalance };
+    },
+
+    toggleSelectAllCompare(checked) {
+        document.querySelectorAll('.shipment-compare-chk').forEach(cb => {
+            cb.checked = checked;
+        });
+        this.updateSelectedComparisonCount();
+    },
+
+    updateSelectedComparisonCount() {
+        const count = document.querySelectorAll('.shipment-compare-chk:checked').length;
+        const btn = document.getElementById('shipment-compare-btn');
+        const countDisplay = document.getElementById('compare-count-display');
+        
+        if (countDisplay) countDisplay.textContent = count;
+        if (btn) {
+            btn.style.display = count >= 2 ? 'inline-block' : 'none';
+        }
+    },
+
+    openShipmentCompareModal() {
+        const checkedBoxes = document.querySelectorAll('.shipment-compare-chk:checked');
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
+        
+        let id1 = selectedIds[0] || '';
+        let id2 = selectedIds[1] || '';
+        let id3 = selectedIds[2] || '';
+        
+        const shipments = AppData.getShipments();
+        if (shipments.length < 2) {
+            alert("Bạn cần có ít nhất 2 chuyến hàng trong hệ thống để thực hiện so sánh!");
+            return;
+        }
+        
+        if (!id1 || !id2) {
+            const sortedShipments = shipments.slice().sort((a, b) => {
+                const dateA = a.dateStart || '';
+                const dateB = b.dateStart || '';
+                return dateB.localeCompare(dateA);
+            });
+            id1 = id1 || sortedShipments[0]?.id || '';
+            id2 = id2 || sortedShipments[1]?.id || '';
+        }
+        
+        this.renderShipmentCompareModal(id1, id2, id3);
+        this.openModal('shipment-compare-modal');
+    },
+
+    updateComparisonSelection() {
+        const id1 = document.getElementById('compare-s1').value;
+        const id2 = document.getElementById('compare-s2').value;
+        const id3 = document.getElementById('compare-s3').value;
+        this.renderShipmentCompareModal(id1, id2, id3);
+    },
+
+    renderShipmentCompareModal(id1, id2, id3 = '') {
+        const container = document.getElementById('shipment-compare-modal-content');
+        if (!container) return;
+        
+        container.innerHTML = Views.shipmentCompare(id1, id2, id3);
+        
+        if (this.compareCharts) {
+            Object.values(this.compareCharts).forEach(c => {
+                if (c && typeof c.destroy === 'function') c.destroy();
+            });
+        }
+        this.compareCharts = {};
+        
+        const canvasFin = document.getElementById('compareFinancialsChart');
+        const canvasCost = document.getElementById('compareCostsChart');
+        if (!canvasFin || !canvasCost) return;
+        
+        if (typeof Chart === 'undefined') {
+            console.warn("Chart.js not loaded. Skipping rendering of compare charts.");
+            return;
+        }
+        
+        const s1 = AppData.getShipment(id1);
+        const s2 = AppData.getShipment(id2);
+        const s3 = id3 ? AppData.getShipment(id3) : null;
+        
+        const f1 = AppData.calculateShipmentFinancials(s1);
+        const f2 = AppData.calculateShipmentFinancials(s2);
+        const f3 = s3 ? AppData.calculateShipmentFinancials(s3) : null;
+        
+        const labels = [`HĐ ${s1.contractNo || s1.voyageNo}`, `HĐ ${s2.contractNo || s2.voyageNo}`];
+        if (s3) labels.push(`HĐ ${s3.contractNo || s3.voyageNo}`);
+        
+        const revenues = [s1.revenueReal, s2.revenueReal];
+        if (s3) revenues.push(s3.revenueReal);
+        
+        const costs = [f1.costSum + f1.vat, f2.costSum + f2.vat];
+        if (s3) costs.push(f3.costSum + f3.vat);
+        
+        const profits = [f1.profit, f2.profit];
+        if (s3) profits.push(f3.profit);
+        
+        this.compareCharts.fin = new Chart(canvasFin, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Doanh thu thực',
+                        data: revenues,
+                        backgroundColor: 'rgba(14, 165, 233, 0.75)',
+                        borderColor: '#0ea5e9',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Tổng chi phí',
+                        data: costs,
+                        backgroundColor: 'rgba(244, 63, 94, 0.75)',
+                        borderColor: '#f43f5e',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Lợi nhuận ròng',
+                        data: profits,
+                        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', font: { family: 'Inter', size: 10 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + AppData.formatCurrency(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', callback: value => (value / 1e6).toFixed(0) + 'M' }
+                    },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                }
+            }
+        });
+        
+        const costLabels = ['Dầu DO', 'Lương Crew', 'Đại lý & Cảng', 'Khấu hao vỏ', 'Lên đà định kỳ'];
+        
+        const values1 = [
+            Number(s1.costs?.fuelDO || 0),
+            Number(s1.costs?.crewSalary || 0),
+            Number(s1.costs?.agent || 0) + Number(s1.costs?.portFees || 0),
+            Number(s1.costs?.depreciation || 0),
+            Number(s1.costs?.dockingPeriodic || 0)
+        ];
+        
+        const values2 = [
+            Number(s2.costs?.fuelDO || 0),
+            Number(s2.costs?.crewSalary || 0),
+            Number(s2.costs?.agent || 0) + Number(s2.costs?.portFees || 0),
+            Number(s2.costs?.depreciation || 0),
+            Number(s2.costs?.dockingPeriodic || 0)
+        ];
+        
+        const datasets = [
+            {
+                label: `HĐ ${s1.contractNo || s1.voyageNo}`,
+                data: values1,
+                backgroundColor: 'rgba(14, 165, 233, 0.75)',
+                borderColor: '#0ea5e9',
+                borderWidth: 1,
+                borderRadius: 4
+            },
+            {
+                label: `HĐ ${s2.contractNo || s2.voyageNo}`,
+                data: values2,
+                backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                borderColor: '#f59e0b',
+                borderWidth: 1,
+                borderRadius: 4
+            }
+        ];
+        
+        if (s3) {
+            const values3 = [
+                Number(s3.costs?.fuelDO || 0),
+                Number(s3.costs?.crewSalary || 0),
+                Number(s3.costs?.agent || 0) + Number(s3.costs?.portFees || 0),
+                Number(s3.costs?.depreciation || 0),
+                Number(s3.costs?.dockingPeriodic || 0)
+            ];
+            datasets.push({
+                label: `HĐ ${s3.contractNo || s3.voyageNo}`,
+                data: values3,
+                backgroundColor: 'rgba(168, 85, 247, 0.75)',
+                borderColor: '#a855f7',
+                borderWidth: 1,
+                borderRadius: 4
+            });
+        }
+        
+        this.compareCharts.cost = new Chart(canvasCost, {
+            type: 'bar',
+            data: {
+                labels: costLabels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', font: { family: 'Inter', size: 10 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + AppData.formatCurrency(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', callback: value => (value / 1e6).toFixed(0) + 'M' }
+                    },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                }
+            }
+        });
     }
 };
 
