@@ -5457,6 +5457,112 @@ const app = {
         this.openModal('report-modal');
     },
 
+    prepareClonedElementForCapture(clonedDoc, clonedEl, captureWidth) {
+        try {
+            // Remove all elements with class 'no-print'
+            clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
+            
+            // Set dimensions
+            clonedEl.style.width = captureWidth + 'px';
+            clonedEl.style.minWidth = captureWidth + 'px';
+            clonedEl.style.maxWidth = 'none';
+            clonedEl.style.overflow = 'visible';
+            clonedEl.style.padding = '2rem';
+            
+            // Set a temporary ID on clonedEl if it doesn't have one
+            if (!clonedEl.id) {
+                clonedEl.id = 'cloned-capture-container-' + Date.now();
+            }
+            const containerId = clonedEl.id;
+            
+            // Force tables inside the container to be wide enough
+            clonedEl.querySelectorAll('table').forEach(t => {
+                t.style.width = '100%';
+                t.style.minWidth = '1300px';
+            });
+            
+            // Inject a style block to force light theme styling and high contrast text inside the clone
+            const styleTag = clonedDoc.createElement('style');
+            styleTag.innerHTML = 
+                '#' + containerId + ' {\n' +
+                '    background-color: #ffffff !important;\n' +
+                '    background: #ffffff !important;\n' +
+                '    color: #0b0f19 !important;\n' +
+                '}\n' +
+                '#' + containerId + ', #' + containerId + ' * {\n' +
+                '    --text-main: #0b0f19 !important;\n' +
+                '    --text-muted: #4b5563 !important;\n' +
+                '    --border-color: #cbd5e1 !important;\n' +
+                '    --secondary: #059669 !important;\n' +
+                '    --accent: #dc2626 !important;\n' +
+                '    --info: #0284c7 !important;\n' +
+                '}\n' +
+                '#' + containerId + ' h1, ' +
+                '#' + containerId + ' h2, ' +
+                '#' + containerId + ' h3, ' +
+                '#' + containerId + ' h4, ' +
+                '#' + containerId + ' h5, ' +
+                '#' + containerId + ' h6, ' +
+                '#' + containerId + ' p, ' +
+                '#' + containerId + ' div, ' +
+                '#' + containerId + ' span, ' +
+                '#' + containerId + ' label {\n' +
+                '    color: #0b0f19 !important;\n' +
+                '}\n' +
+                '#' + containerId + ' .text-success, ' +
+                '#' + containerId + ' td.text-success, ' +
+                '#' + containerId + ' [style*="color: var(--secondary)"], ' +
+                '#' + containerId + ' td[style*="var(--secondary)"], ' +
+                '#' + containerId + ' span[style*="var(--secondary)"] {\n' +
+                '    color: #059669 !important;\n' +
+                '}\n' +
+                '#' + containerId + ' .text-danger, ' +
+                '#' + containerId + ' td.text-danger, ' +
+                '#' + containerId + ' [style*="color: var(--accent)"], ' +
+                '#' + containerId + ' td[style*="var(--accent)"], ' +
+                '#' + containerId + ' span[style*="var(--accent)"] {\n' +
+                '    color: #dc2626 !important;\n' +
+                '}\n' +
+                '#' + containerId + ' .text-info, ' +
+                '#' + containerId + ' td.text-info, ' +
+                '#' + containerId + ' [style*="color: var(--info)"], ' +
+                '#' + containerId + ' td[style*="var(--info)"], ' +
+                '#' + containerId + ' span[style*="var(--info)"] {\n' +
+                '    color: #0284c7 !important;\n' +
+                '}\n' +
+                '#' + containerId + ' [style*="color: var(--primary-light)"], ' +
+                '#' + containerId + ' td[style*="var(--primary-light)"], ' +
+                '#' + containerId + ' span[style*="var(--primary-light)"] {\n' +
+                '    color: #0369a1 !important;\n' +
+                '}\n' +
+                '#' + containerId + ' table {\n' +
+                '    border-color: #cbd5e1 !important;\n' +
+                '    background-color: #ffffff !important;\n' +
+                '}\n' +
+                '#' + containerId + ' th {\n' +
+                '    background-color: #1e293b !important;\n' +
+                '    color: #f8fafc !important;\n' +
+                '    border: 1px solid #cbd5e1 !important;\n' +
+                '}\n' +
+                '#' + containerId + ' td {\n' +
+                '    color: #0b0f19 !important;\n' +
+                '    border: 1px solid #cbd5e1 !important;\n' +
+                '    background-color: transparent !important;\n' +
+                '}\n' +
+                '#' + containerId + ' .glass-card, ' +
+                '#' + containerId + ' .stat-card {\n' +
+                '    background-color: #f8fafc !important;\n' +
+                '    background: #f8fafc !important;\n' +
+                '    border: 1px solid #e2e8f0 !important;\n' +
+                '    color: #0b0f19 !important;\n' +
+                '    box-shadow: none !important;\n' +
+                '}\n';
+            clonedDoc.head.appendChild(styleTag);
+        } catch (err) {
+            console.error('Error styling cloned element for image capture:', err);
+        }
+    },
+
     exportReportAsImage() {
         if (typeof html2canvas === 'undefined') {
             alert('Thư viện xuất ảnh chưa được tải xong. Vui lòng thử lại sau vài giây.');
@@ -5488,19 +5594,7 @@ const app = {
             width:           CAPTURE_WIDTH,
             windowWidth:     CAPTURE_WIDTH,
             onclone: (clonedDoc, clonedEl) => {
-                // Remove action buttons
-                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                // Force container to full capture width
-                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
-                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                clonedEl.style.maxWidth = 'none';
-                clonedEl.style.overflow = 'visible';
-                clonedEl.style.padding  = '2rem';
-                // Force tables to be at least 1300px wide so all columns show
-                clonedEl.querySelectorAll('table').forEach(t => {
-                    t.style.width    = '100%';
-                    t.style.minWidth = '1300px';
-                });
+                this.prepareClonedElementForCapture(clonedDoc, clonedEl, CAPTURE_WIDTH);
             }
         }).then(canvas => {
             const link = document.createElement('a');
@@ -5543,16 +5637,7 @@ const app = {
             width:           CAPTURE_WIDTH,
             windowWidth:     CAPTURE_WIDTH,
             onclone: (clonedDoc, clonedEl) => {
-                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
-                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                clonedEl.style.maxWidth = 'none';
-                clonedEl.style.overflow = 'visible';
-                clonedEl.style.padding  = '2rem';
-                clonedEl.querySelectorAll('table').forEach(t => {
-                    t.style.width    = '100%';
-                    t.style.minWidth = '1300px';
-                });
+                this.prepareClonedElementForCapture(clonedDoc, clonedEl, CAPTURE_WIDTH);
             }
         }).then(canvas => {
             canvas.toBlob(blob => {
@@ -5687,16 +5772,7 @@ const app = {
             width:           CAPTURE_WIDTH,
             windowWidth:     CAPTURE_WIDTH,
             onclone: (clonedDoc, clonedEl) => {
-                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
-                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                clonedEl.style.maxWidth = 'none';
-                clonedEl.style.overflow = 'visible';
-                clonedEl.style.padding  = '2rem';
-                clonedEl.querySelectorAll('table').forEach(t => {
-                    t.style.width    = '100%';
-                    t.style.minWidth = '1300px';
-                });
+                this.prepareClonedElementForCapture(clonedDoc, clonedEl, CAPTURE_WIDTH);
             }
         }).then(canvas => {
             const escapedElementId = elementId.replace(/'/g, "");
@@ -5736,16 +5812,7 @@ const app = {
             width:           CAPTURE_WIDTH,
             windowWidth:     CAPTURE_WIDTH,
             onclone: (clonedDoc, clonedEl) => {
-                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
-                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                clonedEl.style.maxWidth = 'none';
-                clonedEl.style.overflow = 'visible';
-                clonedEl.style.padding  = '2rem';
-                clonedEl.querySelectorAll('table').forEach(t => {
-                    t.style.width    = '100%';
-                    t.style.minWidth = '1300px';
-                });
+                this.prepareClonedElementForCapture(clonedDoc, clonedEl, CAPTURE_WIDTH);
             }
         }).then(canvas => {
             this.handleImageShareOrDownload(canvas, imageName || `${elementId}.png`, btn, originalText, 'download');
@@ -5805,16 +5872,7 @@ const app = {
                 width: CAPTURE_WIDTH,
                 windowWidth: CAPTURE_WIDTH,
                 onclone: (clonedDoc, clonedEl) => {
-                    clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                    clonedEl.style.width = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.maxWidth = 'none';
-                    clonedEl.style.overflow = 'visible';
-                    clonedEl.style.padding = '2rem';
-                    clonedEl.querySelectorAll('table').forEach(t => {
-                        t.style.width = '100%';
-                        t.style.minWidth = '1300px';
-                    });
+                    this.prepareClonedElementForCapture(clonedDoc, clonedEl, CAPTURE_WIDTH);
                 }
             }).then(canvas => {
                 this.handleImageShareOrDownload(canvas, `Bao_cao_tong_hop_${startMonth}_den_${endMonth}.png`, btn, originalText, 'download');
@@ -5842,16 +5900,7 @@ const app = {
                 width: CAPTURE_WIDTH,
                 windowWidth: CAPTURE_WIDTH,
                 onclone: (clonedDoc, clonedEl) => {
-                    clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                    clonedEl.style.width = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.maxWidth = 'none';
-                    clonedEl.style.overflow = 'visible';
-                    clonedEl.style.padding = '2rem';
-                    clonedEl.querySelectorAll('table').forEach(t => {
-                        t.style.width = '100%';
-                        t.style.minWidth = '1300px';
-                    });
+                    this.prepareClonedElementForCapture(clonedDoc, clonedEl, CAPTURE_WIDTH);
                 }
             }).then(canvas => {
                 this.handleImageShareOrDownload(canvas, `Bao_cao_tong_hop_${startMonth}_den_${endMonth}.png`, btn, originalText, 'share');
