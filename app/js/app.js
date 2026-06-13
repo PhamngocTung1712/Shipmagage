@@ -7626,6 +7626,391 @@ const app = {
                 }
             }
         });
+    },
+
+    openVirtualShipmentModal() {
+        try {
+            const vessels = AppData.getVessels();
+            if (!vessels || vessels.length === 0) {
+                alert("Hệ thống chưa có dữ liệu tàu. Hãy thêm tàu trước!");
+                return;
+            }
+            
+            const firstVesselId = vessels[0].id;
+            
+            // Prepopulate 2-3 default scenarios for firstVesselId
+            // We can look up the last shipment of this vessel to suggest a default cargo and ports
+            const vesselShipments = AppData.getShipments().filter(s => s.vesselId === firstVesselId);
+            const latestShipment = vesselShipments[0] || {};
+            
+            const defaultScenarios = [
+                {
+                    pLoad: latestShipment.portLoad || 'Cảng Xếp 1',
+                    pDis: latestShipment.portDischarge || 'Cảng Dỡ 1',
+                    qty: Number(latestShipment.qty) || 3000,
+                    rate: Number(latestShipment.rate) || 150000,
+                    dateStart: new Date().toISOString().split('T')[0],
+                    dateEnd: new Date(Date.now() + 10*24*3600*1000).toISOString().split('T')[0],
+                    hours: 120,
+                    doPrice: 20000,
+                    loPrice: 85000,
+                    agentPortFees: 50000000,
+                    brokerage: 0,
+                    others: 0
+                },
+                {
+                    pLoad: latestShipment.portLoad || 'Cảng Xếp 2',
+                    pDis: latestShipment.portDischarge || 'Cảng Dỡ 2',
+                    qty: Number(latestShipment.qty) || 3000,
+                    rate: Number(latestShipment.rate) || 160000,
+                    dateStart: new Date().toISOString().split('T')[0],
+                    dateEnd: new Date(Date.now() + 12*24*3600*1000).toISOString().split('T')[0],
+                    hours: 140,
+                    doPrice: 20000,
+                    loPrice: 85000,
+                    agentPortFees: 60000000,
+                    brokerage: 0,
+                    others: 0
+                },
+                {
+                    pLoad: '',
+                    pDis: '',
+                    qty: '',
+                    rate: '',
+                    dateStart: '',
+                    dateEnd: '',
+                    hours: '',
+                    doPrice: 20000,
+                    loPrice: 85000,
+                    agentPortFees: '',
+                    brokerage: '',
+                    others: ''
+                }
+            ];
+            
+            this.virtualScenarios = defaultScenarios;
+            this.activeVirtualVessel = firstVesselId;
+            
+            const container = document.getElementById('virtual-shipment-modal-content');
+            if (container) {
+                container.innerHTML = Views.virtualShipmentSimulator(firstVesselId, defaultScenarios);
+            }
+            
+            this.openModal('virtual-shipment-modal');
+            this.recalculateVirtualShipment();
+        } catch (err) {
+            console.error(err);
+            alert("LỖI KHI MỞ GIẢ LẬP CHUYẾN:\n" + err.message);
+        }
+    },
+    
+    updateVirtualShipmentVessel(vesselId) {
+        try {
+            this.activeVirtualVessel = vesselId;
+            const vesselShipments = AppData.getShipments().filter(s => s.vesselId === vesselId);
+            const latestShipment = vesselShipments[0] || {};
+            
+            // Read current values of inputs to preserve them if possible
+            for (let i = 0; i < 3; i++) {
+                if (document.getElementById(`sim-pLoad-${i}`)) {
+                    this.virtualScenarios[i] = {
+                        pLoad: document.getElementById(`sim-pLoad-${i}`).value,
+                        pDis: document.getElementById(`sim-pDis-${i}`).value,
+                        qty: document.getElementById(`sim-qty-${i}`).value === '' ? '' : Number(document.getElementById(`sim-qty-${i}`).value),
+                        rate: document.getElementById(`sim-rate-${i}`).value === '' ? '' : Number(document.getElementById(`sim-rate-${i}`).value),
+                        dateStart: document.getElementById(`sim-start-${i}`).value,
+                        dateEnd: document.getElementById(`sim-end-${i}`).value,
+                        hours: document.getElementById(`sim-hours-${i}`).value === '' ? '' : Number(document.getElementById(`sim-hours-${i}`).value),
+                        doPrice: Number(document.getElementById(`sim-doPrice-${i}`).value) || 20000,
+                        loPrice: Number(document.getElementById(`sim-loPrice-${i}`).value) || 85000,
+                        agentPortFees: document.getElementById(`sim-portFees-${i}`).value === '' ? '' : Number(document.getElementById(`sim-portFees-${i}`).value),
+                        brokerage: Number(document.getElementById(`sim-brokerage-${i}`).value) || 0,
+                        others: Number(document.getElementById(`sim-others-${i}`).value) || 0
+                    };
+                }
+            }
+            
+            const container = document.getElementById('virtual-shipment-modal-content');
+            if (container) {
+                container.innerHTML = Views.virtualShipmentSimulator(vesselId, this.virtualScenarios);
+            }
+            this.recalculateVirtualShipment();
+        } catch (err) {
+            console.error(err);
+        }
+    },
+    
+    recalculateVirtualShipment() {
+        try {
+            const vesselId = this.activeVirtualVessel;
+            const vessel = AppData.getVessel(vesselId);
+            if (!vessel) return;
+            
+            const results = [];
+            
+            for (let i = 0; i < 3; i++) {
+                const pLoad = document.getElementById(`sim-pLoad-${i}`).value;
+                const pDis = document.getElementById(`sim-pDis-${i}`).value;
+                const qtyVal = document.getElementById(`sim-qty-${i}`).value;
+                const rateVal = document.getElementById(`sim-rate-${i}`).value;
+                const dateStart = document.getElementById(`sim-start-${i}`).value;
+                const dateEnd = document.getElementById(`sim-end-${i}`).value;
+                const hoursVal = document.getElementById(`sim-hours-${i}`).value;
+                const doPrice = Number(document.getElementById(`sim-doPrice-${i}`).value) || 0;
+                const loPrice = Number(document.getElementById(`sim-loPrice-${i}`).value) || 0;
+                const portFees = Number(document.getElementById(`sim-portFees-${i}`).value) || 0;
+                const brokerage = Number(document.getElementById(`sim-brokerage-${i}`).value) || 0;
+                const others = Number(document.getElementById(`sim-others-${i}`).value) || 0;
+                
+                // If it's Scenario 3 and it's completely empty, we can skip it or mark it inactive
+                const isEmpty = (i === 2 && !qtyVal && !rateVal && !dateStart);
+                
+                if (isEmpty) {
+                    results.push(null);
+                    continue;
+                }
+                
+                const qty = Number(qtyVal) || 0;
+                const rate = Number(rateVal) || 0;
+                const hours = Number(hoursVal) || 0;
+                
+                const days = AppData.calcDays(dateStart, dateEnd) || 1;
+                
+                // Doanh thu thực
+                const revenueReal = qty * rate;
+                
+                // Chi phí dầu DO
+                const doRate = Number(vessel.fuelRate) || 150; // default to 150 L/h
+                const fuelDO = Math.round(hours * doRate * doPrice);
+                
+                // Chi phí dầu LO
+                const loHours = Number(vessel.loHours) || 800;
+                const loRepl = Number(vessel.loReplacementQty) || 8;
+                const loTopup = Number(vessel.loTopupQty) || 3;
+                const hourlyLORate = loHours > 0 ? ((loRepl + loTopup) / loHours) : 0;
+                const fuelLO = Math.round(hours * hourlyLORate * loPrice);
+                
+                // Phân bổ chi phí cố định (crew salary, food, insurance, depreciation, loan bank, loan external, monthly other, annual costs)
+                // We will look up monthly costs and annual costs based on the start date
+                const year = dateStart ? new Date(dateStart).getFullYear() : new Date().getFullYear();
+                const monthStr = dateStart ? dateStart.substring(0, 7) : new Date().toISOString().substring(0, 7);
+                
+                const monthlyCost = AppData.getMonthlyCosts(monthStr, vesselId);
+                const annualConfig = AppData.getAnnualCosts(year, vesselId);
+                
+                // Daily rates
+                const dailySalary = (Number(monthlyCost.salary) || 0) / 30;
+                const dailyFood = (Number(monthlyCost.food) || 0) / 30;
+                const dailyInsurance = (Number(monthlyCost.insurance) || 0) / 30;
+                const dailyLoanInterest = (Number(monthlyCost.loanInterest) || 0) / 30;
+                const dailyLoanInterestExternal = (Number(monthlyCost.loanInterestExternal) || 0) / 30;
+                const dailyOtherMonthly = (Number(monthlyCost.other) || 0) / 30;
+                const dailyMaterialCompany = (Number(monthlyCost.materialCompany) || 0) / 30;
+                const dailyMaterialVessel = (Number(monthlyCost.materialVessel) || 0) / 30;
+                
+                const dailyDepreciation = Number(annualConfig.depreciationDaily) || 0;
+                const dailyHullInsurance = Number(annualConfig.hullInsuranceDaily) || 0;
+                const dailyLargeRepair = Number(annualConfig.largeRepairDaily) || 0;
+                const dailyRegistryAnnual = Number(annualConfig.registryAnnualDaily) || 0;
+                const dailyDockingIntermediate = Number(annualConfig.dockingIntermediateDaily) || 0;
+                const dailyDockingPeriodic = Number(annualConfig.dockingPeriodicDaily) || 0;
+                
+                // Allocations
+                const allocatedSalary = Math.round(dailySalary * days);
+                const allocatedFood = Math.round(dailyFood * days);
+                const allocatedInsurance = Math.round(dailyInsurance * days);
+                const allocatedInterest = Math.round(dailyLoanInterest * days);
+                const allocatedInterestExt = Math.round(dailyLoanInterestExternal * days);
+                const allocatedOtherMonthly = Math.round(dailyOtherMonthly * days);
+                const allocatedMaterialCompany = Math.round(dailyMaterialCompany * days);
+                const allocatedMaterialVessel = Math.round(dailyMaterialVessel * days);
+                
+                const allocatedDepreciation = Math.round(dailyDepreciation * days);
+                const allocatedHullInsurance = Math.round(dailyHullInsurance * days);
+                const allocatedLargeRepair = Math.round(dailyLargeRepair * days);
+                const allocatedRegistry = Math.round(dailyRegistryAnnual * days);
+                const allocatedDockingInt = Math.round(dailyDockingIntermediate * days);
+                const allocatedDockingPer = Math.round(dailyDockingPeriodic * days);
+                
+                const fixedCostSum = allocatedSalary + allocatedFood + allocatedInsurance + allocatedInterest + allocatedInterestExt + allocatedOtherMonthly + allocatedMaterialCompany + allocatedMaterialVessel + allocatedDepreciation + allocatedHullInsurance + allocatedLargeRepair + allocatedRegistry + allocatedDockingInt + allocatedDockingPer;
+                
+                // VAT chuyến: 8% Doanh thu - 8% (Dầu DO + Dầu LO + Phí Cảng)
+                const deduc = fuelDO + fuelLO + portFees;
+                const vat = Math.round((0.08 * revenueReal) - (0.08 * deduc));
+                const vatVal = vat > 0 ? vat : 0;
+                
+                // Tổng chi phí
+                const totalCosts = fuelDO + fuelLO + portFees + brokerage + others + fixedCostSum;
+                
+                // Lợi nhuận ròng
+                const netProfit = (revenueReal - vatVal) - totalCosts;
+                
+                // Lợi nhuận / ngày
+                const profitPerDay = Math.round(netProfit / days);
+                
+                results.push({
+                    pLoad,
+                    pDis,
+                    qty,
+                    rate,
+                    days,
+                    hours,
+                    revenueReal,
+                    fuelDO,
+                    fuelLO,
+                    portFees,
+                    brokerage,
+                    others,
+                    fixedCostSum,
+                    vatVal,
+                    totalCosts,
+                    netProfit,
+                    profitPerDay
+                });
+            }
+            
+            // Build Results HTML rows
+            const resultsBody = document.getElementById('sim-results-body');
+            if (resultsBody) {
+                const renderCellVal = (res, formatFn) => {
+                    if (!res) return `<td style="padding:8px 10px; text-align:right; color:var(--text-muted);">---</td>`;
+                    return `<td style="padding:8px 10px; text-align:right; font-weight:600; color:var(--text-main);">${formatFn(res)}</td>`;
+                };
+                
+                resultsBody.innerHTML = `
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted);">Tuyến đường</td>
+                        ${results.map(r => r ? `<td style="padding:8px 10px; text-align:right; font-weight:600; color:var(--text-main);">${r.pLoad || '---'} &rarr; ${r.pDis || '---'}</td>` : `<td style="padding:8px 10px; text-align:right; color:var(--text-muted);">---</td>`).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted);">Sản lượng & Đơn giá cước</td>
+                        ${results.map(r => r ? `<td style="padding:8px 10px; text-align:right; color:var(--text-main);">${r.qty.toLocaleString()} Tấn | ${AppData.formatCurrency(r.rate)} / Tấn</td>` : `<td style="padding:8px 10px; text-align:right; color:var(--text-muted);">---</td>`).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted);">Thời gian khai thác</td>
+                        ${results.map(r => r ? `<td style="padding:8px 10px; text-align:right; color:var(--text-main);">${r.days} Ngày (${r.hours} Giờ biển)</td>` : `<td style="padding:8px 10px; text-align:right; color:var(--text-muted);">---</td>`).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); background: rgba(14, 165, 233, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; font-weight:600; color:var(--text-main);">DOANH THU THỰC DỰ PHÓNG</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.revenueReal))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted); padding-left: 20px;">- Chi phí dầu DO dự toán</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.fuelDO))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted); padding-left: 20px;">- Chi phí dầu LO dự toán</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.fuelLO))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted); padding-left: 20px;">- Chi phí Cảng & Đại lý nhập</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.portFees))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted); padding-left: 20px;">- Môi giới & Chi phí khác nhập</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.brokerage + x.others))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted); padding-left: 20px;">- Chi phí cố định phân bổ</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.fixedCostSum))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); color: var(--accent);">
+                        <td style="padding:8px 10px; text-align:left; color:var(--text-muted); padding-left: 20px;">- Thuế VAT chuyến tạm tính</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.vatVal))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); background: rgba(244, 63, 94, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; font-weight:600; color:var(--text-main);">TỔNG CHI PHÍ (+VAT) DỰ PHÓNG</td>
+                        ${results.map(r => renderCellVal(r, x => AppData.formatCurrency(x.totalCosts + x.vatVal))).join('')}
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); background: rgba(16, 185, 129, 0.03); border-top: 1px solid var(--border-color);">
+                        <td style="padding:8px 10px; text-align:left; font-weight:600; color:var(--text-main);">LỢI NHUẬN RÒNG DỰ PHÓNG</td>
+                        ${results.map(r => {
+                            if (!r) return `<td style="padding:8px 10px; text-align:right; color:var(--text-muted);">---</td>`;
+                            const color = r.netProfit >= 0 ? '#10b981' : '#ef4444';
+                            return `<td style="padding:8px 10px; text-align:right; font-weight:700; color:${color};">${AppData.formatCurrency(r.netProfit)}</td>`;
+                        }).join('')}
+                    </tr>
+                    <tr style="border-bottom: 2px solid var(--border-color); background: rgba(168, 85, 247, 0.03);">
+                        <td style="padding:8px 10px; text-align:left; font-weight:600; color:var(--text-main);">HIỆU QUẢ RÒNG TRUNG BÌNH / NGÀY</td>
+                        ${results.map(r => {
+                            if (!r) return `<td style="padding:8px 10px; text-align:right; color:var(--text-muted);">---</td>`;
+                            const color = r.profitPerDay >= 0 ? '#10b981' : '#ef4444';
+                            return `<td style="padding:8px 10px; text-align:right; font-weight:700; color:${color};">${AppData.formatCurrency(r.profitPerDay)} / ngày</td>`;
+                        }).join('')}
+                    </tr>
+                `;
+            }
+            
+            // Build recommendations
+            const recsCard = document.getElementById('sim-recs-card');
+            if (recsCard) {
+                const validScenarios = results.filter(r => r !== null);
+                if (validScenarios.length >= 2) {
+                    recsCard.style.display = 'block';
+                    
+                    // Find highest total profit scenario
+                    let bestTotalIdx = 0;
+                    let maxTotalProfit = -Infinity;
+                    
+                    // Find highest daily profit scenario
+                    let bestDailyIdx = 0;
+                    let maxDailyProfit = -Infinity;
+                    
+                    results.forEach((r, idx) => {
+                        if (r) {
+                            if (r.netProfit > maxTotalProfit) {
+                                maxTotalProfit = r.netProfit;
+                                bestTotalIdx = idx;
+                            }
+                            if (r.profitPerDay > maxDailyProfit) {
+                                maxDailyProfit = r.profitPerDay;
+                                bestDailyIdx = idx;
+                            }
+                        }
+                    });
+                    
+                    let recsHtml = `
+                        <h4 style="margin:0 0 10px 0; font-size:0.9rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent);"></i> Phân Tích Kịch Bản Giả Lập & Khuyến Nghị
+                        </h4>
+                        <ul style="margin: 0; padding-left: 10px; list-style: none;">
+                    `;
+                    
+                    if (bestTotalIdx === bestDailyIdx) {
+                        recsHtml += `
+                            <li style="margin-bottom: 8px; line-height: 1.4; font-size: 0.85rem;">
+                                <i class="fa-solid fa-circle-check" style="color:#10b981; margin-right: 6px;"></i>
+                                <strong>Định hướng tối ưu:</strong> Kịch bản ${bestTotalIdx + 1} (${results[bestTotalIdx].pLoad || '---'} &rarr; ${results[bestTotalIdx].pDis || '---'}) là lựa chọn tốt nhất toàn diện. Tuyến này mang lại cả **Lợi nhuận ròng tổng thể cao nhất** (${AppData.formatCurrency(maxTotalProfit)}) và **Hiệu suất khai thác ngày tối ưu nhất** (${AppData.formatCurrency(maxDailyProfit)}/ngày). Bạn nên ưu tiên đàm phán ký kết hợp đồng cho kịch bản này.
+                            </li>
+                        `;
+                    } else {
+                        recsHtml += `
+                            <li style="margin-bottom: 8px; line-height: 1.4; font-size: 0.85rem;">
+                                <i class="fa-solid fa-circle-info" style="color:var(--warning); margin-right: 6px;"></i>
+                                <strong>So sánh Lợi nhuận tổng thể:</strong> Kịch bản ${bestTotalIdx + 1} (${results[bestTotalIdx].pLoad || '---'} &rarr; ${results[bestTotalIdx].pDis || '---'}) có **Tổng lợi nhuận ròng cao nhất** (${AppData.formatCurrency(maxTotalProfit)} trong ${results[bestTotalIdx].days} ngày).
+                            </li>
+                            <li style="margin-bottom: 8px; line-height: 1.4; font-size: 0.85rem;">
+                                <i class="fa-solid fa-bolt" style="color:var(--secondary); margin-right: 6px;"></i>
+                                <strong>So sánh Hiệu suất ngày:</strong> Kịch bản ${bestDailyIdx + 1} (${results[bestDailyIdx].pLoad || '---'} &rarr; ${results[bestDailyIdx].pDis || '---'}) lại vượt trội về **Hiệu suất khai thác ngày** (${AppData.formatCurrency(maxDailyProfit)}/ngày, chạy trong ${results[bestDailyIdx].days} ngày).
+                            </li>
+                            <li style="margin-top: 10px; line-height: 1.4; font-size: 0.85rem; border-top:1px dashed rgba(255,255,255,0.05); padding-top:10px;">
+                                <i class="fa-solid fa-circle-question" style="color:var(--accent); margin-right: 6px;"></i>
+                                <strong>Khuyến nghị định hướng:</strong> 
+                                - Nếu sau chuyến này bạn đã có sẵn hợp đồng nối tiếp ngay lập tức, hãy chọn **Kịch bản ${bestDailyIdx + 1}** để tối đa hóa dòng tiền mỗi ngày.
+                                - Nếu sau chuyến này tàu có khả năng phải neo chờ hàng hoặc chưa có tuyến gối đầu, hãy chọn **Kịch bản ${bestTotalIdx + 1}** để đảm bảo gom được lợi nhuận tổng lớn nhất cho đợt khai thác này.
+                            </li>
+                        `;
+                    }
+                    
+                    recsHtml += `</ul>`;
+                    recsCard.innerHTML = recsHtml;
+                } else {
+                    recsCard.style.display = 'none';
+                }
+            }
+        } catch (err) {
+            console.error("LỖI RECALC VIRTUAL SHIPMENT:", err);
+        }
     }
 };
 

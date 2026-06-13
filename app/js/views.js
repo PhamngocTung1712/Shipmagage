@@ -2701,6 +2701,9 @@ const Views = {
                 <div class="page-header">
                     <div><h1 class="page-title">Quản lý Chuyến hàng</h1><p class="page-subtitle">Theo dõi doanh thu, chi phí và hiệu quả từng mã chuyến</p></div>
                     <div>
+                        <button class="btn btn-outline" id="virtual-shipment-btn" onclick="app.openVirtualShipmentModal()" style="margin-right: 8px;">
+                            <i class="fa-solid fa-flask"></i> Chuyến Hàng Ảo
+                        </button>
                         <button class="btn btn-outline" id="shipment-compare-btn" onclick="app.openShipmentCompareModal()" style="margin-right: 8px;">
                             <i class="fa-solid fa-chart-column"></i> So Sánh Chuyến
                         </button>
@@ -8330,6 +8333,148 @@ const Views = {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="app.closeModal('shipment-compare-modal')" style="width:120px;">Đóng</button>
+            </div>
+        `;
+    },
+
+    virtualShipmentSimulator: (vesselId, scenarios) => {
+        const vessels = AppData.getVessels();
+        const activeVessel = AppData.getVessel(vesselId) || vessels[0];
+        const allShipments = AppData.getShipments().sort((a, b) => {
+            const nameA = `${a.vesselId} - ${a.voyageNo} (${a.contractNo || 'Không HĐ'})`;
+            const nameB = `${b.vesselId} - ${b.voyageNo} (${b.contractNo || 'Không HĐ'})`;
+            return nameB.localeCompare(nameA);
+        });
+
+        const renderScenarioCard = (idx) => {
+            const s = scenarios[idx] || { pLoad:'', pDis:'', qty:'', rate:'', dateStart:'', dateEnd:'', hours:'', doPrice:20000, loPrice:85000, agentPortFees:'', brokerage:'', others:'' };
+            const color = idx === 0 ? 'var(--primary-light)' : (idx === 1 ? 'var(--warning)' : 'var(--secondary)');
+            
+            return `
+                <div class="glass-card" style="padding: 1.2rem; border-top: 4px solid ${color}; display:flex; flex-direction:column; gap:10px;">
+                    <div style="font-weight: 700; color: ${color}; font-size: 0.95rem; margin-bottom: 4px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>Kịch bản giả lập ${idx + 1}</span>
+                        ${idx === 2 ? '<span style="font-size:0.7rem; font-weight:normal; color:var(--text-muted);">(Tùy chọn)</span>' : ''}
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Cảng xếp (Đi)</label>
+                            <input type="text" class="form-control sim-input" id="sim-pLoad-${idx}" value="${s.pLoad || ''}" placeholder="Cảng xếp" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Cảng dỡ (Đến)</label>
+                            <input type="text" class="form-control sim-input" id="sim-pDis-${idx}" value="${s.pDis || ''}" placeholder="Cảng dỡ" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Khối lượng (Tấn)</label>
+                            <input type="number" class="form-control sim-input" id="sim-qty-${idx}" value="${s.qty || ''}" placeholder="Tấn" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Đơn giá cước</label>
+                            <input type="number" class="form-control sim-input" id="sim-rate-${idx}" value="${s.rate || ''}" placeholder="đ/Tấn" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Ngày bắt đầu</label>
+                            <input type="date" class="form-control sim-input" id="sim-start-${idx}" value="${s.dateStart || ''}" style="height:36px; padding: 4px 8px; font-size:0.85rem;" onchange="app.recalculateVirtualShipment()">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Ngày kết thúc</label>
+                            <input type="date" class="form-control sim-input" id="sim-end-${idx}" value="${s.dateEnd || ''}" style="height:36px; padding: 4px 8px; font-size:0.85rem;" onchange="app.recalculateVirtualShipment()">
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Số giờ chạy biển</label>
+                            <input type="number" class="form-control sim-input" id="sim-hours-${idx}" value="${s.hours || ''}" placeholder="Giờ" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Phí cảng & đại lý</label>
+                            <input type="number" class="form-control sim-input" id="sim-portFees-${idx}" value="${s.agentPortFees || ''}" placeholder="VNĐ" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Đơn giá dầu DO/L</label>
+                            <input type="number" class="form-control sim-input" id="sim-doPrice-${idx}" value="${s.doPrice || 20000}" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Đơn giá dầu LO/L</label>
+                            <input type="number" class="form-control sim-input" id="sim-loPrice-${idx}" value="${s.loPrice || 85000}" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Môi giới / Khác</label>
+                            <input type="number" class="form-control sim-input" id="sim-brokerage-${idx}" value="${s.brokerage || 0}" placeholder="Môi giới" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Chi phí khác</label>
+                            <input type="number" class="form-control sim-input" id="sim-others-${idx}" value="${s.others || 0}" placeholder="Khác" style="height:36px; padding: 4px 8px; font-size:0.85rem;" oninput="app.recalculateVirtualShipment()">
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        return `
+            <div class="modal-header">
+                <h3 style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-flask" style="color:var(--accent);"></i> Giả Lập & Hoạch Định Tuyến Chạy (Chuyến Hàng Ảo)</h3>
+                <button class="modal-close" onclick="app.closeModal('virtual-shipment-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 80vh; overflow-y: auto; padding-right: 10px;">
+                <!-- Vessel Selector -->
+                <div class="vessel-selector-bar" style="margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); display:flex; align-items:center; gap:12px; flex-wrap: wrap;">
+                    <label class="form-label" style="margin:0; font-weight:600; font-size:0.9rem; color:var(--text-main);">Chọn tàu giả lập:</label>
+                    <select class="form-control" id="sim-vessel-id" style="width:250px; height:42px; font-size:0.95rem; padding: 6px 12px;" onchange="app.updateVirtualShipmentVessel(this.value)">
+                        ${vessels.map(v => `<option value="${v.id}" ${v.id === vesselId ? 'selected' : ''}>${v.name} (Định mức DO: ${v.fuelRate} L/h)</option>`).join('')}
+                    </select>
+                    <span style="font-size:0.8rem; color:var(--text-muted);">Hệ thống sẽ tự động phân bổ chi phí cố định (lương, lãi vay, khấu hao...) và lượng dầu tiêu thụ dựa trên thông số định mức của tàu này.</span>
+                </div>
+                
+                <!-- Inputs grid -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    ${renderScenarioCard(0)}
+                    ${renderScenarioCard(1)}
+                    ${renderScenarioCard(2)}
+                </div>
+
+                <!-- comparative outputs table -->
+                <div class="glass-card" style="padding: 1.2rem; overflow-x: auto; margin-bottom: 1.5rem;">
+                    <h4 style="margin:0 0 12px 0; font-size:0.85rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-calculator" style="color:var(--accent);"></i> Kết Quả Giả Lập & Dự Phóng Hiệu Quả
+                    </h4>
+                    <table class="table" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border-color); background: rgba(255,255,255,0.02);">
+                                <th style="padding:10px; text-align:left; color:var(--text-muted); font-weight:600;">Hạng mục dự phóng</th>
+                                <th style="padding:10px; text-align:right; color:var(--primary-light); font-weight:700; width:25%;">Kịch bản 1</th>
+                                <th style="padding:10px; text-align:right; color:var(--warning); font-weight:700; width:25%;">Kịch bản 2</th>
+                                <th style="padding:10px; text-align:right; color:var(--secondary); font-weight:700; width:25%;">Kịch bản 3</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sim-results-body">
+                            <!-- Populated dynamically by recalculateVirtualShipment -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Recommendations panel -->
+                <div class="glass-card" id="sim-recs-card" style="padding: 1.2rem; margin-bottom: 1.5rem; border-left: 4px solid var(--accent); background: rgba(239, 68, 68, 0.02); display:none;">
+                    <!-- Populated dynamically by recalculateVirtualShipment -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('virtual-shipment-modal')" style="width:120px;">Đóng</button>
             </div>
         `;
     },
