@@ -4419,6 +4419,9 @@ const app = {
             contractSelect.value = '';
         }
     },
+    onTransactionPartnerChange() {
+        this.onTransactionCatChange();
+    },
 
     // Fuel Actions
     openFuelVoyageModal(vesselId, voyageId) {
