@@ -10868,6 +10868,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
     getCompany() { return this.state.company; },
     getVessels() { return this.state.vessels; },
     getVessel(id) { return this.state.vessels.find(v => v.id === id); },
+    getShipment(id) { return this.state.shipments.find(s => s.id === id); },
     getVendors() {
         const hasFontError = (str) => {
             if (!str) return false;

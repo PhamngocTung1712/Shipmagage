@@ -7406,31 +7406,36 @@ const app = {
     },
 
     openShipmentCompareModal() {
-        const checkedBoxes = document.querySelectorAll('.shipment-compare-chk:checked');
-        const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
-        
-        let id1 = selectedIds[0] || '';
-        let id2 = selectedIds[1] || '';
-        let id3 = selectedIds[2] || '';
-        
-        const shipments = AppData.getShipments();
-        if (shipments.length < 2) {
-            alert("Bạn cần có ít nhất 2 chuyến hàng trong hệ thống để thực hiện so sánh!");
-            return;
+        try {
+            const checkedBoxes = document.querySelectorAll('.shipment-compare-chk:checked');
+            const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
+            
+            let id1 = selectedIds[0] || '';
+            let id2 = selectedIds[1] || '';
+            let id3 = selectedIds[2] || '';
+            
+            const shipments = AppData.getShipments();
+            if (shipments.length < 2) {
+                alert("Bạn cần có ít nhất 2 chuyến hàng trong hệ thống để thực hiện so sánh!");
+                return;
+            }
+            
+            if (!id1 || !id2) {
+                const sortedShipments = shipments.slice().sort((a, b) => {
+                    const dateA = a.dateStart || '';
+                    const dateB = b.dateStart || '';
+                    return dateB.localeCompare(dateA);
+                });
+                id1 = id1 || sortedShipments[0]?.id || '';
+                id2 = id2 || sortedShipments[1]?.id || '';
+            }
+            
+            this.renderShipmentCompareModal(id1, id2, id3);
+            this.openModal('shipment-compare-modal');
+        } catch (err) {
+            console.error(err);
+            alert("LỖI KHI MỞ SO SÁNH CHUYẾN:\n" + err.message + "\n\nStack:\n" + err.stack);
         }
-        
-        if (!id1 || !id2) {
-            const sortedShipments = shipments.slice().sort((a, b) => {
-                const dateA = a.dateStart || '';
-                const dateB = b.dateStart || '';
-                return dateB.localeCompare(dateA);
-            });
-            id1 = id1 || sortedShipments[0]?.id || '';
-            id2 = id2 || sortedShipments[1]?.id || '';
-        }
-        
-        this.renderShipmentCompareModal(id1, id2, id3);
-        this.openModal('shipment-compare-modal');
     },
 
     updateComparisonSelection() {
