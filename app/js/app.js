@@ -5184,6 +5184,7 @@ const app = {
 
         let grandTotalRevCompleted = 0;
         let grandTotalPaid = 0;
+        let grandTotalDebtCompleted = 0;
         let grandTotalIncomplete = 0;
         let grandTotalDebt = 0;
 
@@ -5269,9 +5270,11 @@ const app = {
             const totalPaid = c.totalPaid;
             const totalInvoiceRevenueIncomplete = c.totalInvoiceRevenueIncomplete;
             const totalDebt = c.invoiceDebt;
+            const totalDebtCompleted = c.invoiceDebtCompleted || 0;
 
             grandTotalRevCompleted += totalInvoiceRevenueCompleted;
             grandTotalPaid += totalPaid;
+            grandTotalDebtCompleted += totalDebtCompleted;
             grandTotalIncomplete += totalInvoiceRevenueIncomplete;
             grandTotalDebt += totalDebt;
 
@@ -5329,7 +5332,7 @@ const app = {
                 <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center;">TỔNG CỘNG KHÁCH HÀNG</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #1d4ed8;">${AppData.formatCurrency(grandTotalRevCompleted)}</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #15803d;">${AppData.formatCurrency(grandTotalPaid)}</td>
-                <td style="border: 1px solid #000; padding: 8px; text-align: left;">-</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #b91c1c;">${AppData.formatCurrency(grandTotalDebtCompleted)}</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #b45309;">${AppData.formatCurrency(grandTotalIncomplete)}</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align: right; color: #b91c1c;">${AppData.formatCurrency(grandTotalDebt)}</td>
             </tr>
