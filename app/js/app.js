@@ -4249,6 +4249,12 @@ const app = {
     openTransactionModal() {
         document.getElementById('trans-modal-content').innerHTML = Views.transModal();
         document.getElementById('t-id').value = '';
+        
+        // Initialize custom autocomplete for partner select
+        const list = [...AppData.getVendors(), ...AppData.getCustomers()];
+        const uniqueNames = Array.from(new Set(list.map(p => p.name).filter(Boolean))).sort();
+        this.initAutocomplete('t-partner', uniqueNames, () => this.onTransactionPartnerChange());
+
         this.openModal('trans-modal');
     },
     saveTransaction() {
@@ -4293,6 +4299,12 @@ const app = {
         document.getElementById('t-thu').value = trans.thu;
         document.getElementById('t-chi').value = trans.chi;
         document.getElementById('t-acc').value = trans.account;
+
+        // Initialize custom autocomplete for partner select
+        const list = [...AppData.getVendors(), ...AppData.getCustomers()];
+        const uniqueNames = Array.from(new Set(list.map(p => p.name).filter(Boolean))).sort();
+        this.initAutocomplete('t-partner', uniqueNames, () => this.onTransactionPartnerChange());
+
         this.openModal('trans-modal');
     },
     deleteTransaction(id) {
@@ -4426,6 +4438,10 @@ const app = {
     // Fuel Actions
     openFuelVoyageModal(vesselId, voyageId) {
         document.getElementById('fuel-voyage-modal-content').innerHTML = Views.fuelVoyageModal(vesselId, voyageId);
+        
+        // Initialize custom autocomplete for Fuel Vendor
+        this.initAutocomplete('fv-vendor', AppData.getVendors().map(v => v.name));
+
         this.openModal('fuel-voyage-modal');
     },
     saveFuelVoyage() {
@@ -4767,6 +4783,12 @@ const app = {
                 this.syncShipmentFuel();
             }, 0);
         }
+
+        // Initialize autocompletes
+        this.initAutocomplete('s-customer', AppData.getCustomers().map(c => c.name));
+        this.initAutocomplete('s-cargo', AppData.getCargos());
+        this.initAutocomplete('s-p-load', AppData.getPorts(), () => this.calcBrokerage());
+        this.initAutocomplete('s-p-dis', AppData.getPorts(), () => this.calcBrokerage());
 
         this.openModal('ship-modal'); 
     },
@@ -5111,6 +5133,13 @@ const app = {
             document.getElementById('s-c-loan-interest-external').value = costs.loanInterestExternal || 0;
 
             this.calcShipmentFinance();
+
+            // Initialize autocompletes
+            this.initAutocomplete('s-customer', AppData.getCustomers().map(c => c.name));
+            this.initAutocomplete('s-cargo', AppData.getCargos());
+            this.initAutocomplete('s-p-load', AppData.getPorts(), () => this.calcBrokerage());
+            this.initAutocomplete('s-p-dis', AppData.getPorts(), () => this.calcBrokerage());
+
             this.openModal('ship-modal');
         } catch (e) {
             console.error("Lỗi trong editShipment:", e);
@@ -5564,6 +5593,104 @@ const app = {
         } catch (err) {
             console.error('Error styling cloned element for image capture:', err);
         }
+    },
+
+    initAutocomplete(inputId, options, onSelect) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        
+        // Remove standard "list" attribute to prevent browser's buggy native datalist from showing up
+        input.removeAttribute('list');
+        
+        // Remove existing autocomplete dropdown if any
+        let dropdown = input.parentNode.querySelector('.custom-autocomplete-dropdown');
+        if (dropdown) dropdown.remove();
+        
+        // Ensure parent has position relative
+        input.parentNode.style.position = 'relative';
+        
+        // Create dropdown element
+        dropdown = document.createElement('div');
+        dropdown.className = 'custom-autocomplete-dropdown';
+        dropdown.style.cssText = `
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 220px;
+            overflow-y: auto;
+            background: var(--bg-surface, #1e293b);
+            border: 1px solid var(--border-color, #334155);
+            border-radius: var(--radius-md, 6px);
+            z-index: 9999;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+            margin-top: 4px;
+        `;
+        
+        input.parentNode.appendChild(dropdown);
+        
+        const renderOptions = (filterText) => {
+            const query = (filterText || '').trim().toLowerCase();
+            const filtered = options.filter(opt => {
+                if (!opt) return false;
+                return opt.toLowerCase().includes(query);
+            });
+            
+            if (filtered.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            dropdown.innerHTML = filtered.map(opt => `
+                <div class="autocomplete-item" data-value="${opt}" style="
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    font-size: 0.85rem;
+                    color: var(--text-main, #f8fafc);
+                    transition: background 0.15s;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+                " onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+                    ${opt}
+                </div>
+            `).join('');
+            
+            dropdown.style.display = 'block';
+            
+            // Add click event for each item
+            dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault(); 
+                    const val = item.getAttribute('data-value');
+                    input.value = val;
+                    dropdown.style.display = 'none';
+                    if (onSelect) onSelect(val);
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            });
+        };
+        
+        input.addEventListener('input', () => {
+            renderOptions(input.value);
+        });
+        
+        input.addEventListener('focus', () => {
+            renderOptions(input.value);
+        });
+        
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                dropdown.style.display = 'none';
+            }, 150);
+        });
+        
+        const clickOutsideHandler = (e) => {
+            if (e.target !== input && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        };
+        document.addEventListener('click', clickOutsideHandler);
+        input._clickOutsideHandler = clickOutsideHandler;
     },
 
     exportReportAsImage() {
