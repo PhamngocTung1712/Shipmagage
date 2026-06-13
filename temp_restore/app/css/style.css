@@ -1130,100 +1130,6 @@ a:hover {
 }
 
 /* ==========================================================================
-   Mobile Report Modal - Full responsive fix for debt report on phones
-   ========================================================================== */
-@media (max-width: 768px) {
-    /* Force report modal to full screen on mobile */
-    #report-modal.modal-overlay {
-        align-items: flex-start !important;
-        padding: 0 !important;
-    }
-
-    #report-modal .modal {
-        width: 100vw !important;
-        max-width: 100vw !important;
-        min-width: 0 !important;
-        max-height: 100vh !important;
-        height: 100vh !important;
-        border-radius: 0 !important;
-        margin: 0 !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-        background: #ffffff !important;
-        box-sizing: border-box !important;
-    }
-
-    /* Reduce padding on the print container */
-    #report-modal .print-container {
-        padding: 0.75rem !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-        overflow-x: hidden !important;
-        background: #ffffff !important;
-    }
-
-    /* Shrink report title */
-    #report-modal .print-header h2 {
-        font-size: 1.1rem !important;
-        line-height: 1.3 !important;
-    }
-
-    #report-modal .print-header p {
-        font-size: 0.78rem !important;
-    }
-
-    /* Section headers */
-    #report-modal .print-container h3 {
-        font-size: 0.95rem !important;
-    }
-
-    /* Action buttons: stack vertically on mobile */
-    #report-modal .print-actions {
-        flex-direction: column !important;
-        gap: 6px !important;
-        align-items: stretch !important;
-    }
-
-    #report-modal .print-actions .btn {
-        width: 100% !important;
-        justify-content: center !important;
-        font-size: 0.85rem !important;
-        padding: 10px 12px !important;
-    }
-
-    /* Table font size reduction */
-    #report-modal .report-print-table th,
-    #report-modal .report-print-table td {
-        padding: 5px 4px !important;
-        font-size: 0.72rem !important;
-        line-height: 1.3 !important;
-    }
-
-    #report-modal .report-print-table td div {
-        font-size: 0.7rem !important;
-        margin-bottom: 1px !important;
-    }
-
-    #report-modal .report-print-table td strong {
-        font-size: 0.7rem !important;
-    }
-
-    /* Footer stacking */
-    #report-modal .print-footer-section {
-        flex-direction: column !important;
-        gap: 1.5rem !important;
-        font-size: 0.8rem !important;
-    }
-
-    #report-modal .print-footer-section > div:last-child {
-        text-align: left !important;
-    }
-}
-
-/* ==========================================================================
    Premium Scrollbar Styling & Compact Sizing Overrides
    ========================================================================== */
 ::-webkit-scrollbar {
@@ -1373,17 +1279,6 @@ a:hover {
         background-image: none !important;
     }
 
-    /* Print-specific glass-card overrides to ensure high contrast and clear boundaries on paper */
-    .glass-card {
-        background: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cbd5e1 !important;
-        box-shadow: none !important;
-        margin-bottom: 1.5rem !important;
-        padding: 1.25rem !important;
-        page-break-inside: avoid !important;
-    }
-
     /* Eliminate sticky header positioning during print to prevent cell overlapping at page breaks */
     .report-container .table th {
         position: static !important;
@@ -1522,12 +1417,6 @@ a:hover {
     /* Hide ALL view-container content except the inline report */
     #monthly-report-inline .no-print,
     #monthly-report-inline button,
-    #fuel-report-inline .no-print,
-    #fuel-report-inline button,
-    #personal-report-inline .no-print,
-    #personal-report-inline button,
-    #summary-report-inline .no-print,
-    #summary-report-inline button,
     .mi-custom-expense-row .no-print {
         display: none !important;
     }
@@ -1543,11 +1432,8 @@ a:hover {
         display: none !important;
     }
 
-    /* Show only the monthly/fuel/personal/summary reports when printing */
-    #monthly-report-inline,
-    #fuel-report-inline,
-    #personal-report-inline,
-    #summary-report-inline {
+    /* Show only the monthly report */
+    #monthly-report-inline {
         display: block !important;
         background: #ffffff !important;
         color: #000000 !important;
@@ -1556,91 +1442,42 @@ a:hover {
         border-radius: 0 !important;
         padding: 0 !important;
         margin: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        overflow: visible !important;
     }
 
     /* Override table colors for print (white background, black text) */
     #monthly-report-inline table,
     #monthly-report-inline th,
-    #monthly-report-inline td,
-    #fuel-report-inline table,
-    #fuel-report-inline th,
-    #fuel-report-inline td,
-    #personal-report-inline table,
-    #personal-report-inline th,
-    #personal-report-inline td,
-    #summary-report-inline table,
-    #summary-report-inline th,
-    #summary-report-inline td {
+    #monthly-report-inline td {
         color: #000000 !important;
         background: transparent !important;
-        border-color: #cbd5e1 !important;
+        border-color: #000000 !important;
     }
 
-    #monthly-report-inline thead tr th,
-    #fuel-report-inline thead tr th,
-    #personal-report-inline thead tr th,
-    #summary-report-inline thead tr th {
+    #monthly-report-inline thead tr th {
         background: #cbd5e1 !important;
         font-weight: bold !important;
     }
 
     #monthly-report-inline tr[style*="rgba(148,163,184,0.1)"],
-    #monthly-report-inline tr[style*="rgba(148,163,184,0.15)"],
-    #fuel-report-inline tr[style*="rgba(148,163,184,0.1)"],
-    #fuel-report-inline tr[style*="rgba(148,163,184,0.15)"],
-    #personal-report-inline tr[style*="rgba(148,163,184,0.1)"],
-    #personal-report-inline tr[style*="rgba(148,163,184,0.15)"],
-    #summary-report-inline tr[style*="rgba(148,163,184,0.1)"],
-    #summary-report-inline tr[style*="rgba(148,163,184,0.15)"] {
+    #monthly-report-inline tr[style*="rgba(148,163,184,0.15)"] {
         background: #f1f5f9 !important;
     }
 
-    #monthly-report-inline tr[style*="#2d3a4a"],
-    #fuel-report-inline tr[style*="#2d3a4a"],
-    #personal-report-inline tr[style*="#2d3a4a"],
-    #summary-report-inline tr[style*="#2d3a4a"] {
+    #monthly-report-inline tr[style*="#2d3a4a"] {
         background: #cbd5e1 !important;
     }
 
-    #monthly-report-inline tr[style*="rgba(100,116,139"],
-    #fuel-report-inline tr[style*="rgba(100,116,139"],
-    #personal-report-inline tr[style*="rgba(100,116,139"],
-    #summary-report-inline tr[style*="rgba(100,116,139"] {
+    #monthly-report-inline tr[style*="rgba(100,116,139"] {
         background: #e2e8f0 !important;
     }
 
     /* Inputs look like text when printed */
-    #monthly-report-inline input,
-    #fuel-report-inline input,
-    #personal-report-inline input,
-    #summary-report-inline input {
+    #monthly-report-inline input {
         border: none !important;
         background: transparent !important;
         color: #000000 !important;
         box-shadow: none !important;
         outline: none !important;
-    }
-
-    /* Scale print tables font size and padding to fit landscape A4 correctly */
-    #monthly-report-inline table,
-    #fuel-report-inline table,
-    #personal-report-inline table,
-    #summary-report-inline table {
-        font-size: 8px !important;
-        table-layout: auto !important;
-    }
-    #monthly-report-inline th,
-    #monthly-report-inline td,
-    #fuel-report-inline th,
-    #fuel-report-inline td,
-    #personal-report-inline th,
-    #personal-report-inline td,
-    #summary-report-inline th,
-    #summary-report-inline td {
-        padding: 4px 2px !important;
     }
 
     /* Make view-container scroll properly */

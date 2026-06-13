@@ -11666,12 +11666,7 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         // 4. Update VAT
         const revenueReal = Number(shipment.revenueReal) || 0;
         const revenueInvoice = Number(shipment.revenueInvoice) || 0;
-        const fuelDO = Number(shipment.costs.fuelDO) || 0;
-        const fuelLO = Number(shipment.costs.fuelLO) || 0;
-        const agent = Number(shipment.costs.agent) || 0;
-        const portFees = Number(shipment.costs.portFees) || 0;
-        const deduc = fuelDO + fuelLO + agent + portFees;
-        const vat = Math.round((0.08 * (revenueInvoice || revenueReal)) - (0.08 * deduc));
+        const vat = Math.round((0.08 * (revenueInvoice || revenueReal)) - (0.10 * shipment.costs.fuelDO));
         shipment.costs.vat = vat > 0 ? vat : 0;
         
         this.save();
@@ -11929,15 +11924,10 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                 s.costs.fuelLO = Math.round(fuelHours * hourlyRate * loPrice);
             }
 
-            // Tính toán lại thuế VAT chuyến hàng dựa trên chi phí DO, LO, Đại lý, Cảng mới
+            // Tính toán lại thuế VAT chuyến hàng dựa trên chi phí dầu DO mới
             const revenueReal = Number(s.revenueReal) || 0;
             const revenueInvoice = Number(s.revenueInvoice) || 0;
-            const fuelDO = Number(s.costs.fuelDO) || 0;
-            const fuelLO = Number(s.costs.fuelLO) || 0;
-            const agent = Number(s.costs.agent) || 0;
-            const portFees = Number(s.costs.portFees) || 0;
-            const deduc = fuelDO + fuelLO + agent + portFees;
-            const vatVal = Math.round((0.08 * (revenueInvoice || revenueReal)) - (0.08 * deduc));
+            const vatVal = Math.round((0.08 * (revenueInvoice || revenueReal)) - (0.10 * (s.costs.fuelDO || 0)));
             s.costs.vat = vatVal > 0 ? vatVal : 0;
         });
         this.save();
@@ -12124,47 +12114,6 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
         }
 
         return schedule;
-    },
-
-    calculateShipmentFinancials(s) {
-        const fuelDO = Number(s.costs?.fuelDO) || 0;
-        const fuelLO = Number(s.costs?.fuelLO) || 0;
-        const agent = Number(s.costs?.agent) || 0;
-        const vessel2ends = Number(s.costs?.vessel2ends) || 0;
-        const portFees = Number(s.costs?.portFees) || 0;
-        const brokerage = Number(s.costs?.brokerage) || 0;
-        const crewSalary = Number(s.costs?.crewSalary) || 0;
-        const crewFood = Number(s.costs?.crewFood) || 0;
-        const crewInsurance = Number(s.costs?.crewInsurance) || 0;
-        const materialCompany = Number(s.costs?.materialCompany) || 0;
-        const materialVessel = Number(s.costs?.materialVessel) || 0;
-        const loanInterest = Number(s.costs?.loanInterest) || 0;
-        const loanInterestExternal = Number(s.costs?.loanInterestExternal) || 0;
-        const monthlyOther = Number(s.costs?.monthlyOther) || 0;
-        const others = Number(s.costs?.others) || 0;
-        const hullInsurance = Number(s.costs?.hullInsurance) || 0;
-        const registryAnnual = Number(s.costs?.registryAnnual) || 0;
-        const largeRepair = Number(s.costs?.largeRepair) || 0;
-
-        const excludeDockingDepreciation = (typeof app !== 'undefined' && app.excludeDockingDepreciation);
-        const depreciation = excludeDockingDepreciation ? 0 : (Number(s.costs?.depreciation) || 0);
-        const dockingIntermediate = excludeDockingDepreciation ? 0 : (Number(s.costs?.dockingIntermediate) || 0);
-        const dockingPeriodic = excludeDockingDepreciation ? 0 : (Number(s.costs?.dockingPeriodic) || 0);
-
-        const revenueReal = Number(s.revenueReal) || 0;
-        const revenueInvoice = Number(s.revenueInvoice) || 0;
-        const deduc = fuelDO + fuelLO + agent + portFees;
-        const vat = Math.round((0.08 * (revenueInvoice || revenueReal)) - (0.08 * deduc));
-        const vatVal = vat > 0 ? vat : 0;
-
-        const costSum = fuelDO + fuelLO + agent + vessel2ends + portFees + brokerage + crewSalary + crewFood + crewInsurance + materialCompany + materialVessel + loanInterest + loanInterestExternal + monthlyOther + others + depreciation + hullInsurance + dockingIntermediate + dockingPeriodic + registryAnnual + largeRepair;
-        const profit = (revenueReal - vatVal) - costSum;
-
-        return {
-            vat: vatVal,
-            costSum,
-            profit
-        };
     },
 
     formatCurrency(amount) {

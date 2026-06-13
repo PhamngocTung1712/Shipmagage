@@ -1624,7 +1624,12 @@ const app = {
         const annualConfig = AppData.getAnnualCosts(year, vesselId);
         const hullInsurance = Math.round(daysInMonth * (annualConfig.hullInsuranceDaily || 0));
         const socialInsurance = monthlyCost.insurance || 0;
-        const totalInsurance = overrides.insurance !== undefined ? Number(overrides.insurance) : (hullInsurance + socialInsurance);
+        const hullInsuranceVal = overrides.hullInsurance !== undefined ? Number(overrides.hullInsurance) : hullInsurance;
+        const socialInsuranceVal = overrides.socialInsurance !== undefined ? Number(overrides.socialInsurance) : socialInsurance;
+        let totalInsurance = hullInsuranceVal + socialInsuranceVal;
+        if (overrides.hullInsurance === undefined && overrides.socialInsurance === undefined && overrides.insurance !== undefined) {
+            totalInsurance = Number(overrides.insurance);
+        }
 
         const autoVat = shipments.reduce((sum, s) => sum + (Number(s.costs?.vat) || 0), 0);
         const useVat = overrides.vat !== undefined ? Number(overrides.vat) : autoVat;
@@ -1854,6 +1859,24 @@ const app = {
         const inputs = this.getMonthlyVesselReportInputs(vesselId, monthStr);
         this.activeReportVessel = vesselId;
         this.activeReportMonth = monthStr;
+        const overrides = inputs.overrides || {};
+
+        const doCostVal = overrides.doCost !== undefined ? Number(overrides.doCost) : doCost;
+        const loCostVal = overrides.loCost !== undefined ? Number(overrides.loCost) : loCost;
+        const vesselAdvancesVal = overrides.advances !== undefined ? Number(overrides.advances) : vesselAdvances;
+        const crewSalaryVal = overrides.salary !== undefined ? Number(overrides.salary) : crewSalary;
+        const totalInterestVal = overrides.interest !== undefined ? Number(overrides.interest) : totalInterest;
+        const totalAgentVal = overrides.agent !== undefined ? Number(overrides.agent) : totalAgent;
+        const totalMaterialVal = overrides.material !== undefined ? Number(overrides.material) : totalMaterial;
+        
+        const hullInsuranceVal = overrides.hullInsurance !== undefined ? Number(overrides.hullInsurance) : hullInsurance;
+        const socialInsuranceVal = overrides.socialInsurance !== undefined ? Number(overrides.socialInsurance) : socialInsurance;
+        let totalInsuranceVal = hullInsuranceVal + socialInsuranceVal;
+        if (overrides.hullInsurance === undefined && overrides.socialInsurance === undefined && overrides.insurance !== undefined) {
+            totalInsuranceVal = Number(overrides.insurance);
+        }
+        
+        const totalVatVal = overrides.vat !== undefined ? Number(overrides.vat) : totalVat;
 
         let customTotal = 0;
         inputs.customExpenses.forEach(exp => {
@@ -1870,20 +1893,20 @@ const app = {
             return sum + sTotal;
         }, 0);
 
-        const totalCostSum = doCost + loCost + vesselAdvances + crewSalary + totalInterest + totalAgent + totalMaterial + totalInsurance + totalVat + customTotal;
+        const totalCostSum = doCostVal + loCostVal + vesselAdvancesVal + crewSalaryVal + totalInterestVal + totalAgentVal + totalMaterialVal + totalInsuranceVal + totalVatVal + customTotal;
         const finalBalance = (Number(inputs.openingBalance) || 0) + totalRevenueSum - totalCostSum;
 
         let html = `
             <div class="print-container" id="report-data-holder" 
-                 data-do-cost="${doCost}" 
-                 data-lo-cost="${loCost}" 
-                 data-advances="${vesselAdvances}" 
-                 data-salary="${crewSalary}" 
-                 data-interest="${totalInterest}" 
-                 data-agent="${totalAgent}" 
-                 data-material="${totalMaterial}" 
-                 data-insurance="${totalInsurance}" 
-                 data-vat="${totalVat}" 
+                 data-do-cost="${doCostVal}" 
+                 data-lo-cost="${loCostVal}" 
+                 data-advances="${vesselAdvancesVal}" 
+                 data-salary="${crewSalaryVal}" 
+                 data-interest="${totalInterestVal}" 
+                 data-agent="${totalAgentVal}" 
+                 data-material="${totalMaterialVal}" 
+                 data-insurance="${totalInsuranceVal}" 
+                 data-vat="${totalVatVal}" 
                  data-revenue="${totalRevenueSum}">
                  
                 <div class="print-actions no-print" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
@@ -1979,7 +2002,7 @@ const app = {
                             <td>Nhiên liệu (Dầu DO & LO)</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(doCost + loCost)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(doCostVal + loCostVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -1989,7 +2012,7 @@ const app = {
                             <td style="padding-left: 20px; color: #475569;">Dầu DO cấp trong tháng</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right;">${AppData.formatCurrency(doCost)}</td>
+                            <td style="text-align: right;">${AppData.formatCurrency(doCostVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -1999,7 +2022,7 @@ const app = {
                             <td style="padding-left: 20px; color: #475569;">Dầu LO cấp trong tháng</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right;">${AppData.formatCurrency(loCost)}</td>
+                            <td style="text-align: right;">${AppData.formatCurrency(loCostVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2011,7 +2034,7 @@ const app = {
                             <td>Tàu ứng chi phí trong tháng</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(vesselAdvances)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(vesselAdvancesVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2023,7 +2046,7 @@ const app = {
                             <td>Chi phí lương thủy thủ</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(crewSalary)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(crewSalaryVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2035,7 +2058,7 @@ const app = {
                             <td>Lãi vay phân bổ (Trong và ngoài ngân hàng)</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalInterest)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalInterestVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2059,7 +2082,7 @@ const app = {
                             <td>Chi phí Cảng phát sinh</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalAgent)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalAgentVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2083,7 +2106,7 @@ const app = {
                             <td>Vật tư mua cấp tàu</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalMaterial)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalMaterialVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2107,7 +2130,7 @@ const app = {
                             <td>Bảo hiểm (Phân bổ bảo hiểm tàu & BHXH)</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalInsurance)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalInsuranceVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2117,7 +2140,7 @@ const app = {
                             <td style="padding-left: 20px; color: #475569;">Bảo hiểm thân vỏ phân bổ tháng (${daysInMonth} ngày)</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right;">${AppData.formatCurrency(hullInsurance)}</td>
+                            <td style="text-align: right;">${AppData.formatCurrency(hullInsuranceVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2127,7 +2150,7 @@ const app = {
                             <td style="padding-left: 20px; color: #475569;">Bảo hiểm xã hội tháng</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right;">${AppData.formatCurrency(socialInsurance)}</td>
+                            <td style="text-align: right;">${AppData.formatCurrency(socialInsuranceVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2139,7 +2162,7 @@ const app = {
                             <td>Thuế VAT phát sinh chuyến trong tháng</td>
                             <td></td>
                             <td></td>
-                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalVat)}</td>
+                            <td style="text-align: right; color: #b91c1c;">${AppData.formatCurrency(totalVatVal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -2235,11 +2258,16 @@ const app = {
             }
         });
 
-        const data = {
-            openingBalance: opening,
-            customExpenses: customExpenses
-        };
-        this.saveMonthlyVesselReportInputs(vesselId, monthStr, data);
+        const inputs = this.getMonthlyVesselReportInputs(vesselId, monthStr);
+        const prevMonthStr = this.getPreviousMonthStr(monthStr);
+        const autoOpening = this.calculateMonthlyClosingBalance(vesselId, prevMonthStr);
+        const isManualOpening = Math.abs(opening - autoOpening) > 0.01;
+
+        inputs.openingBalance = opening;
+        inputs.customExpenses = customExpenses;
+        inputs.isManualOpening = isManualOpening;
+
+        this.saveMonthlyVesselReportInputs(vesselId, monthStr, inputs);
 
         const doCost = Number(holder.dataset.doCost) || 0;
         const loCost = Number(holder.dataset.loCost) || 0;
@@ -2667,20 +2695,42 @@ const app = {
         XLSX.writeFile(wb, `Bao_Cao_DT_CP_Tau_${vesselName}_Thang_${month}_${year}.xlsx`);
     },
 
-    exportYearSummaryReport(year) {
+    exportYearSummaryReport(selectedYear) {
         if (typeof XLSX === 'undefined') return alert('Chưa tải xong thư viện xuất Excel!');
-        
         const vessels = AppData.getVessels();
         const ships = AppData.getShipments().filter(s => s.contractNo && s.contractNo.trim() !== '');
         
-        const data = [];
-        data.push([
-            'Tháng', 'Tàu', 'Doanh thu (VNĐ)', 'Dầu DO (VNĐ)', 'Dầu LO (VNĐ)', 
-            'Chi phí cảng (VNĐ)', 'Tàu ứng (VNĐ)', 'Lương (VNĐ)', 'Lãi vay (VNĐ)', 
-            'Bảo hiểm (VNĐ)', 'Thuế VAT (VNĐ)', 'Vật tư (VNĐ)', 'Chi phí khác (VNĐ)', 
-            'Tổng chi phí (VNĐ)', 'Lợi nhuận (VNĐ)'
+        const formatVal1000 = (val) => {
+            if (val === undefined || val === null || val === '') return 0;
+            return Math.round(Number(val) / 1000);
+        };
+        
+        const wb = XLSX.utils.book_new();
+        const rows = [];
+        
+        rows.push([`BẢNG TỔNG HỢP DOANH THU - CHI PHÍ NĂM ${selectedYear}`]);
+        rows.push([`Tàu Vũ Gia 05 - Vũ Gia 09 - Vũ Gia 15 - Vũ Gia 18 - Vũ Gia 36`]);
+        rows.push([`ĐVT: 1.000Đ`]);
+        rows.push([]);
+        
+        rows.push([
+            'THÁNG',
+            'TÀU',
+            'DOANH THU',
+            'Nhiên liệu DO',
+            'Nhiên liệu LO',
+            'Đại lý',
+            'Chi tàu',
+            'Chi lương',
+            'Lãi NH',
+            'Bảo hiểm',
+            'VAT',
+            'Sửa chữa / Hoán cải / Vật tư',
+            'Chi phí khác',
+            'CÔNG CHI',
+            'TỒN CUỐI THÁNG'
         ]);
-
+        
         let yearTotalRevenue = 0;
         let yearTotalDO = 0;
         let yearTotalLO = 0;
@@ -2693,12 +2743,11 @@ const app = {
         let yearTotalMaterial = 0;
         let yearTotalOther = 0;
         let yearTotalCost = 0;
-        let yearTotalClosing = 0;
-
+        
+        const activeMonths = [];
         for (let m = 1; m <= 12; m++) {
-            const monthStr = `${year}-${String(m).padStart(2, '0')}`;
+            const monthStr = `${selectedYear}-${String(m).padStart(2, '0')}`;
             let hasData = false;
-            
             vessels.forEach(v => {
                 const shipments = ships.some(s => {
                     const sm = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
@@ -2711,10 +2760,15 @@ const app = {
                 if (fuel) hasData = true;
                 const monthlyCost = AppData.getMonthlyCosts(monthStr, v.id);
                 if (monthlyCost && (monthlyCost.salary || monthlyCost.insurance)) hasData = true;
+                const key = `monthly_vessel_report_inputs_${v.id}_${monthStr}`;
+                if (localStorage.getItem(key)) hasData = true;
             });
-
-            if (!hasData) continue;
-
+            if (hasData) {
+                activeMonths.push({ monthNum: m, monthStr });
+            }
+        }
+        
+        activeMonths.forEach(({ monthNum, monthStr }) => {
             let monthSubRevenue = 0;
             let monthSubDO = 0;
             let monthSubLO = 0;
@@ -2728,11 +2782,11 @@ const app = {
             let monthSubOther = 0;
             let monthSubCost = 0;
             let monthSubClosing = 0;
-
-            vessels.forEach(v => {
+            
+            vessels.forEach((v) => {
                 const breakdown = this.getMonthlyVesselReportBreakdown(v.id, monthStr);
                 const monthlyBalance = breakdown.revenue - breakdown.totalCost;
-
+                
                 monthSubRevenue += breakdown.revenue;
                 monthSubDO += breakdown.doCost;
                 monthSubLO += breakdown.loCost;
@@ -2746,22 +2800,45 @@ const app = {
                 monthSubOther += breakdown.other;
                 monthSubCost += breakdown.totalCost;
                 monthSubClosing += monthlyBalance;
-
-                data.push([
-                    `Tháng ${m}`, v.id, breakdown.revenue, breakdown.doCost, breakdown.loCost,
-                    breakdown.agent, breakdown.advances, breakdown.salary, breakdown.interest,
-                    breakdown.insurance, breakdown.vat, breakdown.material, breakdown.other,
-                    breakdown.totalCost, monthlyBalance
+                
+                rows.push([
+                    `Tháng ${monthNum}`,
+                    v.id,
+                    formatVal1000(breakdown.revenue),
+                    formatVal1000(breakdown.doCost),
+                    formatVal1000(breakdown.loCost),
+                    formatVal1000(breakdown.agent),
+                    formatVal1000(breakdown.advances),
+                    formatVal1000(breakdown.salary),
+                    formatVal1000(breakdown.interest),
+                    formatVal1000(breakdown.insurance),
+                    formatVal1000(breakdown.vat),
+                    formatVal1000(breakdown.material),
+                    formatVal1000(breakdown.other),
+                    formatVal1000(breakdown.totalCost),
+                    formatVal1000(monthlyBalance)
                 ]);
             });
-
-            data.push([
-                `Cộng Tháng ${m}`, '', monthSubRevenue, monthSubDO, monthSubLO,
-                monthSubAgent, monthSubAdvances, monthSubSalary, monthSubInterest,
-                monthSubInsurance, monthSubVat, monthSubMaterial, monthSubOther,
-                monthSubCost, monthSubClosing
+            
+            // Subtotal Row
+            rows.push([
+                `Cộng tháng ${monthNum}`,
+                '',
+                formatVal1000(monthSubRevenue),
+                formatVal1000(monthSubDO),
+                formatVal1000(monthSubLO),
+                formatVal1000(monthSubAgent),
+                formatVal1000(monthSubAdvances),
+                formatVal1000(monthSubSalary),
+                formatVal1000(monthSubInterest),
+                formatVal1000(monthSubInsurance),
+                formatVal1000(monthSubVat),
+                formatVal1000(monthSubMaterial),
+                formatVal1000(monthSubOther),
+                formatVal1000(monthSubCost),
+                formatVal1000(monthSubClosing)
             ]);
-
+            
             yearTotalRevenue += monthSubRevenue;
             yearTotalDO += monthSubDO;
             yearTotalLO += monthSubLO;
@@ -2774,17 +2851,157 @@ const app = {
             yearTotalMaterial += monthSubMaterial;
             yearTotalOther += monthSubOther;
             yearTotalCost += monthSubCost;
-            yearTotalClosing += monthSubClosing;
-        }
-
-        data.push([
-            `TỔNG CỘNG NĂM ${year}`, '', yearTotalRevenue, yearTotalDO, yearTotalLO,
-            yearTotalAgent, yearTotalAdvances, yearTotalSalary, yearTotalInterest,
-            yearTotalInsurance, yearTotalVat, yearTotalMaterial, yearTotalOther,
-            yearTotalCost, yearTotalClosing
+        });
+        
+        const yearClosingBalance = yearTotalRevenue - yearTotalCost;
+        
+        // Grand Total Row
+        rows.push([
+            'TỔNG CỘNG NĂM',
+            '',
+            formatVal1000(yearTotalRevenue),
+            formatVal1000(yearTotalDO),
+            formatVal1000(yearTotalLO),
+            formatVal1000(yearTotalAgent),
+            formatVal1000(yearTotalAdvances),
+            formatVal1000(yearTotalSalary),
+            formatVal1000(yearTotalInterest),
+            formatVal1000(yearTotalInsurance),
+            formatVal1000(yearTotalVat),
+            formatVal1000(yearTotalMaterial),
+            formatVal1000(yearTotalOther),
+            formatVal1000(yearTotalCost),
+            formatVal1000(yearClosingBalance)
         ]);
+        
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        
+        // Number formatting & Column widths
+        for (let key in ws) {
+            if (key[0] === '!') continue;
+            const cell = ws[key];
+            if (typeof cell.v === 'number') {
+                cell.t = 'n';
+                cell.z = '#,##0';
+            }
+        }
+        
+        ws['!cols'] = [
+            { wch: 15 }, // THÁNG
+            { wch: 10 }, // TÀU
+            { wch: 15 }, // DOANH THU
+            { wch: 15 }, // DO
+            { wch: 15 }, // LO
+            { wch: 12 }, // Đại lý
+            { wch: 12 }, // Chi tàu
+            { wch: 12 }, // Chi lương
+            { wch: 12 }, // Lãi NH
+            { wch: 12 }, // Bảo hiểm
+            { wch: 12 }, // VAT
+            { wch: 25 }, // Sửa chữa/Vật tư
+            { wch: 15 }, // Khác
+            { wch: 15 }, // Cộng chi
+            { wch: 18 }  // TỒN CUỐI THÁNG
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, ws, `Tong hop nam ${selectedYear}`);
+        XLSX.writeFile(wb, `Bao_Cao_Tong_Hop_Nam_${selectedYear}.xlsx`);
+    },
 
-        const ws = XLSX.utils.aoa_to_sheet(data);
+    exportPersonalAccountReport(selectedPeriod) {
+        if (typeof XLSX === 'undefined') return alert('Chưa tải xong thư viện xuất Excel!');
+        
+        const ships = AppData.getShipments().filter(s => s.contractNo && s.contractNo.trim() !== '');
+        const monthsSet = new Set();
+        ships.forEach(s => {
+            const m = s.reportMonth || (s.dateStart ? s.dateStart.substring(0, 7) : '');
+            if (m) monthsSet.add(m);
+        });
+        const availableMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+        
+        const personalTrans = (AppData.state.transactions || []).filter(t => !t.vessel || t.vessel === 'VP' || t.vessel === 'Cá Nhân' || t.vessel.trim() === '');
+        
+        let periodOpening = Number(AppData.state.personalOpeningBalance) || 0;
+        let periodTrans = [];
+        
+        if (selectedPeriod !== 'all') {
+            const index = availableMonths.indexOf(selectedPeriod);
+            let prevMonths = [];
+            if (index !== -1) {
+                prevMonths = availableMonths.slice(index + 1);
+            }
+            
+            const prevTrans = personalTrans.filter(t => (t.date && prevMonths.some(m => t.date.substring(0, 7) === m)) || (t.date && t.date.substring(0, 7) < selectedPeriod));
+            const totalPrevThu = prevTrans.reduce((sum, t) => sum + (Number(t.thu) || 0), 0);
+            const totalPrevChi = prevTrans.reduce((sum, t) => sum + (Number(t.chi) || 0), 0);
+            periodOpening = periodOpening + totalPrevThu - totalPrevChi;
+            
+            periodTrans = personalTrans.filter(t => t.date && t.date.substring(0, 7) === selectedPeriod);
+        } else {
+            periodTrans = personalTrans;
+        }
+        
+        const wb = XLSX.utils.book_new();
+        const rows = [];
+        
+        rows.push([`SỔ CHI TIẾT QUỸ TÀU - TÀI KHOẢN CÁ NHÂN`]);
+        rows.push([selectedPeriod === 'all' ? 'TẤT CẢ THỜI GIAN' : `THÁNG ${selectedPeriod.split('-')[1]}/${selectedPeriod.split('-')[0]}`]);
+        rows.push([`ĐVT: VNĐ`]);
+        rows.push([]);
+        
+        rows.push([
+            'STT',
+            'NGÀY',
+            'TÀU',
+            'HẠNG MỤC',
+            'ĐỐI TÁC',
+            'NỘI DUNG CHI TIẾT',
+            'THU (VND)',
+            'CHI (VND)',
+            'SỐ DƯ (VND)'
+        ]);
+        
+        rows.push(['', '', '', '', '', 'Dư đầu kỳ chuyển sang', '', '', periodOpening]);
+        
+        let runningBalance = periodOpening;
+        let totalThu = 0;
+        let totalChi = 0;
+        
+        const sortedTrans = periodTrans.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        
+        sortedTrans.forEach((t, idx) => {
+            const thuAmt = Number(t.thu) || 0;
+            const chiAmt = Number(t.chi) || 0;
+            runningBalance = runningBalance + thuAmt - chiAmt;
+            totalThu += thuAmt;
+            totalChi += chiAmt;
+            
+            rows.push([
+                idx + 1,
+                t.date ? t.date.split('-').reverse().join('/') : '',
+                t.vessel || '',
+                t.category || '',
+                t.partner || '',
+                t.content || '',
+                thuAmt || '',
+                chiAmt || '',
+                runningBalance
+            ]);
+        });
+        
+        rows.push([
+            '',
+            '',
+            '',
+            '',
+            '',
+            'TỔNG CỘNG PHÁT SINH',
+            totalThu,
+            totalChi,
+            runningBalance
+        ]);
+        
+        const ws = XLSX.utils.aoa_to_sheet(rows);
         
         for (let key in ws) {
             if (key[0] === '!') continue;
@@ -2794,21 +3011,21 @@ const app = {
                 cell.z = '#,##0';
             }
         }
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, `Năm ${year}`);
         
-        const wscols = data[0].map((_, i) => {
-            let maxLen = 12;
-            data.forEach(row => {
-                const val = row[i] ? row[i].toString() : '';
-                if (val.length > maxLen) maxLen = val.length;
-            });
-            return { wch: maxLen + 2 };
-        });
-        ws['!cols'] = wscols;
-
-        XLSX.writeFile(wb, `Bao_cao_tong_hop_nam_${year}.xlsx`);
+        ws['!cols'] = [
+            { wch: 8 },  // STT
+            { wch: 12 }, // NGÀY
+            { wch: 10 }, // TÀU
+            { wch: 15 }, // HẠNG MỤC
+            { wch: 20 }, // ĐỐI TÁC
+            { wch: 45 }, // NỘI DUNG CHI TIẾT
+            { wch: 15 }, // THU
+            { wch: 15 }, // CHI
+            { wch: 18 }  // SỐ DƯ
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, ws, 'So Quy Ca Nhan');
+        XLSX.writeFile(wb, `So_Chi_Tiet_Quy_Personal_${selectedPeriod}.xlsx`);
     },
 
     exportJsonBackup() {
@@ -2975,6 +3192,8 @@ const app = {
         const year      = yearEl ? yearEl.value : '';
         const monthFrom = fromEl ? fromEl.value : '1';
         const monthTo   = toEl  ? toEl.value   : '12';
+        // Signature: reports(currentTab, filterMonth, filterVessel, filterVesselMonthly,
+        //   filterMonthMonthly, filterYearSummary, filterPeriodPersonal, filterMonthFrom, filterMonthTo)
         this.navigate('reports', 'summary', '', '', '', '', year, '', monthFrom, monthTo);
     },
 
@@ -3168,18 +3387,6 @@ const app = {
         const ctx = document.getElementById('financialChart');
         if (!ctx) return;
 
-        if (typeof Chart === 'undefined') {
-            console.warn("Chart.js library is not loaded. Skipping rendering of financials chart.");
-            if (ctx && ctx.parentNode) {
-                const msgEl = document.createElement('div');
-                msgEl.className = 'chart-error-placeholder';
-                msgEl.style.cssText = 'display:flex; align-items:center; justify-content:center; height:200px; color:var(--text-muted); font-size:0.9rem; font-style:italic; border:1px dashed var(--border-color); border-radius:var(--radius-md); text-align: center;';
-                msgEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px; color: var(--warning);"></i> Không thể hiển thị biểu đồ do chưa tải xong thư viện Biểu đồ';
-                ctx.parentNode.replaceChild(msgEl, ctx);
-            }
-            return;
-        }
-
         const trans = AppData.getTransactions().filter(t => t.category !== 'Luân chuyển');
         const monthly = {};
         trans.forEach(t => {
@@ -3285,20 +3492,6 @@ const app = {
 
         if (!canvasVessel || !canvasTrend || !canvasCost || !canvasFuel) return;
 
-        if (typeof Chart === 'undefined') {
-            console.warn("Chart.js library is not loaded. Skipping rendering of dashboard charts.");
-            [canvasVessel, canvasTrend, canvasCost, canvasFuel].forEach(canvas => {
-                if (canvas && canvas.parentNode) {
-                    const msgEl = document.createElement('div');
-                    msgEl.className = 'chart-error-placeholder';
-                    msgEl.style.cssText = 'display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:0.9rem; font-style:italic; padding: 20px; text-align: center;';
-                    msgEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px; color: var(--warning);"></i> Không thể tải thư viện Biểu đồ (Kiểm tra mạng)';
-                    canvas.parentNode.replaceChild(msgEl, canvas);
-                }
-            });
-            return;
-        }
-
         const allShipments = AppData.getShipments();
         let shipments = allShipments;
         if (filterMonth) {
@@ -3332,9 +3525,16 @@ const app = {
                 vesselStats[vId] = { name: vId, revenue: 0, cost: 0, profit: 0, fuelDO: 0 };
             }
             const rev = Number(s.revenueReal || 0);
-            const financials = AppData.calculateShipmentFinancials(s);
-            const costSum = financials.costSum + financials.vat;
-            const profit = financials.profit;
+            const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
+            const baseCosts = { ...s.costs };
+            delete baseCosts.vat;
+            if (this.excludeDockingDepreciation) {
+                delete baseCosts.dockingIntermediate;
+                delete baseCosts.dockingPeriodic;
+                delete baseCosts.depreciation;
+            }
+            const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
+            const profit = rev - costSum;
             
             vesselStats[vId].revenue += rev;
             vesselStats[vId].cost += costSum;
@@ -3428,9 +3628,16 @@ const app = {
                     monthlyStats[m] = { revenue: 0, cost: 0, profit: 0 };
                 }
                 const rev = Number(s.revenueReal || 0);
-                const financials = AppData.calculateShipmentFinancials(s);
-                const costSum = financials.costSum + financials.vat;
-                const profit = financials.profit;
+                const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
+                const baseCosts = { ...s.costs };
+                delete baseCosts.vat;
+                if (this.excludeDockingDepreciation) {
+                    delete baseCosts.dockingIntermediate;
+                    delete baseCosts.dockingPeriodic;
+                    delete baseCosts.depreciation;
+                }
+                const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
+                const profit = rev - costSum;
 
                 monthlyStats[m].revenue += rev;
                 monthlyStats[m].cost += costSum;
@@ -3451,8 +3658,17 @@ const app = {
             trendLabels = sortedVoyages.map(s => `${s.vesselId} (HĐ: ${s.contractNo || s.voyageNo})`);
             trendRevData = sortedVoyages.map(s => Number(s.revenueReal || 0));
             trendProfitData = sortedVoyages.map(s => {
-                const financials = AppData.calculateShipmentFinancials(s);
-                return financials.profit;
+                const rev = Number(s.revenueReal || 0);
+                const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
+                const baseCosts = { ...s.costs };
+                delete baseCosts.vat;
+                if (this.excludeDockingDepreciation) {
+                    delete baseCosts.dockingIntermediate;
+                    delete baseCosts.dockingPeriodic;
+                    delete baseCosts.depreciation;
+                }
+                const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
+                return rev - costSum;
             });
         }
 
@@ -3535,8 +3751,7 @@ const app = {
         };
 
         shipments.forEach(s => {
-            const financials = AppData.calculateShipmentFinancials(s);
-            const vat = financials.vat;
+            const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
             costSums.fuelDO += Number(s.costs?.fuelDO || 0);
             costSums.fuelLO += Number(s.costs?.fuelLO || 0);
             costSums.crewSalary += Number(s.costs?.crewSalary || 0);
@@ -3549,7 +3764,7 @@ const app = {
             costSums.vessel2ends += Number(s.costs?.vessel2ends || 0);
             costSums.portFees += Number(s.costs?.portFees || 0);
             costSums.brokerage += Number(s.costs?.brokerage || 0);
-            costSums.vat += vat;
+            costSums.vat += (vat > 0 ? vat : 0);
             costSums.others += Number(s.costs?.others || 0);
             costSums.dockingIntermediate += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingIntermediate || 0);
             costSums.dockingPeriodic += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingPeriodic || 0);
@@ -3738,12 +3953,19 @@ const app = {
 
         filteredShipments.forEach(s => {
             totalRevenue += Number(s.revenueReal || 0);
-            const financials = AppData.calculateShipmentFinancials(s);
-            const costSum = financials.costSum + financials.vat;
+            const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
+            const baseCosts = { ...s.costs };
+            delete baseCosts.vat;
+            if (this.excludeDockingDepreciation) {
+                delete baseCosts.dockingIntermediate;
+                delete baseCosts.dockingPeriodic;
+                delete baseCosts.depreciation;
+            }
+            const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
             
             totalCost += costSum;
             totalFuelDO += Number(s.costs?.fuelDO || 0);
-            totalVat += financials.vat;
+            totalVat += (vat > 0 ? vat : 0);
             totalBrokerage += Number(s.costs?.brokerage || 0);
             totalCrewSalary += Number(s.costs?.crewSalary || 0);
         });
@@ -3786,13 +4008,19 @@ const app = {
                 };
             }
             const rev = Number(s.revenueReal || 0);
-            const financials = AppData.calculateShipmentFinancials(s);
-            const costSum = financials.costSum + financials.vat;
-            const profit = financials.profit;
+            const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
+            const baseCosts = { ...s.costs };
+            delete baseCosts.vat;
+            if (this.excludeDockingDepreciation) {
+                delete baseCosts.dockingIntermediate;
+                delete baseCosts.dockingPeriodic;
+                delete baseCosts.depreciation;
+            }
+            const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
             
             vesselStats[vId].revenue += rev;
             vesselStats[vId].cost += costSum;
-            vesselStats[vId].profit += profit;
+            vesselStats[vId].profit += (rev - costSum);
             vesselStats[vId].voyages += 1;
 
             // Cộng dồn chi tiết từng hạng mục chi phí
@@ -3808,7 +4036,7 @@ const app = {
             vesselStats[vId].costsDetail.vessel2ends += Number(s.costs?.vessel2ends || 0);
             vesselStats[vId].costsDetail.portFees += Number(s.costs?.portFees || 0);
             vesselStats[vId].costsDetail.brokerage += Number(s.costs?.brokerage || 0);
-            vesselStats[vId].costsDetail.vat += financials.vat;
+            vesselStats[vId].costsDetail.vat += (vat > 0 ? vat : 0);
             vesselStats[vId].costsDetail.others += Number(s.costs?.others || 0);
             vesselStats[vId].costsDetail.dockingIntermediate += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingIntermediate || 0);
             vesselStats[vId].costsDetail.dockingPeriodic += this.excludeDockingDepreciation ? 0 : Number(s.costs?.dockingPeriodic || 0);
@@ -3904,8 +4132,15 @@ const app = {
                 let prevCost = 0;
                 prevShipments.forEach(s => {
                     prevRevenue += Number(s.revenueReal || 0);
-                    const financials = AppData.calculateShipmentFinancials(s);
-                    const costSum = financials.costSum + financials.vat;
+                    const vat = Math.round((0.08 * (s.revenueInvoice || s.revenueReal)) - (0.10 * (s.costs?.fuelDO || 0)));
+                    const baseCosts = { ...s.costs };
+                    delete baseCosts.vat;
+                    if (this.excludeDockingDepreciation) {
+                        delete baseCosts.dockingIntermediate;
+                        delete baseCosts.dockingPeriodic;
+                        delete baseCosts.depreciation;
+                    }
+                    const costSum = Object.values(baseCosts).reduce((sum, v) => sum + (Number(v) || 0), 0) + (vat > 0 ? vat : 0);
                     prevCost += costSum;
                 });
                 const prevProfit = prevRevenue - prevCost;
@@ -5252,32 +5487,6 @@ const app = {
                 }).join('');
             }
 
-            const incompleteDebts = [];
-            sortedShipments.forEach(s => {
-                const hasContract = s.contractNo && s.contractNo.trim() !== '';
-                if (!hasContract) {
-                    const amt = Number(s.revenueInvoice) || 0;
-                    if (amt > 0) {
-                        const rawName = vesselMap[s.vesselId] || s.vesselId;
-                        const vName = rawName.replace(/Vũ\s*Gia|VU\s*GIA/gi, 'VG').replace(/\s+/g, '').trim();
-                        incompleteDebts.push({
-                            vesselName: vName,
-                            voyageNo: s.voyageNo,
-                            amount: amt
-                        });
-                    }
-                }
-            });
-
-            let incompleteDebtsHtml = AppData.formatCurrency(totalInvoiceRevenueIncomplete);
-            let incompleteAlign = 'right';
-            if (incompleteDebts.length > 0) {
-                incompleteAlign = 'left';
-                incompleteDebtsHtml = incompleteDebts.map(cd => {
-                    return `<div style="margin-bottom: 2px;">• Tàu ${cd.vesselName || ''} C.${cd.voyageNo || ''}: <strong>${AppData.formatCurrency(cd.amount)}</strong></div>`;
-                }).join('');
-            }
-
             return `
                 <tr style="border: 1px solid #000;">
                     <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top;">${idx + 1}</td>
@@ -5285,7 +5494,7 @@ const app = {
                     <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #1d4ed8;">${AppData.formatCurrency(totalInvoiceRevenueCompleted)}</td>
                     <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #15803d;">${AppData.formatCurrency(totalPaid)}</td>
                     <td style="border: 1px solid #000; padding: 8px; text-align: left; vertical-align: top; font-size: 0.9rem; line-height: 1.4;">${contractDebtsHtml}</td>
-                    <td style="border: 1px solid #000; padding: 8px; text-align: ${incompleteAlign}; vertical-align: top; color: #b45309; font-size: 0.9rem; line-height: 1.4;">${incompleteDebtsHtml}</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; color: #b45309;">${AppData.formatCurrency(totalInvoiceRevenueIncomplete)}</td>
                     <td style="border: 1px solid #000; padding: 8px; text-align: right; vertical-align: top; font-weight: bold; color: #b91c1c;">${AppData.formatCurrency(totalDebt)}</td>
                 </tr>
             `;
@@ -5389,7 +5598,6 @@ const app = {
                 </style>
                 <div class="print-actions no-print" style="margin-bottom: 1.5rem; text-align: right; display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                     <button class="btn" onclick="app.closeModal('report-modal')" style="background-color: #ef4444 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-xmark"></i> Đóng Báo Cáo</button>
-                    <button class="btn" onclick="app.shareReport()" style="background-color: #3b82f6 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-share-nodes"></i> Chia Sẻ Báo Cáo (Zalo/Copy)</button>
                     <button class="btn" onclick="app.exportReportAsImage()" style="background-color: #0ea5e9 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-file-image"></i> Tải Ảnh Báo Cáo</button>
                     <button class="btn" onclick="app.printDebtReport()" style="background-color: #10b981 !important; color: #ffffff !important; border: none !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; line-height: 1;"><i class="fa-solid fa-print"></i> In Báo Cáo / Xuất PDF</button>
                 </div>
@@ -5407,7 +5615,7 @@ const app = {
                             <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 150px;">Doanh Thu đã HT (VNĐ)</th>
                             <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 140px;">Tổng Đã Thu (VNĐ)</th>
                             <th style="border: 1px solid #000; padding: 8px; text-align: left; width: 380px;">Dư Nợ Còn Lại theo HĐ</th>
-                            <th style="border: 1px solid #000; padding: 8px; text-align: left; width: 280px;">Doanh Thu Dở Dang (VNĐ)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 150px;">Doanh Thu Dở Dang (VNĐ)</th>
                             <th style="border: 1px solid #000; padding: 8px; text-align: right; width: 150px;">Tổng Công Nợ (VNĐ)</th>
                         </tr>
                     </thead>
@@ -5514,359 +5722,45 @@ const app = {
         });
     },
 
-    shareReport() {
-        if (typeof html2canvas === 'undefined') {
-            alert('Thư viện xuất ảnh chưa được tải xong. Vui lòng thử lại sau vài giây.');
-            return;
-        }
-
-        const container = document.querySelector('#report-modal .print-container');
-        if (!container) {
-            alert('Không tìm thấy nội dung báo cáo để chia sẻ!');
-            return;
-        }
-
-        const btn = document.querySelector('button[onclick="app.shareReport()"]');
-        const originalText = btn ? btn.innerHTML : 'Chia sẻ Báo cáo';
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
-        }
-
-        const CAPTURE_WIDTH = 1500;
-
-        html2canvas(container, {
-            scale:           2,
-            useCORS:         true,
-            backgroundColor: '#ffffff',
-            width:           CAPTURE_WIDTH,
-            windowWidth:     CAPTURE_WIDTH,
-            onclone: (clonedDoc, clonedEl) => {
-                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
-                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                clonedEl.style.maxWidth = 'none';
-                clonedEl.style.overflow = 'visible';
-                clonedEl.style.padding  = '2rem';
-                clonedEl.querySelectorAll('table').forEach(t => {
-                    t.style.width    = '100%';
-                    t.style.minWidth = '1300px';
-                });
-            }
-        }).then(canvas => {
-            canvas.toBlob(blob => {
-                if (!blob) {
-                    alert('Lỗi tạo ảnh báo cáo!');
-                    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-                    return;
-                }
-
-                const file = new File([blob], 'bao-cao-cong-no.png', { type: 'image/png' });
-                
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    navigator.share({
-                        files: [file],
-                        title: 'Báo cáo công nợ',
-                        text: 'Chia sẻ báo cáo tổng hợp công nợ khách hàng và nhà cung cấp'
-                    }).then(() => {
-                        if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-                    }).catch(err => {
-                        console.error('Lỗi chia sẻ:', err);
-                        this.copyImageToClipboard(blob, btn, originalText);
-                    });
-                } else {
-                    this.copyImageToClipboard(blob, btn, originalText);
-                }
-            }, 'image/png');
-        }).catch(err => {
-            console.error('Error generating image for share:', err);
-            alert('Đã xảy ra lỗi khi tạo file ảnh: ' + err.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-        });
-    },
-
-    copyImageToClipboard(blob, btn, originalText) {
-        if (navigator.clipboard && navigator.clipboard.write) {
-            navigator.clipboard.write([
-                new ClipboardItem({ 'image/png': blob })
-            ]).then(() => {
-                alert('Đã sao chép ảnh báo cáo vào bộ nhớ tạm!\nBạn hãy mở Zalo, Messenger hoặc bất kỳ ứng dụng nào và nhấn Ctrl+V (hoặc chạm giữ -> Dán) để gửi ngay.');
-                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-            }).catch(err => {
-                console.error('Lỗi sao chép vào clipboard:', err);
-                alert('Không thể tự động sao chép ảnh báo cáo. Bạn hãy dùng chức năng "Tải Ảnh Báo Cáo" rồi gửi qua Zalo.');
-                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-            });
-        } else {
-            alert('Trình duyệt không hỗ trợ sao chép ảnh tự động. Bạn hãy dùng chức năng "Tải Ảnh Báo Cáo" rồi gửi qua Zalo.');
-            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-        }
-    },
-
-    handleImageShareOrDownload(canvas, imageName, btn, originalText, actionType) {
-        if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-        
-        // Detect mobile browsers
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
-            || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
-            
-        if (isMobile) {
-            // Mobile: display generated image in modal for touch-and-hold saving/sharing
-            const imgData = canvas.toDataURL('image/png');
-            const modalImg = document.getElementById('mobile-share-img');
-            const shareModal = document.getElementById('mobile-share-modal');
-            if (modalImg && shareModal) {
-                modalImg.src = imgData;
-                this.openModal('mobile-share-modal');
-            } else {
-                // Fallback
-                alert('Vui lòng chạm giữ vào ảnh ở trang tiếp theo để lưu/chia sẻ.');
-                const newWin = window.open();
-                if (newWin) {
-                    newWin.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${imgData}" style="max-width:100%; max-height:100%; object-fit:contain;" /></body>`);
-                }
-            }
-        } else {
-            // PC:
-            if (actionType === 'share') {
-                // Copy to clipboard
-                canvas.toBlob(blob => {
-                    if (blob) {
-                        this.copyImageToClipboard(blob, btn, originalText);
-                    } else {
-                        alert('Lỗi tạo ảnh báo cáo!');
-                    }
-                }, 'image/png');
-            } else {
-                // Download file
-                try {
-                    const link = document.createElement('a');
-                    link.download = imageName || 'Bao_cao.png';
-                    link.href = canvas.toDataURL('image/png');
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                } catch (err) {
-                    console.error("Direct download failed, attempting copy to clipboard", err);
-                    canvas.toBlob(blob => {
-                        if (blob) {
-                            this.copyImageToClipboard(blob, btn, originalText);
-                        }
-                    }, 'image/png');
-                }
-            }
-        }
-    },
-
-    shareInlineReport(elementId, shareTitle) {
-        if (typeof html2canvas === 'undefined') {
-            alert('Thư viện xuất ảnh chưa được tải xong. Vui lòng thử lại sau vài giây.');
-            return;
-        }
-
-        const container = document.getElementById(elementId);
-        if (!container) {
-            alert('Không tìm thấy nội dung báo cáo để chia sẻ!');
-            return;
-        }
-
-        const btn = document.querySelector(`button[onclick*="${elementId}"]`);
-        const originalText = btn ? btn.innerHTML : 'Gửi Zalo / MXH';
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
-        }
-
-        const CAPTURE_WIDTH = 1500;
-
-        html2canvas(container, {
-            scale:           2,
-            useCORS:         true,
-            backgroundColor: '#ffffff',
-            width:           CAPTURE_WIDTH,
-            windowWidth:     CAPTURE_WIDTH,
-            onclone: (clonedDoc, clonedEl) => {
-                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
-                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                clonedEl.style.maxWidth = 'none';
-                clonedEl.style.overflow = 'visible';
-                clonedEl.style.padding  = '2rem';
-                clonedEl.querySelectorAll('table').forEach(t => {
-                    t.style.width    = '100%';
-                    t.style.minWidth = '1300px';
-                });
-            }
-        }).then(canvas => {
-            const escapedElementId = elementId.replace(/'/g, "");
-            this.handleImageShareOrDownload(canvas, `${escapedElementId}.png`, btn, originalText, 'share');
-        }).catch(err => {
-            console.error('Error generating image for share:', err);
-            alert('Đã xảy ra lỗi khi tạo file ảnh: ' + err.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-        });
-    },
-
-    exportInlineReportAsImage(elementId, imageName) {
-        if (typeof html2canvas === 'undefined') {
-            alert('Thư viện xuất ảnh chưa được tải xong. Vui lòng thử lại sau vài giây.');
-            return;
-        }
-
-        const container = document.getElementById(elementId);
-        if (!container) {
-            alert('Không tìm thấy nội dung báo cáo để xuất ảnh!');
-            return;
-        }
-
-        const btn = document.querySelector(`button[onclick*="${elementId}"]`);
-        const originalText = btn ? btn.innerHTML : 'Tải Ảnh';
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
-        }
-
-        const CAPTURE_WIDTH = 1500;
-
-        html2canvas(container, {
-            scale:           2,
-            useCORS:         true,
-            backgroundColor: '#ffffff',
-            width:           CAPTURE_WIDTH,
-            windowWidth:     CAPTURE_WIDTH,
-            onclone: (clonedDoc, clonedEl) => {
-                clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                clonedEl.style.width    = CAPTURE_WIDTH + 'px';
-                clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                clonedEl.style.maxWidth = 'none';
-                clonedEl.style.overflow = 'visible';
-                clonedEl.style.padding  = '2rem';
-                clonedEl.querySelectorAll('table').forEach(t => {
-                    t.style.width    = '100%';
-                    t.style.minWidth = '1300px';
-                });
-            }
-        }).then(canvas => {
-            this.handleImageShareOrDownload(canvas, imageName || `${elementId}.png`, btn, originalText, 'download');
-        }).catch(err => {
-            console.error('Error generating image:', err);
-            alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-        });
-    },
-
-    generateMasterReport(action) {
-        const startMonth = document.getElementById('master-report-month-from')?.value || this.lastSelectedMasterMonthFrom;
-        const endMonth = document.getElementById('master-report-month-to')?.value || this.lastSelectedMasterMonthTo;
-        if (!startMonth || !endMonth) {
-            alert('Vui lòng chọn thời gian bắt đầu và kết thúc!');
-            return;
-        }
-
-        const html = Views.compileMasterReportHTML(startMonth, endMonth);
-        document.getElementById('report-content').innerHTML = html;
-
-        if (action === 'print') {
-            const container = document.getElementById('report-content');
-            if (!container) return;
-
-            // Set report modal width styles for master report layout
-            const modalEl = document.querySelector('#report-modal .modal');
-            if (modalEl) {
-                modalEl.style.maxWidth = '1300px';
-                modalEl.style.width = '95%';
-            }
-
-            // Open the modal
-            this.openModal('report-modal');
-
-            // Wait brief paint period, run print, then close modal
-            setTimeout(() => {
-                window.print();
-                this.closeModal('report-modal');
-            }, 300);
-        } else if (action === 'image') {
-            const container = document.getElementById('report-content');
-            if (!container) return;
-
-            const btn = document.getElementById('btn-master-image');
-            const originalText = btn ? btn.innerHTML : 'Tải Ảnh';
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
-            }
-
-            const CAPTURE_WIDTH = 1500;
-            html2canvas(container, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                width: CAPTURE_WIDTH,
-                windowWidth: CAPTURE_WIDTH,
-                onclone: (clonedDoc, clonedEl) => {
-                    clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                    clonedEl.style.width = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.maxWidth = 'none';
-                    clonedEl.style.overflow = 'visible';
-                    clonedEl.style.padding = '2rem';
-                    clonedEl.querySelectorAll('table').forEach(t => {
-                        t.style.width = '100%';
-                        t.style.minWidth = '1300px';
-                    });
-                }
-            }).then(canvas => {
-                this.handleImageShareOrDownload(canvas, `Bao_cao_tong_hop_${startMonth}_den_${endMonth}.png`, btn, originalText, 'download');
-            }).catch(err => {
-                console.error('Error generating image:', err);
-                alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
-                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-            });
-        } else if (action === 'share') {
-            const container = document.getElementById('report-content');
-            if (!container) return;
-
-            const btn = document.getElementById('btn-master-share');
-            const originalText = btn ? btn.innerHTML : 'Gửi Zalo / MXH';
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo ảnh...';
-            }
-
-            const CAPTURE_WIDTH = 1500;
-            html2canvas(container, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                width: CAPTURE_WIDTH,
-                windowWidth: CAPTURE_WIDTH,
-                onclone: (clonedDoc, clonedEl) => {
-                    clonedDoc.querySelectorAll('.no-print').forEach(el => el.remove());
-                    clonedEl.style.width = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.minWidth = CAPTURE_WIDTH + 'px';
-                    clonedEl.style.maxWidth = 'none';
-                    clonedEl.style.overflow = 'visible';
-                    clonedEl.style.padding = '2rem';
-                    clonedEl.querySelectorAll('table').forEach(t => {
-                        t.style.width = '100%';
-                        t.style.minWidth = '1300px';
-                    });
-                }
-            }).then(canvas => {
-                this.handleImageShareOrDownload(canvas, `Bao_cao_tong_hop_${startMonth}_den_${endMonth}.png`, btn, originalText, 'share');
-            }).catch(err => {
-                console.error('Error generating image:', err);
-                alert('Đã xảy ra lỗi khi tạo file ảnh báo cáo: ' + err.message);
-                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-            });
-        }
-    },
-
     // Open a dedicated print window for landscape PDF - mobile browsers ignore
     // @page{size:landscape} inside window.print(), but a new window with its
     // own <style> block is respected reliably on both Android and iOS.
     printDebtReport() {
-        window.print();
+        const container = document.querySelector('#report-modal .print-container');
+        if (!container) return;
+
+        const clone = container.cloneNode(true);
+        clone.querySelectorAll('.no-print').forEach(el => el.remove());
+
+        const pw = window.open('', '_blank', 'width=1200,height=800');
+        if (!pw) {
+            alert('Trình duyệt đã chặn cửa sổ popup. Vui lòng cho phép popup để in báo cáo.');
+            return;
+        }
+
+        pw.document.write(`<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200, initial-scale=1">
+  <title>Báo Cáo Tổng Hợp Công Nợ</title>
+  <style>
+    @page { size: A4 landscape; margin: 1cm 1.5cm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background:#fff !important; color:#000 !important; font-family:Arial,sans-serif; margin:0; padding:1rem; }
+    table { border-collapse:collapse; width:100%; min-width:900px; }
+    th, td { border:1px solid #000 !important; padding:6px 8px; color:#000 !important; font-size:0.88rem; }
+    th { background:#cbd5e1 !important; font-weight:bold; }
+    h2, h3, p, div { color:#000 !important; }
+    .print-actions { display:none !important; }
+  </style>
+</head>
+<body>
+${clone.outerHTML}
+<script>window.onload=function(){window.focus();window.print();};<\/script>
+</body>
+</html>`);
+        pw.document.close();
     },
 
     updateHeaderCompanyInfo() {
@@ -7382,10 +7276,4 @@ const app = {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        app.init();
-    } catch (err) {
-        alert('LỖI KHỞI CHẠY HỆ THỐNG:\n' + err.message + '\n\nStack:\n' + err.stack);
-    }
-});
+document.addEventListener('DOMContentLoaded', () => app.init());

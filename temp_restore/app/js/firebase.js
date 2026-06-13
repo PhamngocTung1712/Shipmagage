@@ -315,20 +315,16 @@ window.forceSyncToCloud = function() {
 
 // Initialize connection when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        // Add pulsing CSS keyframes for indicator
-        const style = document.createElement('style');
-        style.innerHTML = `
-            @keyframes pulse {
-                from { transform: scale(1); opacity: 0.6; }
-                to { transform: scale(1.3); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(style);
-        
-        // Start Firebase setup
-        initFirebase();
-    } catch (err) {
-        alert('LỖI KHỞI TẠO FIREBASE:\n' + err.message + '\n\nStack:\n' + err.stack);
-    }
+    // Add pulsing CSS keyframes for indicator
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @keyframes pulse {
+            from { transform: scale(1); opacity: 0.6; }
+            to { transform: scale(1.3); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Start Firebase setup
+    initFirebase();
 });

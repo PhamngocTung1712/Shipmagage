@@ -2,22 +2,10 @@
 (function() {
     // Global Error Listeners for Remote Diagnostics
     window.addEventListener('error', function(e) {
-        let errorMsg = e.message;
-        let stackMsg = '';
-        if (e.error) {
-            errorMsg = e.error.message || e.message;
-            stackMsg = '\nStack:\n' + (e.error.stack || '');
-        }
-        alert('LỖI HỆ THỐNG (Error):\n' + errorMsg + '\nTại file: ' + e.filename + '\nDòng: ' + e.lineno + ':' + e.colno + stackMsg);
+        alert('LỖI HỆ THỐNG (Error):\n' + e.message + '\nTại file: ' + e.filename + '\nDòng: ' + e.lineno + ':' + e.colno);
     });
     window.addEventListener('unhandledrejection', function(e) {
-        let reasonMsg = e.reason;
-        let stackMsg = '';
-        if (e.reason instanceof Error) {
-            reasonMsg = e.reason.message;
-            stackMsg = '\nStack:\n' + (e.reason.stack || '');
-        }
-        alert('LỖI HỆ THỐNG (Promise Rejection):\n' + reasonMsg + stackMsg);
+        alert('LỖI HỆ THỐNG (Promise Rejection):\n' + e.reason);
     });
 
     // Keep track of the original descriptor for HTMLInputElement.prototype.value
@@ -268,11 +256,7 @@
 
     // Also process existing inputs on DOM load
     function initExisting() {
-        try {
-            document.querySelectorAll('input[type="number"]').forEach(setupInput);
-        } catch (err) {
-            alert('LỖI KHỞI TẠO EXCEL-INPUT:\n' + err.message + '\n\nStack:\n' + err.stack);
-        }
+        document.querySelectorAll('input[type="number"]').forEach(setupInput);
     }
     
     if (document.readyState === 'loading') {
