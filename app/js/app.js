@@ -2960,7 +2960,140 @@ const app = {
             });
         }
 
+        this.setupCurrencyInputTooltip();
         this.navigate(this.currentView);
+    },
+
+    setupCurrencyInputTooltip() {
+        let tooltip = document.getElementById('currency-preview-tooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'currency-preview-tooltip';
+            tooltip.style.position = 'absolute';
+            tooltip.style.zIndex = '999999';
+            tooltip.style.background = 'rgba(15, 23, 42, 0.95)';
+            tooltip.style.backdropFilter = 'blur(8px)';
+            tooltip.style.border = '1px solid var(--primary-light, #3b82f6)';
+            tooltip.style.color = '#ffffff';
+            tooltip.style.padding = '6px 12px';
+            tooltip.style.borderRadius = '8px';
+            tooltip.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)';
+            tooltip.style.fontSize = '0.9rem';
+            tooltip.style.fontWeight = 'bold';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'translateY(10px) scale(0.95)';
+            tooltip.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+            tooltip.style.display = 'none';
+            document.body.appendChild(tooltip);
+        }
+
+        const formatVND = (num) => {
+            return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ';
+        };
+
+        const formatVNDToWords = (n) => {
+            if (isNaN(n) || n === 0) return '';
+            if (n >= 1e9) {
+                let val = (n / 1e9).toFixed(2).replace(/\.?0+$/, '');
+                return `(${val} tỷ)`;
+            }
+            if (n >= 1e6) {
+                let val = (n / 1e6).toFixed(2).replace(/\.?0+$/, '');
+                return `(${val} triệu)`;
+            }
+            if (n >= 1e3) {
+                let val = (n / 1e3).toFixed(2).replace(/\.?0+$/, '');
+                return `(${val} nghìn)`;
+            }
+            return '';
+        };
+
+        const isCurrencyInput = (input) => {
+            if (input.type !== 'number' && input.type !== 'text') return false;
+            const checkString = (input.id + ' ' + (input.placeholder || '') + ' ' + (input.className || '') + ' ' + (input.getAttribute('name') || '')).toLowerCase();
+            const keywords = ['thu', 'chi', 'price', 'amount', 'rate', 'salary', 'cost', 'interest', 'alloc', 'fund', 'money', 'markup', 'added', 'freight', 'refund', 'opening', 'vessel-alloc'];
+            if (keywords.some(k => checkString.includes(k))) return true;
+            
+            const formGroup = input.closest('.form-group');
+            if (formGroup) {
+                const label = formGroup.querySelector('label');
+                if (label) {
+                    const labelText = label.textContent.toLowerCase();
+                    const labelKeywords = ['thu', 'chi', 'tiền', 'giá', 'phí', 'lương', 'cước', 'nợ', 'thanh toán', 'vnd', 'vnđ'];
+                    if (labelKeywords.some(k => labelText.includes(k))) return true;
+                }
+            }
+            return false;
+        };
+
+        let activeInput = null;
+
+        const updateTooltip = (input) => {
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && val > 0) {
+                const formatted = formatVND(val);
+                const words = formatVNDToWords(val);
+                tooltip.innerHTML = `<i class="fa-solid fa-calculator" style="color: var(--accent, #3b82f6); margin-right: 6px;"></i>${formatted} <span style="color: #94a3b8; font-weight: normal; font-size: 0.85rem; margin-left: 4px;">${words}</span>`;
+                
+                const rect = input.getBoundingClientRect();
+                const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                
+                tooltip.style.display = 'block';
+                
+                const tooltipHeight = tooltip.clientHeight;
+                tooltip.style.left = (rect.left + scrollLeft + (rect.width - tooltip.clientWidth) / 2) + 'px';
+                tooltip.style.top = (rect.top + scrollTop - tooltipHeight - 10) + 'px';
+                
+                setTimeout(() => {
+                    tooltip.style.opacity = '1';
+                    tooltip.style.transform = 'translateY(0) scale(1)';
+                }, 10);
+            } else {
+                hideTooltip();
+            }
+        };
+
+        const hideTooltip = () => {
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'translateY(10px) scale(0.95)';
+            setTimeout(() => {
+                if (tooltip.style.opacity === '0') {
+                    tooltip.style.display = 'none';
+                }
+            }, 150);
+        };
+
+        if (document.body && typeof document.body.addEventListener === 'function') {
+            document.body.addEventListener('focusin', (e) => {
+                if (isCurrencyInput(e.target)) {
+                    activeInput = e.target;
+                    updateTooltip(e.target);
+                }
+            });
+
+            document.body.addEventListener('input', (e) => {
+                if (isCurrencyInput(e.target)) {
+                    updateTooltip(e.target);
+                }
+            });
+
+            document.body.addEventListener('focusout', (e) => {
+                if (isCurrencyInput(e.target)) {
+                    activeInput = null;
+                    hideTooltip();
+                }
+            });
+        }
+
+        if (typeof document.addEventListener === 'function') {
+            document.addEventListener('scroll', () => {
+                if (activeInput) {
+                    updateTooltip(activeInput);
+                }
+            }, { capture: true, passive: true });
+        }
     },
 
     changeFinancialsTab(tab) {
