@@ -2701,8 +2701,8 @@ const Views = {
                 <div class="page-header">
                     <div><h1 class="page-title">Quản lý Chuyến hàng</h1><p class="page-subtitle">Theo dõi doanh thu, chi phí và hiệu quả từng mã chuyến</p></div>
                     <div>
-                        <button class="btn btn-outline" id="shipment-compare-btn" onclick="app.openShipmentCompareModal()" style="margin-right: 8px; display: none;">
-                            <i class="fa-solid fa-chart-column" style="color: var(--accent);"></i> So Sánh (<span id="compare-count-display">0</span>)
+                        <button class="btn btn-outline" id="shipment-compare-btn" onclick="app.openShipmentCompareModal()" style="margin-right: 8px;">
+                            <i class="fa-solid fa-chart-column"></i> So Sánh Chuyến
                         </button>
                         <button class="btn btn-outline" onclick="app.exportShipmentReport()" style="margin-right: 8px;">
                             <i class="fa-solid fa-file-excel"></i> Xuất Báo Cáo

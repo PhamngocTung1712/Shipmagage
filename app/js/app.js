@@ -7392,11 +7392,16 @@ const app = {
     updateSelectedComparisonCount() {
         const count = document.querySelectorAll('.shipment-compare-chk:checked').length;
         const btn = document.getElementById('shipment-compare-btn');
-        const countDisplay = document.getElementById('compare-count-display');
-        
-        if (countDisplay) countDisplay.textContent = count;
         if (btn) {
-            btn.style.display = count >= 2 ? 'inline-block' : 'none';
+            if (count >= 2) {
+                btn.innerHTML = `<i class="fa-solid fa-chart-column"></i> So Sánh (${count})`;
+                btn.classList.remove('btn-outline');
+                btn.classList.add('btn-primary');
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-chart-column"></i> So Sánh Chuyến`;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline');
+            }
         }
     },
 
