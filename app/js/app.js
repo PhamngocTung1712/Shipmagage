@@ -12,6 +12,544 @@ const app = {
         localStorage.setItem('exclude_docking_depreciation', checked ? 'true' : 'false');
         this.navigate(this.currentView, ...this.currentViewArgs || []);
     },
+
+    exportDocumentedSalaryExcel() {
+        const month = document.getElementById('sal-month')?.value || new Date().toISOString().substring(0, 7);
+        const [year, monthNum] = month.split('-');
+        
+        const calcTax = (income) => {
+            if (income <= 0) return 0;
+            if (income <= 5000000) return income * 0.05;
+            if (income <= 10000000) return (5000000 * 0.05) + ((income - 5000000) * 0.1);
+            if (income <= 18000000) return (5000000 * 0.05) + (5000000 * 0.1) + ((income - 10000000) * 0.15);
+            if (income <= 32000000) return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + ((income - 18000000) * 0.2);
+            if (income <= 52000000) return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + (14000000 * 0.2) + ((income - 32000000) * 0.25);
+            if (income <= 80000000) return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + (14000000 * 0.2) + (20000000 * 0.25) + ((income - 52000000) * 0.3);
+            return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + (14000000 * 0.2) + (20000000 * 0.25) + (28000000 * 0.3) + ((income - 80000000) * 0.35);
+        };
+
+        const numCell = (val) => {
+            if (!val) return '<td style="text-align: right; mso-number-format:\'\\#\\,\\#\\#0\';" x:num="0">0</td>';
+            return `<td style="text-align: right; mso-number-format:\'\\#\\,\\#\\#0\';" x:num="${val}">${val}</td>`;
+        };
+
+        const boldNumCell = (val) => {
+            if (!val) return '<td style="text-align: right; font-weight: bold; mso-number-format:\'\\#\\,\\#\\#0\';" x:num="0">0</td>';
+            return `<td style="text-align: right; font-weight: bold; mso-number-format:\'\\#\\,\\#\\#0\';" x:num="${val}">${val}</td>`;
+        };
+
+        const formulaCell = (formula, val) => {
+            return `<td style="text-align: right; mso-number-format:\'\\#\\,\\#\\#0\';" x:num="${val}" x:fmla="=${formula}">${val}</td>`;
+        };
+
+        const boldFormulaCell = (formula, val) => {
+            return `<td style="text-align: right; font-weight: bold; mso-number-format:\'\\#\\,\\#\\#0\';" x:num="${val}" x:fmla="=${formula}">${val}</td>`;
+        };
+
+        const centerCell = (val) => {
+            if (typeof val === 'number') {
+                return `<td style="text-align: center;" x:num="${val}">${val}</td>`;
+            }
+            return `<td style="text-align: center;">${val !== undefined ? val : ''}</td>`;
+        };
+
+        const boldCenterCell = (val) => {
+            if (typeof val === 'number') {
+                return `<td style="text-align: center; font-weight: bold;" x:num="${val}">${val}</td>`;
+            }
+            return `<td style="text-align: center; font-weight: bold;">${val !== undefined ? val : ''}</td>`;
+        };
+
+        const boldCenterFormulaCell = (formula, val) => {
+            return `<td style="text-align: center; font-weight: bold;" x:num="${val}" x:fmla="=${formula}">${val}</td>`;
+        };
+
+        const sumSelectedRowsFormula = (colLetter, rowIndices) => {
+            if (!rowIndices || rowIndices.length === 0) return '0';
+            return rowIndices.map(r => `${colLetter}${r}`).join('+');
+        };
+
+        const employees = AppData.getEmployees();
+        const vessels = AppData.getVessels();
+
+        // 1. Group VP (Management)
+        const vpEmployees = employees.filter(e => AppData.getEmployeeActiveState(e, month).department === 'VP');
+        // 2. Group Exploitation (Vessels)
+        const vesselGroups = vessels.map(v => {
+            return {
+                vessel: v,
+                employees: employees.filter(e => AppData.getEmployeeActiveState(e, month).department === v.id)
+            };
+        }).filter(g => g.employees.length > 0);
+
+        // We will collect grand totals
+        let grandBasic = 0, grandMeal = 0, grandPhone = 0, grandClothing = 0, grandTransport = 0, grandDelivery = 0, grandBonus = 0;
+        let grandActualTotal = 0, grandTaxable = 0, grandPersonal = 0, grandDependents = 0, grandDepDeduction = 0, grandInsuranceBase = 0;
+        let grandDnBhxh = 0, grandDnBhyt = 0, grandDnBhtn = 0, grandDnTotal = 0;
+        let grandNvBhxh = 0, grandNvBhyt = 0, grandNvBhtn = 0, grandNvTotal = 0;
+        let grandAssessable = 0, grandTax = 0, grandRemaining = 0;
+
+        let rowsHTML = '';
+        let stt = 1;
+        let currentRow = 6;
+
+        // Helper to process a list of employees for a department
+        const processGroup = (groupEmployees, depId, groupName) => {
+            let subBasic = 0, subMeal = 0, subPhone = 0, subClothing = 0, subTransport = 0, subDelivery = 0, subBonus = 0;
+            let subActualTotal = 0, subTaxable = 0, subPersonal = 0, subDependents = 0, subDepDeduction = 0, subInsuranceBase = 0;
+            let subDnBhxh = 0, subDnBhyt = 0, subDnBhtn = 0, subDnTotal = 0;
+            let subNvBhxh = 0, subNvBhyt = 0, subNvBhtn = 0, subNvTotal = 0;
+            let subAssessable = 0, subTax = 0, subRemaining = 0;
+
+            const timesheet = AppData.getTimesheet(month, depId) || {};
+            const voyageCount = Number(timesheet.voyageCount) || 0;
+            const depRate = timesheet.dependentDeductionRate !== undefined ? timesheet.dependentDeductionRate : 4400000;
+
+            let groupRows = '';
+            let groupStartRow = currentRow;
+            groupEmployees.forEach(e => {
+                const ov = (timesheet.salaryOverrides && timesheet.salaryOverrides[e.id]) || {};
+                const activeState = AppData.getEmployeeActiveState(e, month);
+
+                const basic = ov.basicSalary !== undefined ? Number(ov.basicSalary) : (Number(activeState.basicSalary) || 0);
+                const meal = ov.mealAllowance !== undefined ? Number(ov.mealAllowance) : (Number(activeState.mealAllowance) || 0);
+                const phone = ov.phoneAllowance !== undefined ? Number(ov.phoneAllowance) : (Number(activeState.phoneAllowance) || 0);
+                const clothing = ov.clothingAllowance !== undefined ? Number(ov.clothingAllowance) : (Number(activeState.clothingAllowance) || 0);
+                const transport = ov.transportAllowance !== undefined ? Number(ov.transportAllowance) : (Number(activeState.transportAllowance) || 0);
+                const delivery = ov.deliveryAllowance !== undefined ? Number(ov.deliveryAllowance) : (Number(activeState.deliveryAllowance) || 0) * voyageCount;
+                const bonus = ov.completionBonus !== undefined ? Number(ov.completionBonus) : (Number(activeState.completionBonus) || 0) * voyageCount;
+
+                const actualTotal = basic + meal + phone + clothing + transport + delivery + bonus;
+                const taxableIncome = Math.max(0, actualTotal - meal - phone - clothing);
+                
+                const personalDeduction = ov.personalDeduction !== undefined ? Number(ov.personalDeduction) : (Number(activeState.personalDeduction) || 15500000);
+                const dependents = ov.dependents !== undefined ? Number(ov.dependents) : (Number(activeState.dependents) || 0);
+                const dependentDeduction = dependents * depRate;
+
+                const insuranceBase = ov.insurance !== undefined ? Number(ov.insurance) : (activeState.insurance !== undefined && activeState.insurance !== null ? Number(activeState.insurance) : basic);
+
+                const dnBhxh = insuranceBase * 0.175;
+                const dnBhyt = insuranceBase * 0.03;
+                const dnBhtn = insuranceBase * 0.01;
+                const dnTotal = dnBhxh + dnBhyt + dnBhtn;
+
+                const nvBhxh = insuranceBase * 0.08;
+                const nvBhyt = insuranceBase * 0.015;
+                const nvBhtn = insuranceBase * 0.01;
+                const nvTotal = nvBhxh + nvBhyt + nvBhtn;
+
+                const assessableIncome = Math.max(0, taxableIncome - personalDeduction - dependentDeduction - nvTotal);
+                const tax = calcTax(assessableIncome);
+                const remaining = actualTotal - nvTotal - tax;
+
+                subBasic += basic;
+                subMeal += meal;
+                subPhone += phone;
+                subClothing += clothing;
+                subTransport += transport;
+                subDelivery += delivery;
+                subBonus += bonus;
+                subActualTotal += actualTotal;
+                subTaxable += taxableIncome;
+                subPersonal += personalDeduction;
+                subDependents += dependents;
+                subDepDeduction += dependentDeduction;
+                subInsuranceBase += insuranceBase;
+                subDnBhxh += dnBhxh;
+                subDnBhyt += dnBhyt;
+                subDnBhtn += dnBhtn;
+                subDnTotal += dnTotal;
+                subNvBhxh += nvBhxh;
+                subNvBhyt += nvBhyt;
+                subNvBhtn += nvBhtn;
+                subNvTotal += nvTotal;
+                subAssessable += assessableIncome;
+                subTax += tax;
+                subRemaining += remaining;
+
+                groupRows += `
+                    <tr style="height: 25px;">
+                        <td style="text-align: center;">${stt++}</td>
+                        <td>${e.name}</td>
+                        <td>${e.role || ''}</td>
+                        ${numCell(basic)}
+                        ${numCell(meal)}
+                        ${numCell(phone)}
+                        ${numCell(clothing)}
+                        ${numCell(transport)}
+                        ${numCell(delivery)}
+                        ${numCell(bonus)}
+                        ${formulaCell(`SUM(D${currentRow}:J${currentRow})`, actualTotal)}
+                        ${formulaCell(`MAX(0,K${currentRow}-E${currentRow}-F${currentRow}-G${currentRow})`, taxableIncome)}
+                        ${numCell(personalDeduction)}
+                        ${centerCell(dependents)}
+                        ${formulaCell(`N${currentRow}*${depRate}`, dependentDeduction)}
+                        ${ov.insurance !== undefined || (e.insurance !== undefined && e.insurance !== null) ? numCell(insuranceBase) : formulaCell(`D${currentRow}`, insuranceBase)}
+                        ${formulaCell(`P${currentRow}*0.175`, dnBhxh)}
+                        ${formulaCell(`P${currentRow}*0.03`, dnBhyt)}
+                        ${formulaCell(`P${currentRow}*0.01`, dnBhtn)}
+                        ${formulaCell(`SUM(Q${currentRow}:S${currentRow})`, dnTotal)}
+                        ${formulaCell(`P${currentRow}*0.08`, nvBhxh)}
+                        ${formulaCell(`P${currentRow}*0.015`, nvBhyt)}
+                        ${formulaCell(`P${currentRow}*0.01`, nvBhtn)}
+                        ${formulaCell(`SUM(U${currentRow}:W${currentRow})`, nvTotal)}
+                        ${formulaCell(`MAX(0,L${currentRow}-M${currentRow}-O${currentRow}-X${currentRow})`, assessableIncome)}
+                        ${formulaCell(`IF(Y${currentRow}<=0,0,IF(Y${currentRow}<=5000000,Y${currentRow}*0.05,IF(Y${currentRow}<=10000000,Y${currentRow}*0.1-250000,IF(Y${currentRow}<=18000000,Y${currentRow}*0.15-750000,IF(Y${currentRow}<=32000000,Y${currentRow}*0.2-1650000,IF(Y${currentRow}<=52000000,Y${currentRow}*0.25-3250000,IF(Y${currentRow}<=80000000,Y${currentRow}*0.3-5850000,Y${currentRow}*0.35-9850000)))))))`, tax)}
+                        ${formulaCell(`K${currentRow}-X${currentRow}-Z${currentRow}`, remaining)}
+                    </tr>
+                `;
+                currentRow++;
+            });
+
+            let groupEndRow = currentRow - 1;
+            let summaryRowIndex = currentRow;
+
+            // Group summary row
+            groupRows += `
+                <tr style="font-weight: bold; background-color: #e6f2ff; height: 28px;">
+                    <td colspan="3" style="text-align: center; font-weight: bold;">TỔNG CỘNG ${groupName.toUpperCase()}</td>
+                    ${boldFormulaCell(`SUM(D${groupStartRow}:D${groupEndRow})`, subBasic)}
+                    ${boldFormulaCell(`SUM(E${groupStartRow}:E${groupEndRow})`, subMeal)}
+                    ${boldFormulaCell(`SUM(F${groupStartRow}:F${groupEndRow})`, subPhone)}
+                    ${boldFormulaCell(`SUM(G${groupStartRow}:G${groupEndRow})`, subClothing)}
+                    ${boldFormulaCell(`SUM(H${groupStartRow}:H${groupEndRow})`, subTransport)}
+                    ${boldFormulaCell(`SUM(I${groupStartRow}:I${groupEndRow})`, subDelivery)}
+                    ${boldFormulaCell(`SUM(J${groupStartRow}:J${groupEndRow})`, subBonus)}
+                    ${boldFormulaCell(`SUM(K${groupStartRow}:K${groupEndRow})`, subActualTotal)}
+                    ${boldFormulaCell(`SUM(L${groupStartRow}:L${groupEndRow})`, subTaxable)}
+                    ${boldFormulaCell(`SUM(M${groupStartRow}:M${groupEndRow})`, subPersonal)}
+                    ${boldCenterFormulaCell(`SUM(N${groupStartRow}:N${groupEndRow})`, subDependents)}
+                    ${boldFormulaCell(`SUM(O${groupStartRow}:O${groupEndRow})`, subDepDeduction)}
+                    ${boldFormulaCell(`SUM(P${groupStartRow}:P${groupEndRow})`, subInsuranceBase)}
+                    ${boldFormulaCell(`SUM(Q${groupStartRow}:Q${groupEndRow})`, subDnBhxh)}
+                    ${boldFormulaCell(`SUM(R${groupStartRow}:R${groupEndRow})`, subDnBhyt)}
+                    ${boldFormulaCell(`SUM(S${groupStartRow}:S${groupEndRow})`, subDnBhtn)}
+                    ${boldFormulaCell(`SUM(T${groupStartRow}:T${groupEndRow})`, subDnTotal)}
+                    ${boldFormulaCell(`SUM(U${groupStartRow}:U${groupEndRow})`, subNvBhxh)}
+                    ${boldFormulaCell(`SUM(V${groupStartRow}:V${groupEndRow})`, subNvBhyt)}
+                    ${boldFormulaCell(`SUM(W${groupStartRow}:W${groupEndRow})`, subNvBhtn)}
+                    ${boldFormulaCell(`SUM(X${groupStartRow}:X${groupEndRow})`, subNvTotal)}
+                    ${boldFormulaCell(`SUM(Y${groupStartRow}:Y${groupEndRow})`, subAssessable)}
+                    ${boldFormulaCell(`SUM(Z${groupStartRow}:Z${groupEndRow})`, subTax)}
+                    ${boldFormulaCell(`SUM(AA${groupStartRow}:AA${groupEndRow})`, subRemaining)}
+                </tr>
+            `;
+            currentRow++;
+
+            return {
+                html: groupRows,
+                summaryRowIndex: summaryRowIndex,
+                sums: {
+                    basic: subBasic, meal: subMeal, phone: subPhone, clothing: subClothing, transport: subTransport,
+                    delivery: subDelivery, bonus: subBonus, actualTotal: subActualTotal, taxable: subTaxable,
+                    personal: subPersonal, dependents: subDependents, depDeduction: subDepDeduction,
+                    insuranceBase: subInsuranceBase, dnBhxh: subDnBhxh, dnBhyt: subDnBhyt, dnBhtn: subDnBhtn, dnTotal: subDnTotal,
+                    nvBhxh: subNvBhxh, nvBhyt: subNvBhyt, nvBhtn: subNvBhtn, nvTotal: subNvTotal,
+                    assessable: subAssessable, tax: subTax, remaining: subRemaining
+                }
+            };
+        };
+
+        let vpSummaryRowIndex = null;
+        // Render VP Group
+        if (vpEmployees.length > 0) {
+            rowsHTML += `
+                <tr style="height: 25px; font-weight: bold; background-color: #d9d9d9;">
+                    <td colspan="27" style="font-weight: bold;">I. BỘ PHẬN QUẢN LÝ</td>
+                </tr>
+            `;
+            currentRow++; // Advance 1 for title
+            const res = processGroup(vpEmployees, 'VP', 'BỘ PHẬN QUẢN LÝ');
+            rowsHTML += res.html;
+            vpSummaryRowIndex = res.summaryRowIndex;
+            
+            // Add to grand totals
+            grandBasic += res.sums.basic; grandMeal += res.sums.meal; grandPhone += res.sums.phone;
+            grandClothing += res.sums.clothing; grandTransport += res.sums.transport;
+            grandDelivery += res.sums.delivery; grandBonus += res.sums.bonus;
+            grandActualTotal += res.sums.actualTotal; grandTaxable += res.sums.taxable;
+            grandPersonal += res.sums.personal; grandDependents += res.sums.dependents;
+            grandDepDeduction += res.sums.depDeduction; grandInsuranceBase += res.sums.insuranceBase;
+            grandDnBhxh += res.sums.dnBhxh; grandDnBhyt += res.sums.dnBhyt; grandDnBhtn += res.sums.dnBhtn; grandDnTotal += res.sums.dnTotal;
+            grandNvBhxh += res.sums.nvBhxh; grandNvBhyt += res.sums.nvBhyt; grandNvBhtn += res.sums.nvBhtn; grandNvTotal += res.sums.nvTotal;
+            grandAssessable += res.sums.assessable; grandTax += res.sums.tax; grandRemaining += res.sums.remaining;
+        }
+
+        // Render Exploitation Group
+        const vesselSummaryRowIndices = [];
+        let expSummaryRowIndex = null;
+
+        let expBasic = 0, expMeal = 0, expPhone = 0, expClothing = 0, expTransport = 0, expDelivery = 0, expBonus = 0;
+        let expActualTotal = 0, expTaxable = 0, expPersonal = 0, expDependents = 0, expDepDeduction = 0, expInsuranceBase = 0;
+        let expDnBhxh = 0, expDnBhyt = 0, expDnBhtn = 0, expDnTotal = 0;
+        let expNvBhxh = 0, expNvBhyt = 0, expNvBhtn = 0, expNvTotal = 0;
+        let expAssessable = 0, expTax = 0, expRemaining = 0;
+
+        if (vesselGroups.length > 0) {
+            rowsHTML += `
+                <tr style="height: 25px; font-weight: bold; background-color: #d9d9d9;">
+                    <td colspan="27" style="font-weight: bold;">II. BỘ PHẬN KHAI THÁC (CÁC TÀU)</td>
+                </tr>
+            `;
+            currentRow++; // Advance 1 for section title
+
+            vesselGroups.forEach(g => {
+                rowsHTML += `
+                    <tr style="height: 25px; font-weight: bold; background-color: #f2f2f2;">
+                        <td colspan="27" style="font-weight: bold; padding-left: 20px;">Tàu ${g.vessel.name}</td>
+                    </tr>
+                `;
+                currentRow++; // Advance 1 for vessel title row
+                
+                const res = processGroup(g.employees, g.vessel.id, `TÀU ${g.vessel.name}`);
+                rowsHTML += res.html;
+                vesselSummaryRowIndices.push(res.summaryRowIndex);
+
+                expBasic += res.sums.basic; expMeal += res.sums.meal; expPhone += res.sums.phone;
+                expClothing += res.sums.clothing; expTransport += res.sums.transport;
+                expDelivery += res.sums.delivery; expBonus += res.sums.bonus;
+                expActualTotal += res.sums.actualTotal; expTaxable += res.sums.taxable;
+                expPersonal += res.sums.personal; expDependents += res.sums.dependents;
+                expDepDeduction += res.sums.depDeduction; expInsuranceBase += res.sums.insuranceBase;
+                expDnBhxh += res.sums.dnBhxh; expDnBhyt += res.sums.dnBhyt; expDnBhtn += res.sums.dnBhtn; expDnTotal += res.sums.dnTotal;
+                expNvBhxh += res.sums.nvBhxh; expNvBhyt += res.sums.nvBhyt; expNvBhtn += res.sums.nvBhtn; expNvTotal += res.sums.nvTotal;
+                expAssessable += res.sums.assessable; expTax += res.sums.tax; expRemaining += res.sums.remaining;
+            });
+
+            expSummaryRowIndex = currentRow;
+
+            const expBasicFormula = sumSelectedRowsFormula('D', vesselSummaryRowIndices);
+            const expMealFormula = sumSelectedRowsFormula('E', vesselSummaryRowIndices);
+            const expPhoneFormula = sumSelectedRowsFormula('F', vesselSummaryRowIndices);
+            const expClothingFormula = sumSelectedRowsFormula('G', vesselSummaryRowIndices);
+            const expTransportFormula = sumSelectedRowsFormula('H', vesselSummaryRowIndices);
+            const expDeliveryFormula = sumSelectedRowsFormula('I', vesselSummaryRowIndices);
+            const expBonusFormula = sumSelectedRowsFormula('J', vesselSummaryRowIndices);
+            const expActualTotalFormula = sumSelectedRowsFormula('K', vesselSummaryRowIndices);
+            const expTaxableFormula = sumSelectedRowsFormula('L', vesselSummaryRowIndices);
+            const expPersonalFormula = sumSelectedRowsFormula('M', vesselSummaryRowIndices);
+            const expDependentsFormula = sumSelectedRowsFormula('N', vesselSummaryRowIndices);
+            const expDepDeductionFormula = sumSelectedRowsFormula('O', vesselSummaryRowIndices);
+            const expInsuranceBaseFormula = sumSelectedRowsFormula('P', vesselSummaryRowIndices);
+            const expDnBhxhFormula = sumSelectedRowsFormula('Q', vesselSummaryRowIndices);
+            const expDnBhytFormula = sumSelectedRowsFormula('R', vesselSummaryRowIndices);
+            const expDnBhtnFormula = sumSelectedRowsFormula('S', vesselSummaryRowIndices);
+            const expDnTotalFormula = sumSelectedRowsFormula('T', vesselSummaryRowIndices);
+            const expNvBhxhFormula = sumSelectedRowsFormula('U', vesselSummaryRowIndices);
+            const expNvBhytFormula = sumSelectedRowsFormula('V', vesselSummaryRowIndices);
+            const expNvBhtnFormula = sumSelectedRowsFormula('W', vesselSummaryRowIndices);
+            const expNvTotalFormula = sumSelectedRowsFormula('X', vesselSummaryRowIndices);
+            const expAssessableFormula = sumSelectedRowsFormula('Y', vesselSummaryRowIndices);
+            const expTaxFormula = sumSelectedRowsFormula('Z', vesselSummaryRowIndices);
+            const expRemainingFormula = sumSelectedRowsFormula('AA', vesselSummaryRowIndices);
+
+            // Exploitation summary row
+            rowsHTML += `
+                <tr style="font-weight: bold; background-color: #d9ebd9; height: 30px;">
+                    <td colspan="3" style="text-align: center; font-weight: bold;">TỔNG CỘNG BỘ PHẬN KHAI THÁC</td>
+                    ${boldFormulaCell(expBasicFormula, expBasic)}
+                    ${boldFormulaCell(expMealFormula, expMeal)}
+                    ${boldFormulaCell(expPhoneFormula, expPhone)}
+                    ${boldFormulaCell(expClothingFormula, expClothing)}
+                    ${boldFormulaCell(expTransportFormula, expTransport)}
+                    ${boldFormulaCell(expDeliveryFormula, expDelivery)}
+                    ${boldFormulaCell(expBonusFormula, expBonus)}
+                    ${boldFormulaCell(expActualTotalFormula, expActualTotal)}
+                    ${boldFormulaCell(expTaxableFormula, expTaxable)}
+                    ${boldFormulaCell(expPersonalFormula, expPersonal)}
+                    ${boldCenterFormulaCell(expDependentsFormula, expDependents)}
+                    ${boldFormulaCell(expDepDeductionFormula, expDepDeduction)}
+                    ${boldFormulaCell(expInsuranceBaseFormula, expInsuranceBase)}
+                    ${boldFormulaCell(expDnBhxhFormula, expDnBhxh)}
+                    ${boldFormulaCell(expDnBhytFormula, expDnBhyt)}
+                    ${boldFormulaCell(expDnBhtnFormula, expDnBhtn)}
+                    ${boldFormulaCell(expDnTotalFormula, expDnTotal)}
+                    ${boldFormulaCell(expNvBhxhFormula, expNvBhxh)}
+                    ${boldFormulaCell(expNvBhytFormula, expNvBhyt)}
+                    ${boldFormulaCell(expNvBhtnFormula, expNvBhtn)}
+                    ${boldFormulaCell(expNvTotalFormula, expNvTotal)}
+                    ${boldFormulaCell(expAssessableFormula, expAssessable)}
+                    ${boldFormulaCell(expTaxFormula, expTax)}
+                    ${boldFormulaCell(expRemainingFormula, expRemaining)}
+                </tr>
+            `;
+            currentRow++;
+
+            // Add to grand totals
+            grandBasic += expBasic; grandMeal += expMeal; grandPhone += expPhone;
+            grandClothing += expClothing; grandTransport += expTransport;
+            grandDelivery += expDelivery; grandBonus += expBonus;
+            grandActualTotal += expActualTotal; grandTaxable += expTaxable;
+            grandPersonal += expPersonal; grandDependents += expDependents;
+            grandDepDeduction += expDepDeduction; grandInsuranceBase += expInsuranceBase;
+            grandDnBhxh += expDnBhxh; grandDnBhyt += expDnBhyt; grandDnBhtn += expDnBhtn; grandDnTotal += expDnTotal;
+            grandNvBhxh += expNvBhxh; grandNvBhyt += expNvBhyt; grandNvBhtn += expNvBhtn; grandNvTotal += expNvTotal;
+            grandAssessable += expAssessable; grandTax += expTax; grandRemaining += expRemaining;
+        }
+
+        // Grand totals row
+        const grandTotalRowIndices = [];
+        if (vpSummaryRowIndex !== null) grandTotalRowIndices.push(vpSummaryRowIndex);
+        if (expSummaryRowIndex !== null) grandTotalRowIndices.push(expSummaryRowIndex);
+
+        const grandBasicFormula = sumSelectedRowsFormula('D', grandTotalRowIndices);
+        const grandMealFormula = sumSelectedRowsFormula('E', grandTotalRowIndices);
+        const grandPhoneFormula = sumSelectedRowsFormula('F', grandTotalRowIndices);
+        const grandClothingFormula = sumSelectedRowsFormula('G', grandTotalRowIndices);
+        const grandTransportFormula = sumSelectedRowsFormula('H', grandTotalRowIndices);
+        const grandDeliveryFormula = sumSelectedRowsFormula('I', grandTotalRowIndices);
+        const grandBonusFormula = sumSelectedRowsFormula('J', grandTotalRowIndices);
+        const grandActualTotalFormula = sumSelectedRowsFormula('K', grandTotalRowIndices);
+        const grandTaxableFormula = sumSelectedRowsFormula('L', grandTotalRowIndices);
+        const grandPersonalFormula = sumSelectedRowsFormula('M', grandTotalRowIndices);
+        const grandDependentsFormula = sumSelectedRowsFormula('N', grandTotalRowIndices);
+        const grandDepDeductionFormula = sumSelectedRowsFormula('O', grandTotalRowIndices);
+        const grandInsuranceBaseFormula = sumSelectedRowsFormula('P', grandTotalRowIndices);
+        const grandDnBhxhFormula = sumSelectedRowsFormula('Q', grandTotalRowIndices);
+        const grandDnBhytFormula = sumSelectedRowsFormula('R', grandTotalRowIndices);
+        const grandDnBhtnFormula = sumSelectedRowsFormula('S', grandTotalRowIndices);
+        const grandDnTotalFormula = sumSelectedRowsFormula('T', grandTotalRowIndices);
+        const grandNvBhxhFormula = sumSelectedRowsFormula('U', grandTotalRowIndices);
+        const grandNvBhytFormula = sumSelectedRowsFormula('V', grandTotalRowIndices);
+        const grandNvBhtnFormula = sumSelectedRowsFormula('W', grandTotalRowIndices);
+        const grandNvTotalFormula = sumSelectedRowsFormula('X', grandTotalRowIndices);
+        const grandAssessableFormula = sumSelectedRowsFormula('Y', grandTotalRowIndices);
+        const grandTaxFormula = sumSelectedRowsFormula('Z', grandTotalRowIndices);
+        const grandRemainingFormula = sumSelectedRowsFormula('AA', grandTotalRowIndices);
+
+        rowsHTML += `
+            <tr style="font-weight: bold; background-color: #ffd699; height: 32px;">
+                <td colspan="3" style="text-align: center; font-weight: bold; text-transform: uppercase;">TỔNG CỘNG TOÀN CÔNG TY</td>
+                ${boldFormulaCell(grandBasicFormula, grandBasic)}
+                ${boldFormulaCell(grandMealFormula, grandMeal)}
+                ${boldFormulaCell(grandPhoneFormula, grandPhone)}
+                ${boldFormulaCell(grandClothingFormula, grandClothing)}
+                ${boldFormulaCell(grandTransportFormula, grandTransport)}
+                ${boldFormulaCell(grandDeliveryFormula, grandDelivery)}
+                ${boldFormulaCell(grandBonusFormula, grandBonus)}
+                ${boldFormulaCell(grandActualTotalFormula, grandActualTotal)}
+                ${boldFormulaCell(grandTaxableFormula, grandTaxable)}
+                ${boldFormulaCell(grandPersonalFormula, grandPersonal)}
+                ${boldCenterFormulaCell(grandDependentsFormula, grandDependents)}
+                ${boldFormulaCell(grandDepDeductionFormula, grandDepDeduction)}
+                ${boldFormulaCell(grandInsuranceBaseFormula, grandInsuranceBase)}
+                ${boldFormulaCell(grandDnBhxhFormula, grandDnBhxh)}
+                ${boldFormulaCell(grandDnBhytFormula, grandDnBhyt)}
+                ${boldFormulaCell(grandDnBhtnFormula, grandDnBhtn)}
+                ${boldFormulaCell(grandDnTotalFormula, grandDnTotal)}
+                ${boldFormulaCell(grandNvBhxhFormula, grandNvBhxh)}
+                ${boldFormulaCell(grandNvBhytFormula, grandNvBhyt)}
+                ${boldFormulaCell(grandNvBhtnFormula, grandNvBhtn)}
+                ${boldFormulaCell(grandNvTotalFormula, grandNvTotal)}
+                ${boldFormulaCell(grandAssessableFormula, grandAssessable)}
+                ${boldFormulaCell(grandTaxFormula, grandTax)}
+                ${boldFormulaCell(grandRemainingFormula, grandRemaining)}
+            </tr>
+        `;
+
+        const htmlContent = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+            <meta charset="utf-8">
+            <!--[if gte mso 9]>
+            <xml>
+            <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+            <x:Name>Lương Chứng Từ</x:Name>
+            <x:WorksheetOptions>
+            <x:DisplayGridlines/>
+            </x:WorksheetOptions>
+            </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+            </xml>
+            <![endif]-->
+            <style>
+              body, table, th, td, tr { font-family: "Times New Roman", Times, serif; font-size: 12pt; }
+              table { border-collapse: collapse; }
+              th, td { border: 0.5pt solid #A0A0A0; padding: 5px; }
+              th { background-color: #f2f2f2; text-align: center; font-weight: bold; }
+              .title { font-size: 16pt; font-weight: bold; text-align: center; text-transform: uppercase; }
+              .text-right { text-align: right; }
+              .text-center { text-align: center; }
+            </style>
+            </head>
+            <body>
+              <table>
+                <thead>
+                  <tr>
+                    <td colspan="27" class="title" style="border: none; text-align: center; font-size: 16pt; font-weight: bold; height: 50px;">BẢNG THANH TOÁN LƯƠNG NHÂN VIÊN THÁNG ${monthNum} NĂM ${year}</td>
+                  </tr>
+                  <tr><td colspan="27" style="border: none; height: 10px;"></td></tr>
+                  <tr style="height: 30px;">
+                    <th rowspan="2" style="width: 50px;">STT</th>
+                    <th rowspan="2" style="width: 180px;">Họ và tên</th>
+                    <th rowspan="2" style="width: 120px;">Chức vụ</th>
+                    <th rowspan="2" style="width: 120px;">Lương cơ bản</th>
+                    <th colspan="4">Hỗ trợ</th>
+                    <th rowspan="2" style="width: 140px;">Phụ cấp giao nhận, bảo dưỡng tàu</th>
+                    <th rowspan="2" style="width: 140px;">Tiền thưởng hoàn thành CV</th>
+                    <th rowspan="2" style="width: 140px;">Tổng lương thực tế</th>
+                    <th rowspan="2" style="width: 140px;">Thu nhập chịu thuế TNCN</th>
+                    <th rowspan="2" style="width: 120px;">Giảm trừ bản thân</th>
+                    <th rowspan="2" style="width: 80px;">Số lượng NPT</th>
+                    <th rowspan="2" style="width: 120px;">Giảm trừ NPT</th>
+                    <th rowspan="2" style="width: 120px;">Mức lương đóng BHXH</th>
+                    <th colspan="4">Các khoản trích vào chi phí DN</th>
+                    <th colspan="4">Các khoản trích vào lương của NV</th>
+                    <th rowspan="2" style="width: 130px;">Thu nhập tính thuế</th>
+                    <th rowspan="2" style="width: 120px;">Thuế TNCN</th>
+                    <th rowspan="2" style="width: 140px;">Lương còn lại</th>
+                  </tr>
+                  <tr style="height: 35px;">
+                    <th style="width: 110px;">Tiền ăn ca</th>
+                    <th style="width: 110px;">Điện thoại</th>
+                    <th style="width: 110px;">Phụ cấp</th>
+                    <th style="width: 110px;">Xăng xe, đi lại</th>
+                    <th style="width: 110px;">BHXH (17.5%)</th>
+                    <th style="width: 110px;">BHYT (3%)</th>
+                    <th style="width: 110px;">BHTN (1%)</th>
+                    <th style="width: 110px;">Cộng</th>
+                    <th style="width: 110px;">BHXH (8%)</th>
+                    <th style="width: 110px;">BHYT (1.5%)</th>
+                    <th style="width: 110px;">BHTN (1%)</th>
+                    <th style="width: 110px;">Cộng</th>
+                  </tr>
+                  <tr style="font-size: 10pt; font-style: italic; background-color: #fafafa; text-align: center; height: 20px;">
+                    <th></th><th></th><th></th><th></th>
+                    <th>1</th><th>2</th><th>3</th><th>4</th>
+                    <th>5</th><th>6</th>
+                    <th>7 = [LCB+1+2+3+4+5+6]</th>
+                    <th>8 = [7-1-2-3]</th>
+                    <th>9</th><th>10</th>
+                    <th>11 = 10 * 4.4M</th>
+                    <th>12</th>
+                    <th>13</th><th>14</th><th>15</th><th>16 = 13+14+15</th>
+                    <th>17</th><th>18</th><th>19</th><th>20 = 17+18+19</th>
+                    <th>21 = 8-9-11-20</th>
+                    <th>22</th>
+                    <th>23 = 7-20-22</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowsHTML}
+                </tbody>
+              </table>
+            </body>
+            </html>
+        `;
+
+        const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Bang_Thanh_Toan_Luong_Chung_Tu_${month}.xls`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    },
     
     exportFuelReport() {
         if (typeof XLSX === 'undefined') return alert('Chưa tải xong thư viện xuất Excel!');
@@ -3032,6 +3570,7 @@ const app = {
         const updateTooltip = (input) => {
             const val = parseFloat(input.value);
             if (!isNaN(val) && val > 0) {
+                activeInput = input;
                 const formatted = formatVND(val);
                 const words = formatVNDToWords(val);
                 tooltip.innerHTML = `<i class="fa-solid fa-calculator" style="color: var(--accent, #3b82f6); margin-right: 6px;"></i>${formatted} <span style="color: #94a3b8; font-weight: normal; font-size: 0.85rem; margin-left: 4px;">${words}</span>`;
@@ -3056,6 +3595,7 @@ const app = {
         };
 
         const hideTooltip = () => {
+            activeInput = null;
             tooltip.style.opacity = '0';
             tooltip.style.transform = 'translateY(10px) scale(0.95)';
             setTimeout(() => {
@@ -3064,6 +3604,8 @@ const app = {
                 }
             }, 150);
         };
+
+        this.hideCurrencyTooltip = hideTooltip;
 
         if (document.body && typeof document.body.addEventListener === 'function') {
             document.body.addEventListener('focusin', (e) => {
@@ -3090,7 +3632,11 @@ const app = {
         if (typeof document.addEventListener === 'function') {
             document.addEventListener('scroll', () => {
                 if (activeInput) {
-                    updateTooltip(activeInput);
+                    if (document.body.contains(activeInput)) {
+                        updateTooltip(activeInput);
+                    } else {
+                        hideTooltip();
+                    }
                 }
             }, { capture: true, passive: true });
         }
@@ -3112,6 +3658,37 @@ const app = {
     },
 
     navigate(viewName, ...args) {
+        // One-time migration to set all employees' joinDate to '2026-01-01'
+        if (localStorage.getItem('employees_joindate_migration_2026_v2') !== 'true') {
+            if (AppData.state && AppData.state.employees && AppData.state.employees.length > 0) {
+                AppData.state.employees.forEach(emp => {
+                    emp.joinDate = '2026-01-01';
+                });
+                AppData.save();
+                localStorage.setItem('employees_joindate_migration_2026_v2', 'true');
+                console.log('Successfully set all employees joinDate to 2026-01-01 via auto-migration');
+            }
+        }
+
+        // One-time migration to set crew allowances: Phone 2.5M, Clothing 400k, Transport 2.5M
+        if (localStorage.getItem('employees_crew_allowances_migration_2026') !== 'true') {
+            if (AppData.state && AppData.state.employees && AppData.state.employees.length > 0) {
+                AppData.state.employees.forEach(emp => {
+                    if (emp.department !== 'VP') {
+                        emp.phoneAllowance = 2500000;
+                        emp.clothingAllowance = 400000;
+                        emp.transportAllowance = 2500000;
+                    }
+                });
+                AppData.save();
+                localStorage.setItem('employees_crew_allowances_migration_2026', 'true');
+                console.log('Successfully set all crew allowances via auto-migration');
+            }
+        }
+
+        if (typeof this.hideCurrencyTooltip === 'function') {
+            this.hideCurrencyTooltip();
+        }
         this.updateHeaderCompanyInfo();
         if (!Views[viewName]) return;
         this.currentView = viewName;
@@ -4292,6 +4869,9 @@ const app = {
     openModal(id) { document.getElementById(id).classList.add('active'); },
     closeModal(id) {
         document.getElementById(id).classList.remove('active');
+        if (typeof this.hideCurrencyTooltip === 'function') {
+            this.hideCurrencyTooltip();
+        }
         if (id === 'report-modal') {
             const m = document.querySelector('#report-modal .modal');
             if (m) {
@@ -4314,6 +4894,7 @@ const app = {
         this.openModal('employee-modal');
     },
     saveEmployee(id) {
+        const existing = id ? AppData.getEmployee(id) : null;
         const emp = {
             id: id || null,
             name: document.getElementById('emp-name').value,
@@ -4330,18 +4911,126 @@ const app = {
             personalDeduction: Number(document.getElementById('emp-personal-deduction').value) || 0,
             dependents: Number(document.getElementById('emp-dependents').value) || 0,
             actualSalary: Number(document.getElementById('emp-actual-salary').value) || 0,
-            insurance: Number(document.getElementById('emp-insurance').value) || 0,
+            insurance: document.getElementById('emp-insurance').value !== '' ? Number(document.getElementById('emp-insurance').value) : null,
             deliveryAllowance: Number(document.getElementById('emp-delivery-allowance').value) || 0,
             completionBonus: Number(document.getElementById('emp-completion-bonus').value) || 0,
-            notes: document.getElementById('emp-notes').value
+            notes: document.getElementById('emp-notes').value,
+            history: (existing && existing.history) ? [...existing.history] : []
         };
+
+        const changeDate = document.getElementById('emp-change-date')?.value;
+        if (changeDate && existing) {
+            // Kiểm tra xem có thay đổi trường thông tin nào nhạy cảm lịch sử không
+            const fieldsToCompare = [
+                'department', 'basicSalary', 'actualSalary', 'mealAllowance', 
+                'phoneAllowance', 'clothingAllowance', 'transportAllowance', 
+                'personalDeduction', 'dependents', 'deliveryAllowance', 
+                'completionBonus', 'insurance', 'role'
+            ];
+            
+            let hasChanges = false;
+            for (const field of fieldsToCompare) {
+                if (emp[field] !== existing[field]) {
+                    hasChanges = true;
+                    break;
+                }
+            }
+            
+            if (hasChanges) {
+                // Khởi tạo lịch sử cũ nếu mảng rỗng
+                if (emp.history.length === 0) {
+                    emp.history.push({
+                        date: existing.joinDate || '1970-01-01',
+                        department: existing.department,
+                        basicSalary: existing.basicSalary,
+                        actualSalary: existing.actualSalary,
+                        mealAllowance: existing.mealAllowance,
+                        phoneAllowance: existing.phoneAllowance,
+                        clothingAllowance: existing.clothingAllowance,
+                        transportAllowance: existing.transportAllowance,
+                        personalDeduction: existing.personalDeduction,
+                        dependents: existing.dependents,
+                        deliveryAllowance: existing.deliveryAllowance,
+                        completionBonus: existing.completionBonus,
+                        insurance: existing.insurance,
+                        role: existing.role
+                    });
+                }
+                
+                // Thêm hoặc cập nhật bản ghi lịch sử vào mảng
+                const newHistoryEntry = {
+                    date: changeDate,
+                    department: emp.department,
+                    basicSalary: emp.basicSalary,
+                    actualSalary: emp.actualSalary,
+                    mealAllowance: emp.mealAllowance,
+                    phoneAllowance: emp.phoneAllowance,
+                    clothingAllowance: emp.clothingAllowance,
+                    transportAllowance: emp.transportAllowance,
+                    personalDeduction: emp.personalDeduction,
+                    dependents: emp.dependents,
+                    deliveryAllowance: emp.deliveryAllowance,
+                    completionBonus: emp.completionBonus,
+                    insurance: emp.insurance,
+                    role: emp.role
+                };
+                
+                const existingIndex = emp.history.findIndex(h => h.date === changeDate);
+                if (existingIndex !== -1) {
+                    emp.history[existingIndex] = newHistoryEntry;
+                } else {
+                    emp.history.push(newHistoryEntry);
+                }
+                
+                // Sắp xếp lại lịch sử theo ngày tăng dần
+                emp.history.sort((a, b) => new Date(a.date) - new Date(b.date));
+            }
+        }
+
         AppData.saveEmployee(emp);
         this.closeModal('employee-modal');
-        this.navigate('hr');
+        if (this.currentView === 'salary') {
+            const month = document.getElementById('sal-month')?.value || this.currentViewArgs[0];
+            const dep = document.getElementById('sal-department')?.value || this.currentViewArgs[1];
+            const tab = app.salaryTab || this.currentViewArgs[2] || 'thucte';
+            this.navigate('salary', month, dep, tab);
+        } else if (this.currentView === 'hr') {
+            // Giữ nguyên tab tàu/bộ phận của nhân viên vừa lưu
+            this.hrTab = emp.department || this.hrTab || 'all';
+            this.navigate('hr');
+        } else {
+            this.navigate(this.currentView, ...this.currentViewArgs || []);
+        }
     },
     deleteEmployee(id) {
         if (confirm('Bạn có chắc muốn xóa nhân sự này?')) {
             AppData.deleteEmployee(id);
+            this.navigate('hr');
+        }
+    },
+    bulkUpdateJoinDate(date) {
+        if (AppData.state && AppData.state.employees) {
+            AppData.state.employees.forEach(emp => {
+                emp.joinDate = date;
+            });
+            AppData.save();
+            localStorage.setItem('employees_joindate_migration_2026_v2', 'true');
+            alert('Đã đặt ngày vào tàu thành ' + date + ' cho tất cả nhân sự!');
+            this.navigate('hr');
+        }
+    },
+    bulkUpdateCrewAllowances() {
+        if (AppData.state && AppData.state.employees) {
+            AppData.state.employees.forEach(emp => {
+                if (emp.department !== 'VP') {
+                    emp.phoneAllowance = 2500000;
+                    emp.clothingAllowance = 400000;
+                    emp.transportAllowance = 2500000;
+                }
+            });
+            AppData.save();
+            localStorage.setItem('employees_crew_allowances_migration_2026', 'true');
+            alert('Đã cập nhật phụ cấp Điện thoại 2.5M, Trang phục 400k, Xăng xe 2.5M cho tất cả thuyền viên!');
             this.navigate('hr');
         }
     },
@@ -4362,6 +5051,51 @@ const app = {
         }
         ts.voyageCount = count;
         AppData.saveTimesheet(ts);
+        this.navigate('salary', month, dep, 'chungtu');
+    },
+
+    updateDependentDeductionRate() {
+        const month = document.getElementById('sal-month')?.value;
+        const dep = document.getElementById('sal-department')?.value;
+        const rate = Number(document.getElementById('sal-dependent-deduction-rate')?.value) || 0;
+        let ts = AppData.getTimesheet(month, dep);
+        if (!ts) {
+            ts = { month, department: dep, attendance: {}, voyageCount: 0 };
+        }
+        ts.dependentDeductionRate = rate;
+        AppData.saveTimesheet(ts);
+        app.salaryTab = 'chungtu';
+        this.navigate('salary', month, dep, 'chungtu');
+    },
+
+    updateSalaryOverride(employeeId, field, value) {
+        const month = document.getElementById('sal-month')?.value;
+        const dep = document.getElementById('sal-department')?.value;
+        let ts = AppData.getTimesheet(month, dep);
+        if (!ts) {
+            ts = { month, department: dep, attendance: {}, voyageCount: 0 };
+        }
+        if (!ts.salaryOverrides) {
+            ts.salaryOverrides = {};
+        }
+        if (!ts.salaryOverrides[employeeId]) {
+            ts.salaryOverrides[employeeId] = {};
+        }
+        
+        // Kiểm tra rộng hơn để đảm bảo khi xóa trống ô nhập liệu sẽ khôi phục mặc định
+        if (value === '' || value === undefined || value === null || String(value).trim() === '' || isNaN(Number(value))) {
+            if (ts.salaryOverrides[employeeId]) {
+                delete ts.salaryOverrides[employeeId][field];
+                if (Object.keys(ts.salaryOverrides[employeeId]).length === 0) {
+                    delete ts.salaryOverrides[employeeId];
+                }
+            }
+        } else {
+            ts.salaryOverrides[employeeId][field] = Number(value);
+        }
+        
+        AppData.saveTimesheet(ts);
+        app.salaryTab = 'chungtu';
         this.navigate('salary', month, dep, 'chungtu');
     },
 
@@ -5737,6 +6471,7 @@ const app = {
         
         // Remove standard "list" attribute to prevent browser's buggy native datalist from showing up
         input.removeAttribute('list');
+        input.setAttribute('autocomplete', 'off');
         
         // Remove existing autocomplete dropdown if any
         let dropdown = input.parentNode.querySelector('.custom-autocomplete-dropdown');

@@ -9925,9 +9925,119 @@ const AppData = {
                 return new Date(y, m, d, 0, 0, 0, 0);
             }
         }
-        const d = new Date(dateStr);
         d.setHours(0,0,0,0);
         return d;
+    },
+
+    applyJune15Migration(customState) {
+        const targetState = customState || this.state;
+        if (!targetState) return;
+
+        const newAllowanceUpdates = {
+            // VG15
+            "Lê Ngọc Huế": { dept: "VG15", delivery: 3500000, bonus: 3000000 },
+            "Lê Duy Anh": { dept: "VG15", delivery: 2500000, bonus: 2000000 },
+            "Lưu Quang Trường": { dept: "VG15", delivery: 2500000, bonus: 2000000 },
+            "Vũ Đức Trọng": { dept: "VG15", delivery: 2200000, bonus: 1800000 },
+            "Nguyễn Xuân Toàn": { dept: "VG15", delivery: 2500000, bonus: 2000000 },
+            "Nguyễn Văn Tú": { dept: "VG15", delivery: 2200000, bonus: 1800000 },
+            "Lê Đức Mừng": { dept: "VG15", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Trọng Dương": { dept: "VG15", delivery: 1500000, bonus: 1000000 },
+            "Vũ Đức An": { dept: "VG15", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Trọng Vũ": { dept: "VG15", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Đức Giang": { dept: "VG15", delivery: 1500000, bonus: 1033333 },
+            "Nguyễn Hữu Quyết": { dept: "VG15", delivery: 1500000, bonus: 1000000 },
+
+            // VG36
+            "Tạ Quang Hợp": { dept: "VG36", delivery: 3500000, bonus: 3000000 },
+            "Lê Ngọc Hoàng": { dept: "VG36", delivery: 2500000, bonus: 2000000 },
+            "Nguyễn Trọng Vinh": { dept: "VG36", delivery: 2500000, bonus: 2000000 },
+            "Bùi Đình Thịnh": { dept: "VG36", delivery: 2800000, bonus: 2300000 },
+            "Tạ Duy Trưởng": { dept: "VG36", delivery: 2500000, bonus: 2200000 },
+            "Nguyễn Văn Danh": { dept: "VG36", delivery: 2200000, bonus: 1800000 },
+            "Lê Duy Tới": { dept: "VG36", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Đức Huy": { dept: "VG36", delivery: 1500000, bonus: 1000000 },
+            "Lê Ngọc Hà": { dept: "VG36", delivery: 1500000, bonus: 1000000 },
+            "Đinh Ngọc Hà": { dept: "VG36", delivery: 1700000, bonus: 1200000 },
+            "Nguyễn Đức Dũng": { dept: "VG36", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Dương Thân": { dept: "VG36", delivery: 1500000, bonus: 1000000 },
+            "Lê Bá Thạo": { dept: "VG36", delivery: 1500000, bonus: 1000000 },
+
+            // VG18
+            "Tạ Quang Đức": { dept: "VG18", delivery: 0, bonus: 0 },
+            "Nguyễn Trường Giang": { dept: "VG18", delivery: 3500000, bonus: 3000000 },
+            "Nguyễn Trọng Hồng": { dept: "VG18", delivery: 3000000, bonus: 2500000 },
+            "Vũ Đình Đại": { dept: "VG18", delivery: 2700000, bonus: 1950000 },
+            "Lê Văn Cường": { dept: "VG18", delivery: 2700000, bonus: 1950000 },
+            "Lê Mạnh Hùng": { dept: "VG18", delivery: 2700000, bonus: 1950000 },
+            "Vũ Đức Thắng": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+            "Lê Ngọc Cung": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+            "Lê Văn Cường(QB)": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+            "Lê Ngọc Hoa": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Trọng Tuấn Anh": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+            "Lương Anh Tuấn": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+            "Lê Văn Thắng": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+            "Trần Văn Phiến": { dept: "VG18", delivery: 1500000, bonus: 1000000 },
+
+            // VG09
+            "Lại Xuân Kiều": { dept: "VG09", delivery: 3500000, bonus: 3000000 },
+            "Nguyễn Xuân Soái": { dept: "VG09", delivery: 2800000, bonus: 2300000 },
+            "Phạm Văn Long": { dept: "VG09", delivery: 2500000, bonus: 2000000 },
+            "Nguyễn Trọng Hiếu": { dept: "VG09", delivery: 2500000, bonus: 2000000 },
+            "Bùi Thế Tuấn Anh": { dept: "VG09", delivery: 2500000, bonus: 2000000 },
+            "Vũ Hội": { dept: "VG09", delivery: 2200000, bonus: 1800000 },
+            "Trần Bá Trọng": { dept: "VG09", delivery: 2200000, bonus: 1800000 },
+            "Bùi Thế Tiến": { dept: "VG09", delivery: 1500000, bonus: 1000000 },
+            "Lê Ngọc Anh": { dept: "VG09", delivery: 1500000, bonus: 1000000 },
+            "Lại Xuân Hà": { dept: "VG09", delivery: 1500000, bonus: 1000000 },
+            "Phạm Văn Khiêm": { dept: "VG09", delivery: 1500000, bonus: 1000000 },
+            "Lê Xuân Hồng": { dept: "VG09", delivery: 1500000, bonus: 1000000 },
+
+            // VG05
+            "Lê Thân Thắng": { dept: "VG05", delivery: 3500000, bonus: 3000000 },
+            "Đỗ Hữu Xuân": { dept: "VG05", delivery: 2500000, bonus: 2000000 },
+            "Đỗ Hữu Xuần": { dept: "VG05", delivery: 2500000, bonus: 2000000 },
+            "Nguyễn Đức Hiền": { dept: "VG05", delivery: 2500000, bonus: 2000000 },
+            "Nguyễn Thái Bình": { dept: "VG05", delivery: 2500000, bonus: 2000000 },
+            "Bùi Đình Kha": { dept: "VG05", delivery: 2200000, bonus: 1800000 },
+            "Nguyễn Văn Bắc": { dept: "VG05", delivery: 1500000, bonus: 1000000 },
+            "Phạm Văn Tứ": { dept: "VG05", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Trọng Hậu": { dept: "VG05", delivery: 2200000, bonus: 1800000 },
+            "Đỗ Hữu Xoa": { dept: "VG05", delivery: 1500000, bonus: 1000000 },
+            "Nguyễn Văn Luân": { dept: "VG05", delivery: 1500000, bonus: 1000000 },
+            "Vũ Văn Cường": { dept: "VG05", delivery: 1500000, bonus: 1000000 }
+        };
+
+        if (targetState.employees) {
+            targetState.employees.forEach(emp => {
+                let nameKey = emp.name ? emp.name.trim() : "";
+                let deptKey = emp.department ? emp.department.trim() : "";
+                
+                let match = Object.entries(newAllowanceUpdates).find(([k, v]) => 
+                    k === nameKey && v.dept === deptKey
+                );
+                
+                if (!match) {
+                    match = Object.entries(newAllowanceUpdates).find(([k, v]) => 
+                        k === nameKey
+                    );
+                }
+
+                if (!match) {
+                    match = Object.entries(newAllowanceUpdates).find(([k, v]) => {
+                        let n1 = k.replace(/\s+/g, '').replace(/xuần/i, 'xuân').toLowerCase();
+                        let n2 = nameKey.replace(/\s+/g, '').replace(/xuần/i, 'xuân').toLowerCase();
+                        return n1 === n2 && v.dept === deptKey;
+                    });
+                }
+
+                if (match) {
+                    emp.deliveryAllowance = match[1].delivery;
+                    emp.completionBonus = match[1].bonus;
+                }
+            });
+        }
+        targetState.allowances_added_v3_june15 = true;
     },
 
     init() {
@@ -10296,6 +10406,12 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
                     });
 
                     localStorage.setItem('allowances_added_v2_vg05', '1');
+                    this.save();
+                }
+
+                if (!localStorage.getItem('allowances_added_v3_june15') || !this.state.allowances_added_v3_june15) {
+                    this.applyJune15Migration();
+                    localStorage.setItem('allowances_added_v3_june15', '1');
                     this.save();
                 }
 
@@ -10903,6 +11019,28 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
 
     getEmployees() { return this.state.employees || []; },
     getEmployee(id) { return (this.state.employees || []).find(e => e.id === id); },
+    getEmployeeActiveState(employee, monthStr) {
+        if (!employee) return {};
+        if (!employee.history || employee.history.length === 0 || !monthStr) {
+            return employee;
+        }
+        // Sắp xếp lịch sử theo ngày tăng dần
+        const sortedHistory = [...employee.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+        // Tìm bản ghi mới nhất có tháng <= monthStr (YYYY-MM)
+        let activeState = employee; // Fallback mặc định là chính đối tượng hiện tại
+        for (let i = sortedHistory.length - 1; i >= 0; i--) {
+            const entry = sortedHistory[i];
+            const entryMonth = entry.date ? entry.date.substring(0, 7) : '';
+            if (entryMonth && entryMonth <= monthStr) {
+                activeState = entry;
+                break;
+            }
+        }
+        return {
+            ...employee, // Giữ các trường cơ bản như ID, tên...
+            ...activeState // Đè các thông tin lịch sử hoạt động vào
+        };
+    },
     saveEmployee(employee) {
         if (!this.state.employees) this.state.employees = [];
         if (employee.id) {

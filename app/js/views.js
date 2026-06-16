@@ -1830,14 +1830,7 @@ const Views = {
 </select></div>
                         <div class="form-group">
                             <label class="form-label">Đối tác</label>
-                            <input type="text" class="form-control" id="t-partner" list="trans-partner-list" placeholder="Chọn hoặc nhập..." required oninput="app.onTransactionPartnerChange()">
-                            <datalist id="trans-partner-list">
-                                ${(() => {
-                                    const list = [...AppData.getVendors(), ...AppData.getCustomers()];
-                                    const uniqueNames = Array.from(new Set(list.map(p => p.name).filter(Boolean))).sort();
-                                    return uniqueNames.map(name => `<option value="${name}"></option>`).join('');
-                                })()}
-                            </datalist>
+                            <input type="text" class="form-control" id="t-partner" placeholder="Chọn hoặc nhập..." required oninput="app.onTransactionPartnerChange()">
                         </div>
                     </div>
                     <div class="grid-2">
@@ -2233,10 +2226,7 @@ const Views = {
                         </div>
                         <div class="form-group">
                             <label class="form-label">Nhà cung cấp</label>
-                            <input type="text" class="form-control" id="fv-vendor" value="${voyage ? (voyage.fuelVendor || '') : ''}" list="fuel-vendor-list" placeholder="Chọn hoặc nhập...">
-                            <datalist id="fuel-vendor-list">
-                                ${AppData.getVendors().map(v => `<option value="${v.name}"></option>`).join('')}
-                            </datalist>
+                            <input type="text" class="form-control" id="fv-vendor" value="${voyage ? (voyage.fuelVendor || '') : ''}" placeholder="Chọn hoặc nhập...">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Địa điểm cấp</label>
@@ -2819,26 +2809,17 @@ const Views = {
                     </div>
                     <div class="grid-3">
                         <div class="form-group"><label class="form-label">Tên khách hàng</label>
-                            <input type="text" class="form-control" id="s-customer" list="customer-list" placeholder="Chọn hoặc nhập..." required>
-                            <datalist id="customer-list">
-                                ${AppData.getCustomers().map(c => `<option value="${c.name}"></option>`).join('')}
-                            </datalist>
+                            <input type="text" class="form-control" id="s-customer" placeholder="Chọn hoặc nhập..." required>
                         </div>
                         <div class="form-group"><label class="form-label">Tên hàng</label>
-                            <input type="text" class="form-control" id="s-cargo" list="cargo-list" placeholder="Chọn hoặc nhập..." required oninput="app.calcBrokerage()">
-                            <datalist id="cargo-list">
-                                ${AppData.getCargos().map(c => `<option value="${c}"></option>`).join('')}
-                            </datalist>
+                            <input type="text" class="form-control" id="s-cargo" placeholder="Chọn hoặc nhập..." required oninput="app.calcBrokerage()">
                         </div>
                         <div class="form-group"><label class="form-label">Cảng xếp (Đi)</label>
-                            <input type="text" class="form-control" id="s-p-load" list="port-list" placeholder="Chọn hoặc nhập..." required oninput="app.calcBrokerage()">
+                            <input type="text" class="form-control" id="s-p-load" placeholder="Chọn hoặc nhập..." required oninput="app.calcBrokerage()">
                         </div>
                     </div>
                     <div class="form-group"><label class="form-label">Cảng dỡ (Đến)</label>
-                        <input type="text" class="form-control" id="s-p-dis" list="port-list" placeholder="Chọn hoặc nhập..." required oninput="app.calcBrokerage()">
-                        <datalist id="port-list">
-                            ${AppData.getPorts().map(p => `<option value="${p}"></option>`).join('')}
-                        </datalist>
+                        <input type="text" class="form-control" id="s-p-dis" placeholder="Chọn hoặc nhập..." required oninput="app.calcBrokerage()">
                     </div>
                     <div class="grid-3">
                         <div class="form-group"><label class="form-label">Ngày xếp hàng</label><input type="date" class="form-control" id="s-start" required onchange="app.calcShipmentAllocations()"></div>
@@ -3029,7 +3010,7 @@ const Views = {
                         </div>
                     </div>
                     <div class="grid-2">
-                        <div class="form-group"><label class="form-label">Lương cơ bản (VND)</label><input type="number" step="any" class="form-control" id="emp-basic-salary" value="${e.basicSalary || ''}"></div>
+                        <div class="form-group"><label class="form-label">Lương cơ bản (VND)</label><input type="number" step="any" class="form-control" id="emp-basic-salary" value="${e.basicSalary || ''}" oninput="const ins = document.getElementById('emp-insurance'); if(ins && !ins.dataset.edited) ins.value = this.value;"></div>
                         <div class="form-group"><label class="form-label">Mức lương thực tế (VND)</label><input type="number" step="any" class="form-control" id="emp-actual-salary" value="${e.actualSalary || ''}"></div>
                     </div>
                     <div class="grid-2">
@@ -3045,7 +3026,10 @@ const Views = {
                         <div class="form-group"><label class="form-label">Số lượng NPT</label><input type="number" class="form-control" id="emp-dependents" value="${e.dependents || 0}"></div>
                     </div>
                     <div class="grid-2">
-                        <div class="form-group"><label class="form-label">Tiền bảo hiểm (VND)</label><input type="number" step="any" class="form-control" id="emp-insurance" value="${e.insurance || 0}"></div>
+                        <div class="form-group">
+                            <label class="form-label">Mức lương đóng BHXH (VND)</label>
+                            <input type="number" step="any" class="form-control" id="emp-insurance" value="${e.insurance !== undefined && e.insurance !== null ? e.insurance : (e.basicSalary || '')}" ${e.insurance !== undefined && e.insurance !== null ? 'data-edited="true"' : ''} oninput="this.dataset.edited = 'true'; if (this.value === '') { delete this.dataset.edited; this.value = document.getElementById('emp-basic-salary').value; }" placeholder="Mặc định = Lương cơ bản">
+                        </div>
                         <div class="form-group"></div>
                     </div>
                     <div class="grid-2">
@@ -3060,6 +3044,52 @@ const Views = {
                         <label class="form-label">Ghi chú</label>
                         <textarea class="form-control" id="emp-notes" rows="2">${e.notes || ''}</textarea>
                     </div>
+                    
+                    ${e.id ? `
+                    <div class="grid-2" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.15);">
+                        <div class="form-group">
+                            <label class="form-label" style="color: var(--warning); font-weight: bold;"><i class="fa-solid fa-calendar-day"></i> Ngày áp dụng thay đổi</label>
+                            <input type="date" class="form-control" id="emp-change-date" style="border-color: var(--warning);">
+                            <small class="form-text" style="display:block; margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                                Chọn ngày áp dụng nếu bạn tăng lương, đổi phụ cấp hoặc luân chuyển tàu để các tháng trước không bị ảnh hưởng. Để trống nếu muốn áp dụng trực tiếp.
+                            </small>
+                        </div>
+                        <div class="form-group"></div>
+                    </div>
+                    
+                    ${e.history && e.history.length > 0 ? `
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <h4 style="margin-bottom: 10px; color: var(--info); font-size: 0.85rem; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử thay đổi thông tin & Luân chuyển</h4>
+                        <div class="table-container" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <table class="table" style="font-size: 0.75rem; width: 100%; margin: 0;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 6px 8px;">Ngày áp dụng</th>
+                                        <th style="padding: 6px 8px;">Tàu / Bộ phận</th>
+                                        <th style="padding: 6px 8px; text-align: right;">Lương cơ bản</th>
+                                        <th style="padding: 6px 8px; text-align: right;">PC Giao nhận</th>
+                                        <th style="padding: 6px 8px; text-align: right;">Thưởng HT CV</th>
+                                        <th style="padding: 6px 8px;">Chức vụ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${[...e.history].sort((a,b) => new Date(b.date) - new Date(a.date)).map(h => `
+                                        <tr>
+                                            <td style="padding: 6px 8px;"><strong>${h.date ? h.date.split('-').reverse().join('/') : ''}</strong></td>
+                                            <td style="padding: 6px 8px;">${h.department === 'VP' ? 'Khối Quản lý' : (vessels.find(v => v.id === h.department)?.name ? 'Tàu ' + vessels.find(v => v.id === h.department).name : h.department)}</td>
+                                            <td style="padding: 6px 8px; text-align: right;">${AppData.formatCurrency(h.basicSalary || 0)}</td>
+                                            <td style="padding: 6px 8px; text-align: right;">${AppData.formatCurrency(h.deliveryAllowance || 0)}</td>
+                                            <td style="padding: 6px 8px; text-align: right;">${AppData.formatCurrency(h.completionBonus || 0)}</td>
+                                            <td style="padding: 6px 8px;">${h.role || ''}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    ` : ''}
+                    ` : ''}
+                    
                     <div class="modal-footer"><button type="submit" class="btn btn-primary" style="width:100%;">${e.id ? 'Lưu Thay Đổi' : 'Thêm Nhân Sự'}</button></div>
                 </form>
             </div>
@@ -3072,7 +3102,7 @@ const Views = {
         if (!department) department = 'VP';
 
         const vessels = AppData.getVessels();
-        let employees = AppData.getEmployees().filter(e => e.department === department);
+        let employees = AppData.getEmployees().filter(e => AppData.getEmployeeActiveState(e, month).department === department);
         
         // Get or initialize timesheet for this month & department
         let timesheet = AppData.getTimesheet(month, department);
@@ -3120,6 +3150,15 @@ const Views = {
                         <label class="form-label">Số chuyến trong tháng</label>
                         <input type="number" class="form-control" id="sal-voyage-count" value="${timesheet.voyageCount || 0}" onchange="app.updateVoyageCount()">
                     </div>
+                    <div class="form-group" style="margin: 0; min-width: 180px;">
+                        <label class="form-label">Mức giảm trừ NPT (đ/người)</label>
+                        <input type="number" class="form-control" id="sal-dependent-deduction-rate" value="${timesheet.dependentDeductionRate !== undefined ? timesheet.dependentDeductionRate : 4400000}" onchange="app.updateDependentDeductionRate()">
+                    </div>
+                    <div class="form-group" style="margin: 0; display: flex; align-items: flex-end;">
+                        <button class="btn btn-success" onclick="app.exportDocumentedSalaryExcel()" style="height: 38px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-file-excel"></i> Xuất Excel Lương Chứng Từ
+                        </button>
+                    </div>
                     ` : ''}
                 </div>
         `;
@@ -3141,7 +3180,7 @@ const Views = {
                         <table class="table" style="min-width: 1200px;">
                             <thead>
                                 <tr>
-                                    <th style="min-width: 150px; position: sticky; left: 0; z-index: 2; background: var(--bg-card);">Nhân sự</th>
+                                    <th style="min-width: 150px; position: sticky; left: 0; z-index: 2; background: #1e212b;">Nhân sự</th>
                                     ${daysHeader}
                                     <th style="text-align:center;">Số công</th>
                                     <th style="text-align:right;">Mức lương thực tế</th>
@@ -3165,8 +3204,12 @@ const Views = {
 
                 const att = timesheet.attendance[e.id];
                 const workingDays = att.filter(Boolean).length;
-                const actual = Number(e.actualSalary) || 0;
-                const insurance = Number(e.insurance) || 0;
+                const activeState = AppData.getEmployeeActiveState(e, month);
+                const actual = Number(activeState.actualSalary) || 0;
+                const ov = (timesheet.salaryOverrides && timesheet.salaryOverrides[e.id]) || {};
+                const basic = ov.basicSalary !== undefined ? Number(ov.basicSalary) : (Number(activeState.basicSalary) || 0);
+                const insuranceBase = ov.insurance !== undefined ? Number(ov.insurance) : (activeState.insurance !== undefined && activeState.insurance !== null ? Number(activeState.insurance) : basic);
+                const insurance = Math.round(insuranceBase * 0.105);
                 
                 // Calculate formula
                 const payment = Math.round((actual / daysInMonth) * workingDays - insurance);
@@ -3187,8 +3230,8 @@ const Views = {
 
                 return `
                     <tr>
-                        <td style="position: sticky; left: 0; z-index: 1; background: var(--bg-card);">
-                            <strong>${e.name}</strong><br>
+                        <td style="position: sticky; left: 0; z-index: 1; background: #151824;">
+                            <span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.editEmployee('${e.id}')" title="Nhấn để xem/sửa thông tin ban đầu của nhân sự"><strong>${e.name}</strong></span><br>
                             <small style="color:var(--text-muted)">${e.role || ''}</small>
                         </td>
                         ${daysCells}
@@ -3203,7 +3246,7 @@ const Views = {
             if (employees.length > 0) {
                 tableHTML += `
                                 <tr>
-                                    <td style="position: sticky; left: 0; z-index: 1; background: var(--bg-card); font-weight: 700; text-transform: uppercase;">Tổng cộng</td>
+                                    <td style="position: sticky; left: 0; z-index: 1; background: #151824; font-weight: 700; text-transform: uppercase;">Tổng cộng</td>
                                     <td colspan="${daysInMonth + 1}" style="background: rgba(255, 255, 255, 0.03);"></td>
                                     <td style="text-align:right; font-weight:700; color:var(--info); background: rgba(255, 255, 255, 0.03);">${AppData.formatCurrency(totalActual)}</td>
                                     <td style="text-align:right; font-weight:700; color:var(--rose-light); background: rgba(255, 255, 255, 0.03);">${AppData.formatCurrency(totalInsurance)}</td>
@@ -3237,6 +3280,7 @@ const Views = {
             };
 
             const voyageCount = Number(timesheet.voyageCount) || 0;
+            const depRate = timesheet.dependentDeductionRate !== undefined ? timesheet.dependentDeductionRate : 4400000;
 
             let docTableHTML = `
                 <div class="glass-card" style="overflow-x: auto;">
@@ -3244,29 +3288,29 @@ const Views = {
                         <table class="table" style="min-width: 2500px; font-size: 0.8rem;">
                             <thead>
                                 <tr>
-                                    <th rowspan="2" style="position: sticky; left: 0; z-index: 3; background: var(--bg-card); min-width: 50px;">STT</th>
-                                    <th rowspan="2" style="position: sticky; left: 50px; z-index: 3; background: var(--bg-card); min-width: 150px;">Họ và tên</th>
-                                    <th rowspan="2" style="position: sticky; left: 200px; z-index: 3; background: var(--bg-card); min-width: 100px;">Chức vụ</th>
+                                    <th rowspan="2" style="position: sticky; left: 0; z-index: 3; background: #1e212b; min-width: 50px;">STT</th>
+                                    <th rowspan="2" style="position: sticky; left: 50px; z-index: 3; background: #1e212b; min-width: 150px;">Họ và tên</th>
+                                    <th rowspan="2" style="position: sticky; left: 200px; z-index: 3; background: #1e212b; min-width: 100px;">Chức vụ</th>
                                     <th rowspan="2">Lương cơ bản</th>
                                     <th colspan="4" style="text-align: center;">Hỗ trợ</th>
-                                    <th rowspan="2">Phụ cấp giao nhận</th>
-                                    <th rowspan="2">Thưởng HT CV</th>
+                                    <th rowspan="2">Phụ cấp giao nhận, bảo dưỡng tàu.</th>
+                                    <th rowspan="2">Tiền thưởng hoàn thành công việc</th>
                                     <th rowspan="2" style="color:var(--info);">Tổng lương thực tế</th>
-                                    <th rowspan="2">Thu nhập chịu thuế</th>
+                                    <th rowspan="2">Thu nhập chịu thuế TNCN</th>
                                     <th rowspan="2">Giảm trừ bản thân</th>
-                                    <th rowspan="2">Số NPT</th>
-                                    <th rowspan="2">Giảm trừ NPT</th>
+                                    <th rowspan="2">Số lượng NPT</th>
+                                    <th rowspan="2">giảm trừ NPT</th>
                                     <th rowspan="2">Mức lương đóng BHXH</th>
-                                    <th colspan="4" style="text-align: center;">Trích vào CP DN</th>
-                                    <th colspan="4" style="text-align: center;">Trích vào lương NV</th>
+                                    <th colspan="4" style="text-align: center;">Các khoản trích vào chi phí DN</th>
+                                    <th colspan="4" style="text-align: center;">Các khoản trích vào lương của NV</th>
                                     <th rowspan="2">Thu nhập tính thuế</th>
-                                    <th rowspan="2">Thuế TNCN phải nộp</th>
+                                    <th rowspan="2">Thuế TNCN</th>
                                     <th rowspan="2" style="color:var(--success);">Lương còn lại</th>
                                 </tr>
                                 <tr>
                                     <th>Tiền ăn ca</th>
-                                    <th>Điện thoại</th>
-                                    <th>Trang phục</th>
+                                    <th>điện thoại</th>
+                                    <th>Phụ cấp</th>
                                     <th>Xăng xe, đi lại</th>
                                     <th>BHXH (17.5%)</th>
                                     <th>BHYT (3%)</th>
@@ -3277,31 +3321,86 @@ const Views = {
                                     <th>BHTN (1%)</th>
                                     <th>Cộng</th>
                                 </tr>
+                                <tr style="background: rgba(255, 255, 255, 0.02); font-size: 0.72rem; color: var(--text-muted); font-style: italic;">
+                                    <th style="position: sticky; left: 0; z-index: 3; background: #1e212b; text-align: center;"></th>
+                                    <th style="position: sticky; left: 50px; z-index: 3; background: #1e212b; text-align: center;"></th>
+                                    <th style="position: sticky; left: 200px; z-index: 3; background: #1e212b; text-align: center;"></th>
+                                    <th style="text-align: center;"></th>
+                                    <th style="text-align: center;">1</th>
+                                    <th style="text-align: center;">2</th>
+                                    <th style="text-align: center;">3</th>
+                                    <th style="text-align: center;">4</th>
+                                    <th style="text-align: center;">5</th>
+                                    <th style="text-align: center;">6</th>
+                                    <th style="text-align: center; color: var(--info); font-weight: bold; font-style: normal;">7 = [LCB+1+2+3+4+5+6]</th>
+                                    <th style="text-align: center;">8 = [7-1-2-3]</th>
+                                    <th style="text-align: center;">9</th>
+                                    <th style="text-align: center;">10</th>
+                                    <th style="text-align: center;">11 = 10 * ${(depRate / 1000000).toFixed(2).replace(/\.?0+$/, '')}M</th>
+                                    <th style="text-align: center;">12</th>
+                                    <th style="text-align: center;">13</th>
+                                    <th style="text-align: center;">14</th>
+                                    <th style="text-align: center;">15</th>
+                                    <th style="text-align: center;">16 = 13+14+15</th>
+                                    <th style="text-align: center;">17</th>
+                                    <th style="text-align: center;">18</th>
+                                    <th style="text-align: center;">19</th>
+                                    <th style="text-align: center;">20 = 17+18+19</th>
+                                    <th style="text-align: center;">21 = 8-9-11-20</th>
+                                    <th style="text-align: center;">22</th>
+                                    <th style="text-align: center; color: var(--success); font-weight: bold; font-style: normal;">23 = 7-20-22</th>
+                                </tr>
                             </thead>
                             <tbody>
             `;
 
+            let sumBasic = 0;
+            let sumMeal = 0;
+            let sumPhone = 0;
+            let sumClothing = 0;
+            let sumTransport = 0;
+            let sumDelivery = 0;
+            let sumBonus = 0;
             let sumActualTotal = 0;
+            let sumTaxableIncome = 0;
+            let sumPersonalDeduction = 0;
+            let sumDependents = 0;
+            let sumDependentDeduction = 0;
+            let sumInsuranceBase = 0;
+            let sumDnBhxh = 0;
+            let sumDnBhyt = 0;
+            let sumDnBhtn = 0;
+            let sumDnTotal = 0;
+            let sumNvBhxh = 0;
+            let sumNvBhyt = 0;
+            let sumNvBhtn = 0;
+            let sumNvTotal = 0;
+            let sumAssessableIncome = 0;
+            let sumTax = 0;
             let sumRemaining = 0;
 
             employees.forEach((e, idx) => {
-                const basic = Number(e.basicSalary) || 0;
-                const meal = Number(e.mealAllowance) || 0;
-                const phone = Number(e.phoneAllowance) || 0;
-                const clothing = Number(e.clothingAllowance) || 0;
-                const transport = Number(e.transportAllowance) || 0;
-                const delivery = (Number(e.deliveryAllowance) || 0) * voyageCount;
-                const bonus = (Number(e.completionBonus) || 0) * voyageCount;
+                const ov = (timesheet.salaryOverrides && timesheet.salaryOverrides[e.id]) || {};
+                const activeState = AppData.getEmployeeActiveState(e, month);
+
+                const basic = ov.basicSalary !== undefined ? Number(ov.basicSalary) : (Number(activeState.basicSalary) || 0);
+                const meal = ov.mealAllowance !== undefined ? Number(ov.mealAllowance) : (Number(activeState.mealAllowance) || 0);
+                const phone = ov.phoneAllowance !== undefined ? Number(ov.phoneAllowance) : (Number(activeState.phoneAllowance) || 0);
+                const clothing = ov.clothingAllowance !== undefined ? Number(ov.clothingAllowance) : (Number(activeState.clothingAllowance) || 0);
+                const transport = ov.transportAllowance !== undefined ? Number(ov.transportAllowance) : (Number(activeState.transportAllowance) || 0);
+                
+                const delivery = ov.deliveryAllowance !== undefined ? Number(ov.deliveryAllowance) : (Number(activeState.deliveryAllowance) || 0) * voyageCount;
+                const bonus = ov.completionBonus !== undefined ? Number(ov.completionBonus) : (Number(activeState.completionBonus) || 0) * voyageCount;
 
                 const actualTotal = basic + meal + phone + clothing + transport + delivery + bonus;
                 // Income subject to tax: actual total - non-taxable allowances (transport is NOT deducted here per business rule)
                 const taxableIncome = Math.max(0, actualTotal - meal - phone - clothing);
                 
-                const personalDeduction = Number(e.personalDeduction) || 15500000;
-                const dependents = Number(e.dependents) || 0;
-                const dependentDeduction = dependents * 6200000;
+                const personalDeduction = ov.personalDeduction !== undefined ? Number(ov.personalDeduction) : (Number(activeState.personalDeduction) || 15500000);
+                const dependents = ov.dependents !== undefined ? Number(ov.dependents) : (Number(activeState.dependents) || 0);
+                const dependentDeduction = dependents * depRate;
 
-                const insuranceBase = Number(e.insurance) || 0;
+                const insuranceBase = ov.insurance !== undefined ? Number(ov.insurance) : (activeState.insurance !== undefined && activeState.insurance !== null ? Number(activeState.insurance) : basic);
 
                 // DN
                 const dnBhxh = insuranceBase * 0.175;
@@ -3322,27 +3421,69 @@ const Views = {
                 // Remaining
                 const remaining = actualTotal - nvTotal - tax;
 
+                sumBasic += basic;
+                sumMeal += meal;
+                sumPhone += phone;
+                sumClothing += clothing;
+                sumTransport += transport;
+                sumDelivery += delivery;
+                sumBonus += bonus;
                 sumActualTotal += actualTotal;
+                sumTaxableIncome += taxableIncome;
+                sumPersonalDeduction += personalDeduction;
+                sumDependents += dependents;
+                sumDependentDeduction += dependentDeduction;
+                sumInsuranceBase += insuranceBase;
+                sumDnBhxh += dnBhxh;
+                sumDnBhyt += dnBhyt;
+                sumDnBhtn += dnBhtn;
+                sumDnTotal += dnTotal;
+                sumNvBhxh += nvBhxh;
+                sumNvBhyt += nvBhyt;
+                sumNvBhtn += nvBhtn;
+                sumNvTotal += nvTotal;
+                sumAssessableIncome += assessableIncome;
+                sumTax += tax;
                 sumRemaining += remaining;
 
                 docTableHTML += `
                     <tr>
-                        <td style="position: sticky; left: 0; z-index: 2; background: var(--bg-card);">${idx + 1}</td>
-                        <td style="position: sticky; left: 50px; z-index: 2; background: var(--bg-card);"><strong>${e.name}</strong></td>
-                        <td style="position: sticky; left: 200px; z-index: 2; background: var(--bg-card);">${e.role || ''}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(basic)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(meal)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(phone)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(clothing)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(transport)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(delivery)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(bonus)}</td>
+                        <td style="position: sticky; left: 0; z-index: 2; background: #151824;">${idx + 1}</td>
+                        <td style="position: sticky; left: 50px; z-index: 2; background: #151824;"><span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.editEmployee('${e.id}')" title="Nhấn để xem/sửa thông tin ban đầu của nhân sự"><strong>${e.name}</strong></span></td>
+                        <td style="position: sticky; left: 200px; z-index: 2; background: #151824;">${e.role || ''}</td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${basic}" onchange="app.updateSalaryOverride('${e.id}', 'basicSalary', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 80px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${meal}" onchange="app.updateSalaryOverride('${e.id}', 'mealAllowance', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 80px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${phone}" onchange="app.updateSalaryOverride('${e.id}', 'phoneAllowance', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 80px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${clothing}" onchange="app.updateSalaryOverride('${e.id}', 'clothingAllowance', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 80px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${transport}" onchange="app.updateSalaryOverride('${e.id}', 'transportAllowance', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${delivery}" onchange="app.updateSalaryOverride('${e.id}', 'deliveryAllowance', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${bonus}" onchange="app.updateSalaryOverride('${e.id}', 'completionBonus', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
                         <td style="text-align:right; font-weight:700; color:var(--info);">${AppData.formatCurrency(actualTotal)}</td>
                         <td style="text-align:right;">${AppData.formatCurrency(taxableIncome)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(personalDeduction)}</td>
-                        <td style="text-align:center;">${dependents}</td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${personalDeduction}" onchange="app.updateSalaryOverride('${e.id}', 'personalDeduction', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
+                        <td style="text-align:center; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: center; width: 50px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${dependents}" onchange="app.updateSalaryOverride('${e.id}', 'dependents', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
                         <td style="text-align:right;">${AppData.formatCurrency(dependentDeduction)}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(insuranceBase)}</td>
+                        <td style="text-align:right; padding: 2px 4px;">
+                            <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${insuranceBase}" onchange="app.updateSalaryOverride('${e.id}', 'insurance', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
+                        </td>
                         <td style="text-align:right;">${AppData.formatCurrency(dnBhxh)}</td>
                         <td style="text-align:right;">${AppData.formatCurrency(dnBhyt)}</td>
                         <td style="text-align:right;">${AppData.formatCurrency(dnBhtn)}</td>
@@ -3360,6 +3501,36 @@ const Views = {
 
             if (employees.length === 0) {
                 docTableHTML += `<tr><td colspan="27" style="text-align:center; padding: 2rem;">Không có nhân sự nào trong bộ phận này</td></tr>`;
+            } else {
+                docTableHTML += `
+                    <tr style="font-weight: bold; background: rgba(255, 255, 255, 0.05);">
+                        <td colspan="3" style="position: sticky; left: 0; z-index: 2; background: #151824; text-align: center; text-transform: uppercase;">Tổng cộng</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumBasic)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumMeal)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumPhone)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumClothing)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumTransport)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumDelivery)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumBonus)}</td>
+                        <td style="text-align:right; color:var(--info);">${AppData.formatCurrency(sumActualTotal)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumTaxableIncome)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumPersonalDeduction)}</td>
+                        <td style="text-align:center;">${sumDependents}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumDependentDeduction)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumInsuranceBase)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumDnBhxh)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumDnBhyt)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumDnBhtn)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumDnTotal)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumNvBhxh)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumNvBhyt)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumNvBhtn)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumNvTotal)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumAssessableIncome)}</td>
+                        <td style="text-align:right;">${AppData.formatCurrency(sumTax)}</td>
+                        <td style="text-align:right; color:var(--success);">${AppData.formatCurrency(sumRemaining)}</td>
+                    </tr>
+                `;
             }
 
             docTableHTML += `

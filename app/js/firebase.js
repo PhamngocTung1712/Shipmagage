@@ -210,6 +210,16 @@ function setupFirebaseSync() {
             
             // Update AppData local state and localStorage
             if (cloudState && typeof cloudState === 'object' && Object.keys(cloudState).length > 0) {
+                let shouldUploadBack = false;
+                if (!cloudState.allowances_added_v3_june15) {
+                    try {
+                        AppData.applyJune15Migration(cloudState);
+                        shouldUploadBack = true;
+                    } catch(e) {
+                        console.error("Failed to run June 15 migration on cloudState:", e);
+                    }
+                }
+
                 AppData.state = cloudState;
                 
                 // Recalculate to ensure new calculation logic is applied, bypassing cloud write during sync load
@@ -224,6 +234,11 @@ function setupFirebaseSync() {
                 }
                 
                 localStorage.setItem(DB_KEY, JSON.stringify(AppData.state));
+                
+                if (shouldUploadBack) {
+                    console.log("Pushing migrated allowances state back to cloud database...");
+                    pushStateToCloud(AppData.state);
+                }
                 
                 // Refresh active view if initialized
                 if (typeof app !== 'undefined' && app.currentView) {
