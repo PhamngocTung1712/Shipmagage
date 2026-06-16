@@ -2904,6 +2904,25 @@ const Views = {
             employees = employees.filter(e => e.department === activeTab);
         }
 
+        // Available roles for this tab
+        const availableHrRoles = [...new Set(employees.map(e => e.role ? e.role.trim() : '').filter(Boolean))].sort();
+
+        // Clean selected Hr roles
+        if (app.selectedHrRoles) {
+            app.selectedHrRoles = app.selectedHrRoles.filter(r => availableHrRoles.includes(r));
+        } else {
+            app.selectedHrRoles = [];
+        }
+
+        // Apply filters
+        if (app.hrSearchQuery) {
+            const q = app.hrSearchQuery.trim().toLowerCase();
+            employees = employees.filter(e => e.name && e.name.toLowerCase().includes(q));
+        }
+        if (app.selectedHrRoles.length > 0) {
+            employees = employees.filter(e => e.role && app.selectedHrRoles.includes(e.role.trim()));
+        }
+
         const tabs = [
             { id: 'all', name: 'Tất cả' },
             { id: 'VP', name: 'Khối Quản lý' },
@@ -2928,6 +2947,44 @@ const Views = {
                             ${t.name}
                         </button>
                     `).join('')}
+                </div>
+
+                <div class="filter-bar glass-card" style="margin-bottom: 1.5rem; padding: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <!-- Thanh tìm kiếm -->
+                    <div style="flex-grow: 1; min-width: 250px; position: relative;">
+                        <input type="text" class="form-control" id="hr-search" placeholder="Tìm kiếm theo tên nhân sự..." value="${app.hrSearchQuery || ''}" oninput="app.handleHrSearch(this.value)" style="padding-left: 2.5rem; height: 38px; width: 100%;">
+                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); opacity: 0.5; color: #fff;"></i>
+                    </div>
+
+                    <!-- Bộ lọc chức danh -->
+                    <div style="min-width: 220px; position: relative;" id="hr-role-select-container">
+                        <button type="button" class="form-control" style="text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 38px; background: var(--bg-input, #1e293b); border: 1px solid var(--border-color, #334155); color: #fff; cursor: pointer; border-radius: 6px; padding: 0.375rem 0.75rem;" onclick="app.toggleHrRoleDropdown(event)">
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; display: inline-block;">
+                                ${app.selectedHrRoles && app.selectedHrRoles.length > 0 
+                                    ? app.selectedHrRoles.join(', ') 
+                                    : 'Tất cả chức danh'}
+                            </span>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem; opacity: 0.7;"></i>
+                        </button>
+                        <div class="multiselect-dropdown" style="display: ${app.hrRoleDropdownOpen ? 'block' : 'none'}; position: absolute; top: 100%; left: 0; right: 0; background: #1e212b; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); z-index: 9999; margin-top: 4px; padding: 10px; max-height: 250px; overflow-y: auto; width: 250px;">
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; margin-bottom: 8px;">
+                                <span style="font-size: 0.75rem; color: var(--info); cursor: pointer; font-weight: 600;" onclick="app.selectAllHrRoles(event)">Chọn tất cả</span>
+                                <span style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer; font-weight: 600;" onclick="app.clearAllHrRoles(event)">Bỏ chọn hết</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                ${availableHrRoles.map(role => {
+                                    const isChecked = app.selectedHrRoles && app.selectedHrRoles.includes(role) ? 'checked' : '';
+                                    return `
+                                        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; margin: 0; padding: 4px 6px; border-radius: 4px; transition: background 0.15s; color: #fff;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                                            <input type="checkbox" ${isChecked} value="${role}" onchange="app.handleHrRoleCheckboxChange(event, '${role}')" style="cursor: pointer; margin: 0;">
+                                            <span style="user-select: none;">${role}</span>
+                                        </label>
+                                    `;
+                                }).join('')}
+                                ${availableHrRoles.length === 0 ? '<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 10px 0;">Không có chức danh nào</div>' : ''}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="glass-card">
@@ -3104,6 +3161,12 @@ const Views = {
         const vessels = AppData.getVessels();
         let employees = AppData.getEmployees().filter(e => AppData.getEmployeeActiveState(e, month).department === department);
         
+        // Filter by search query
+        if (app.salarySearchQuery) {
+            const q = app.salarySearchQuery.trim().toLowerCase();
+            employees = employees.filter(e => e.name && e.name.toLowerCase().includes(q));
+        }
+        
         // Get or initialize timesheet for this month & department
         let timesheet = AppData.getTimesheet(month, department);
         if (!timesheet) {
@@ -3134,16 +3197,23 @@ const Views = {
                 </div>
 
                 <div class="glass-card" style="margin-bottom: 1.5rem; padding: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                    <div class="form-group" style="margin: 0; min-width: 200px;">
+                    <div class="form-group" style="margin: 0; min-width: 180px;">
                         <label class="form-label">Chọn tháng</label>
                         <input type="month" class="form-control" id="sal-month" value="${month}" onchange="app.loadSalaryView()">
                     </div>
-                    <div class="form-group" style="margin: 0; min-width: 200px;">
+                    <div class="form-group" style="margin: 0; min-width: 180px;">
                         <label class="form-label">Chọn Tàu / Bộ phận</label>
                         <select class="form-control" id="sal-department" onchange="app.loadSalaryView()">
                             <option value="VP" ${department === 'VP' ? 'selected' : ''}>Quản lý (VP)</option>
                             ${vessels.map(v => `<option value="${v.id}" ${department === v.id ? 'selected' : ''}>Tàu ${v.name}</option>`).join('')}
                         </select>
+                    </div>
+                    <div class="form-group" style="margin: 0; min-width: 250px; flex-grow: 1; position: relative;">
+                        <label class="form-label">Tìm kiếm nhân sự</label>
+                        <div style="position: relative;">
+                            <input type="text" class="form-control" id="sal-search" placeholder="Tìm theo tên..." value="${app.salarySearchQuery || ''}" oninput="app.handleSalarySearch(this.value)" style="padding-left: 2.5rem; height: 38px; width: 100%;">
+                            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); opacity: 0.5; color: #fff;"></i>
+                        </div>
                     </div>
                     ${activeTab === 'chungtu' ? `
                     <div class="form-group" style="margin: 0; min-width: 150px;">

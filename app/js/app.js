@@ -7,6 +7,10 @@ const app = {
     selectedDebtCustomer: '',
     excludeDockingDepreciation: localStorage.getItem('exclude_docking_depreciation') === 'true',
     sentZaloList: JSON.parse(localStorage.getItem('sent_zalo_list') || '{}'),
+    selectedHrRoles: [],
+    hrRoleDropdownOpen: false,
+    hrSearchQuery: '',
+    salarySearchQuery: '',
 
     toggleExcludeDockingDepreciation(checked) {
         this.excludeDockingDepreciation = checked;
@@ -3500,6 +3504,16 @@ const app = {
         }
 
         this.setupCurrencyInputTooltip();
+
+        // Close HR role dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('hr-role-select-container');
+            if (this.hrRoleDropdownOpen && container && !container.contains(e.target)) {
+                this.hrRoleDropdownOpen = false;
+                this.navigate('hr');
+            }
+        });
+
         this.navigate(this.currentView);
     },
 
@@ -3659,6 +3673,32 @@ const app = {
     },
 
     navigate(viewName, ...args) {
+        // Handle filter state reset on view change
+        if (viewName !== 'hr') {
+            this.selectedHrRoles = [];
+            this.hrRoleDropdownOpen = false;
+            this.hrSearchQuery = '';
+        } else {
+            const currentTab = this.hrTab || 'all';
+            if (this.prevHrTab !== currentTab) {
+                this.selectedHrRoles = [];
+                this.hrRoleDropdownOpen = false;
+                this.hrSearchQuery = '';
+                this.prevHrTab = currentTab;
+            }
+        }
+
+        if (viewName !== 'salary') {
+            this.salarySearchQuery = '';
+        } else {
+            const [m, d] = args;
+            const prevMonth = this.currentViewArgs && this.currentViewArgs[0];
+            const prevDep = this.currentViewArgs && this.currentViewArgs[1];
+            if (m !== prevMonth || d !== prevDep) {
+                this.salarySearchQuery = '';
+            }
+        }
+
         // One-time migration to set all employees' joinDate to '2026-01-01'
         if (localStorage.getItem('employees_joindate_migration_2026_v2') !== 'true') {
             if (AppData.state && AppData.state.employees && AppData.state.employees.length > 0) {
@@ -3703,6 +3743,15 @@ const app = {
         });
         const container = document.getElementById('view-container');
         try {
+            // Capture focus state before rendering
+            const activeId = document.activeElement ? document.activeElement.id : null;
+            let caretPos = 0;
+            if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+                try {
+                    caretPos = document.activeElement.selectionStart;
+                } catch(e) {}
+            }
+
             if (viewName === 'hr') {
                 container.innerHTML = Views.hr(this.hrTab || 'all');
             } else if (viewName === 'financials') {
@@ -3739,6 +3788,19 @@ const app = {
                 container.innerHTML = Views.shipments(m, y, v, c);
             } else {
                 container.innerHTML = Views[viewName](...args);
+            }
+
+            // Restore focus and caret position
+            if (activeId) {
+                const el = document.getElementById(activeId);
+                if (el) {
+                    el.focus();
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                        try {
+                            el.setSelectionRange(caretPos, caretPos);
+                        } catch(e) {}
+                    }
+                }
             }
         } catch (err) {
             console.error('Error rendering view ' + viewName + ':', err);
@@ -5222,6 +5284,56 @@ Tàu: Vũ Gia ${vesselName}
         const month = document.getElementById('sal-month')?.value;
         const dep = document.getElementById('sal-department')?.value;
         this.navigate('salary', month, dep, app.salaryTab || 'thucte');
+    },
+
+    handleHrSearch(val) {
+        this.hrSearchQuery = val;
+        this.navigate('hr');
+    },
+
+    handleSalarySearch(val) {
+        this.salarySearchQuery = val;
+        const month = document.getElementById('sal-month')?.value;
+        const dep = document.getElementById('sal-department')?.value;
+        this.navigate('salary', month, dep, app.salaryTab || 'thucte');
+    },
+
+    toggleHrRoleDropdown(event) {
+        event.stopPropagation();
+        this.hrRoleDropdownOpen = !this.hrRoleDropdownOpen;
+        this.navigate('hr');
+    },
+
+    handleHrRoleCheckboxChange(event, role) {
+        event.stopPropagation();
+        if (!this.selectedHrRoles) this.selectedHrRoles = [];
+        if (event.target.checked) {
+            if (!this.selectedHrRoles.includes(role)) {
+                this.selectedHrRoles.push(role);
+            }
+        } else {
+            this.selectedHrRoles = this.selectedHrRoles.filter(r => r !== role);
+        }
+        this.navigate('hr');
+    },
+
+    selectAllHrRoles(event) {
+        event.stopPropagation();
+        const employees = AppData.getEmployees();
+        const activeTab = this.hrTab || 'all';
+        let filteredEmployees = employees;
+        if (activeTab !== 'all') {
+            filteredEmployees = employees.filter(e => e.department === activeTab);
+        }
+        const availableHrRoles = [...new Set(filteredEmployees.map(e => e.role ? e.role.trim() : '').filter(Boolean))].sort();
+        this.selectedHrRoles = [...availableHrRoles];
+        this.navigate('hr');
+    },
+
+    clearAllHrRoles(event) {
+        event.stopPropagation();
+        this.selectedHrRoles = [];
+        this.navigate('hr');
     },
 
     updateVoyageCount() {
