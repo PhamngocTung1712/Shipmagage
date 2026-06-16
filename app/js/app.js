@@ -6,6 +6,7 @@ const app = {
     currentView: 'dashboard',
     selectedDebtCustomer: '',
     excludeDockingDepreciation: localStorage.getItem('exclude_docking_depreciation') === 'true',
+    sentZaloList: JSON.parse(localStorage.getItem('sent_zalo_list') || '{}'),
 
     toggleExcludeDockingDepreciation(checked) {
         this.excludeDockingDepreciation = checked;
@@ -5120,6 +5121,74 @@ Tàu: Vũ Gia ${vesselName}
         }).catch(err => {
             console.error('Lỗi khi sao chép vào bộ nhớ tạm:', err);
             alert('Không thể tự động sao chép bảng quyết toán. Vui lòng copy thông tin sau để gửi:\n\n' + message);
+        });
+    },
+    quickSendZalo(employeeId, month, department, buttonEl) {
+        const employee = AppData.getEmployee(employeeId);
+        if (!employee) return;
+        
+        const phone = employee.phone ? String(employee.phone).trim() : '';
+        if (!phone) {
+            alert('Thuyền viên này chưa có số điện thoại Zalo. Vui lòng click vào tên thuyền viên để cập nhật số điện thoại.');
+            return;
+        }
+        
+        const actualData = AppData.calculateActualSalaryForEmployee(employeeId, month, department);
+        const companyCK = AppData.calculateDocumentedSalaryForEmployee(employeeId, month);
+        
+        const ts = AppData.getTimesheet(month, department);
+        const companyAdvance = (ts && ts.salaryOverrides && ts.salaryOverrides[employeeId] && ts.salaryOverrides[employeeId].companyAdvance) !== undefined 
+            ? ts.salaryOverrides[employeeId].companyAdvance 
+            : 0;
+            
+        const payment = actualData.payment;
+        const settlement = companyCK + companyAdvance - payment;
+        
+        const [yyyy, mm] = month.split('-');
+        const monthYearStr = `${mm}/${yyyy}`;
+        const vesselName = AppData.getVessels().find(v => v.id === department)?.name || department;
+        
+        const message = `BẢNG QUYẾT TOÁN LƯƠNG THÁNG ${monthYearStr}
+Thuyền viên: ${employee.name}
+Tàu: Vũ Gia ${vesselName}
+---------------------------------
+- Mức lương thực tế (1): ${AppData.formatCurrency(actualData.actual)}đ
+- Ngày công: ${actualData.workingDays}/${actualData.daysInMonth}
+- Bảo hiểm (2): ${AppData.formatCurrency(actualData.insurance)}đ
+- Lương thực lĩnh (1-2): ${AppData.formatCurrency(payment)}đ
+- Ứng công ty: ${AppData.formatCurrency(companyAdvance)}đ
+- Công ty CK: ${AppData.formatCurrency(companyCK)}đ
+---------------------------------
+=> Quyết toán: ${AppData.formatCurrency(settlement)}đ
+
+(Công ty CK: ${AppData.formatCurrency(companyCK)}đ + Ứng công ty: ${AppData.formatCurrency(companyAdvance)}đ - Lương thực lĩnh: ${AppData.formatCurrency(payment)}đ = Quyết toán: ${AppData.formatCurrency(settlement)}đ)`;
+
+        navigator.clipboard.writeText(message).then(() => {
+            if (!this.sentZaloList) this.sentZaloList = {};
+            const key = `${employeeId}_${month}`;
+            this.sentZaloList[key] = true;
+            localStorage.setItem('sent_zalo_list', JSON.stringify(this.sentZaloList));
+            
+            // Cập nhật UI nút bấm
+            if (buttonEl) {
+                buttonEl.className = 'btn btn-success';
+                buttonEl.style.padding = '2px 6px';
+                buttonEl.style.fontSize = '0.75rem';
+                buttonEl.style.display = 'inline-flex';
+                buttonEl.style.alignItems = 'center';
+                buttonEl.style.gap = '4px';
+                buttonEl.innerHTML = '<i class="fa-solid fa-check"></i> Đã gửi';
+            }
+            
+            // Mở khung chat Zalo
+            let formattedPhone = phone.replace(/[^0-9+]/g, '');
+            if (formattedPhone.startsWith('+84')) {
+                formattedPhone = '0' + formattedPhone.substring(3);
+            }
+            window.open(`https://zalo.me/${formattedPhone}`, '_blank');
+        }).catch(err => {
+            console.error('Lỗi khi sao chép vào bộ nhớ tạm:', err);
+            alert('Không thể sao chép văn bản quyết toán.');
         });
     },
     bulkUpdateJoinDate(date) {

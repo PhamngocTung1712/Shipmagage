@@ -3186,11 +3186,12 @@ const Views = {
                                     <th style="text-align:right;">Mức lương thực tế</th>
                                     <th style="text-align:right;">Bảo hiểm</th>
                                     <th style="text-align:right; color:var(--success);">Thực lĩnh</th>
+                                    <th style="text-align:center; width:80px;">Zalo</th>
                                 </tr>
                             </thead>
                             <tbody>
             `;
-
+ 
             tableHTML += employees.map(e => {
                 // Make sure attendance array exists for employee
                 if (!timesheet.attendance[e.id]) {
@@ -3201,7 +3202,7 @@ const Views = {
                     while(timesheet.attendance[e.id].length < daysInMonth) timesheet.attendance[e.id].push(true);
                     if (timesheet.attendance[e.id].length > daysInMonth) timesheet.attendance[e.id] = timesheet.attendance[e.id].slice(0, daysInMonth);
                 }
-
+ 
                 const att = timesheet.attendance[e.id];
                 const workingDays = att.filter(Boolean).length;
                 const activeState = AppData.getEmployeeActiveState(e, month);
@@ -3210,14 +3211,14 @@ const Views = {
                 const basic = ov.basicSalary !== undefined ? Number(ov.basicSalary) : (Number(activeState.basicSalary) || 0);
                 const insuranceBase = ov.insurance !== undefined ? Number(ov.insurance) : (activeState.insurance !== undefined && activeState.insurance !== null ? Number(activeState.insurance) : basic);
                 const insurance = Math.round(insuranceBase * 0.105);
-                
+                 
                 // Calculate formula
                 const payment = Math.round((actual / daysInMonth) * workingDays - insurance);
-
+ 
                 totalActual += actual;
                 totalInsurance += insurance;
                 totalPayment += payment;
-
+ 
                 let daysCells = '';
                 for (let i = 0; i < daysInMonth; i++) {
                     const isChecked = att[i] ? 'checked' : '';
@@ -3227,22 +3228,31 @@ const Views = {
                         </td>
                     `;
                 }
-
+ 
+                const isSent = app.sentZaloList && app.sentZaloList[`${e.id}_${month}`];
                 return `
                     <tr>
                         <td style="position: sticky; left: 0; z-index: 1; background: #151824;">
-                            <span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo"><strong>${e.name}</strong></span><br>
+                            <span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.editEmployee('${e.id}')" title="Nhấn để xem/sửa thông tin ban đầu của nhân sự"><strong>${e.name}</strong></span><br>
                             <small style="color:var(--text-muted)">${e.role || ''}</small>
                         </td>
                         ${daysCells}
                         <td style="text-align:center; font-weight:600; color:var(--info);">${workingDays}</td>
-                        <td style="text-align:right;">${AppData.formatCurrency(actual)}</td>
-                        <td style="text-align:right; color:var(--rose-light);">${AppData.formatCurrency(insurance)}</td>
-                        <td style="text-align:right; font-weight:700; color:var(--success);">${AppData.formatCurrency(payment)}</td>
+                        <td style="text-align:right; cursor:pointer; text-decoration:underline dashed rgba(255,255,255,0.2);" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo">${AppData.formatCurrency(actual)}</td>
+                        <td style="text-align:right; color:var(--rose-light); cursor:pointer; text-decoration:underline dashed rgba(255,255,255,0.2);" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo">${AppData.formatCurrency(insurance)}</td>
+                        <td style="text-align:right; font-weight:700; color:var(--success); cursor:pointer; text-decoration:underline dashed rgba(255,255,255,0.2);" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo">${AppData.formatCurrency(payment)}</td>
+                        <td style="text-align:center; padding: 0.25rem;">
+                            <button class="btn ${isSent ? 'btn-success' : 'btn-outline'}" 
+                                    style="padding: 2px 6px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px;" 
+                                    onclick="app.quickSendZalo('${e.id}', '${month}', '${department}', this)" 
+                                    title="Gửi nhanh quyết toán lương qua Zalo">
+                                <i class="fa-solid ${isSent ? 'fa-check' : 'fa-paper-plane'}"></i> ${isSent ? 'Đã gửi' : 'Gửi'}
+                            </button>
+                        </td>
                     </tr>
                 `;
             }).join('');
-
+ 
             if (employees.length > 0) {
                 tableHTML += `
                                 <tr>
@@ -3251,10 +3261,11 @@ const Views = {
                                     <td style="text-align:right; font-weight:700; color:var(--info); background: rgba(255, 255, 255, 0.03);">${AppData.formatCurrency(totalActual)}</td>
                                     <td style="text-align:right; font-weight:700; color:var(--rose-light); background: rgba(255, 255, 255, 0.03);">${AppData.formatCurrency(totalInsurance)}</td>
                                     <td style="text-align:right; font-weight:700; color:var(--success); background: rgba(255, 255, 255, 0.03);">${AppData.formatCurrency(totalPayment)}</td>
+                                    <td style="background: rgba(255, 255, 255, 0.03);"></td>
                                 </tr>
                 `;
             } else {
-                tableHTML += `<tr><td colspan="${daysInMonth + 5}" style="text-align:center; padding: 2rem;">Không có nhân sự nào trong bộ phận này</td></tr>`;
+                tableHTML += `<tr><td colspan="${daysInMonth + 6}" style="text-align:center; padding: 2rem;">Không có nhân sự nào trong bộ phận này</td></tr>`;
             }
 
             tableHTML += `
@@ -3306,6 +3317,7 @@ const Views = {
                                     <th rowspan="2">Thu nhập tính thuế</th>
                                     <th rowspan="2">Thuế TNCN</th>
                                     <th rowspan="2" style="color:var(--success);">Lương còn lại</th>
+                                    <th rowspan="2" style="text-align:center; width:80px;">Zalo</th>
                                 </tr>
                                 <tr>
                                     <th>Tiền ăn ca</th>
@@ -3349,6 +3361,7 @@ const Views = {
                                     <th style="text-align: center;">21 = 8-9-11-20</th>
                                     <th style="text-align: center;">22</th>
                                     <th style="text-align: center; color: var(--success); font-weight: bold; font-style: normal;">23 = 7-20-22</th>
+                                    <th style="text-align: center;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3446,10 +3459,11 @@ const Views = {
                 sumTax += tax;
                 sumRemaining += remaining;
 
+                const isSent = app.sentZaloList && app.sentZaloList[`${e.id}_${month}`];
                 docTableHTML += `
                     <tr>
                         <td style="position: sticky; left: 0; z-index: 2; background: #151824;">${idx + 1}</td>
-                        <td style="position: sticky; left: 50px; z-index: 2; background: #151824;"><span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo"><strong>${e.name}</strong></span></td>
+                        <td style="position: sticky; left: 50px; z-index: 2; background: #151824;"><span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.editEmployee('${e.id}')" title="Nhấn để xem/sửa thông tin ban đầu của nhân sự"><strong>${e.name}</strong></span></td>
                         <td style="position: sticky; left: 200px; z-index: 2; background: #151824;">${e.role || ''}</td>
                         <td style="text-align:right; padding: 2px 4px;">
                             <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${basic}" onchange="app.updateSalaryOverride('${e.id}', 'basicSalary', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
@@ -3472,7 +3486,7 @@ const Views = {
                         <td style="text-align:right; padding: 2px 4px;">
                             <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${bonus}" onchange="app.updateSalaryOverride('${e.id}', 'completionBonus', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
                         </td>
-                        <td style="text-align:right; font-weight:700; color:var(--info);">${AppData.formatCurrency(actualTotal)}</td>
+                        <td style="text-align:right; font-weight:700; color:var(--info); cursor:pointer;" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo">${AppData.formatCurrency(actualTotal)}</td>
                         <td style="text-align:right;">${AppData.formatCurrency(taxableIncome)}</td>
                         <td style="text-align:right; padding: 2px 4px;">
                             <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${personalDeduction}" onchange="app.updateSalaryOverride('${e.id}', 'personalDeduction', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
@@ -3494,13 +3508,21 @@ const Views = {
                         <td style="text-align:right;">${AppData.formatCurrency(nvTotal)}</td>
                         <td style="text-align:right;">${AppData.formatCurrency(assessableIncome)}</td>
                         <td style="text-align:right;">${AppData.formatCurrency(tax)}</td>
-                        <td style="text-align:right; font-weight:700; color:var(--success);">${AppData.formatCurrency(remaining)}</td>
+                        <td style="text-align:right; font-weight:700; color:var(--success); cursor:pointer;" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo">${AppData.formatCurrency(remaining)}</td>
+                        <td style="text-align:center; padding: 0.25rem;">
+                            <button class="btn ${isSent ? 'btn-success' : 'btn-outline'}" 
+                                    style="padding: 2px 6px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px;" 
+                                    onclick="app.quickSendZalo('${e.id}', '${month}', '${department}', this)" 
+                                    title="Gửi nhanh quyết toán lương qua Zalo">
+                                <i class="fa-solid ${isSent ? 'fa-check' : 'fa-paper-plane'}"></i> ${isSent ? 'Đã gửi' : 'Gửi'}
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
 
             if (employees.length === 0) {
-                docTableHTML += `<tr><td colspan="27" style="text-align:center; padding: 2rem;">Không có nhân sự nào trong bộ phận này</td></tr>`;
+                docTableHTML += `<tr><td colspan="28" style="text-align:center; padding: 2rem;">Không có nhân sự nào trong bộ phận này</td></tr>`;
             } else {
                 docTableHTML += `
                     <tr style="font-weight: bold; background: rgba(255, 255, 255, 0.05);">
@@ -3529,6 +3551,7 @@ const Views = {
                         <td style="text-align:right;">${AppData.formatCurrency(sumAssessableIncome)}</td>
                         <td style="text-align:right;">${AppData.formatCurrency(sumTax)}</td>
                         <td style="text-align:right; color:var(--success);">${AppData.formatCurrency(sumRemaining)}</td>
+                        <td style="background: rgba(255, 255, 255, 0.05);"></td>
                     </tr>
                 `;
             }
