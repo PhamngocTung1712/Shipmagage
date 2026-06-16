@@ -5008,6 +5008,120 @@ const app = {
             this.navigate('hr');
         }
     },
+    openSettlementModal(employeeId) {
+        const month = document.getElementById('sal-month')?.value || this.currentViewArgs[0] || new Date().toISOString().substring(0, 7);
+        const department = document.getElementById('sal-department')?.value || this.currentViewArgs[1] || 'VP';
+        
+        const employee = AppData.getEmployee(employeeId);
+        if (!employee) return;
+        
+        const actualData = AppData.calculateActualSalaryForEmployee(employeeId, month, department);
+        const companyCK = AppData.calculateDocumentedSalaryForEmployee(employeeId, month);
+        
+        const ts = AppData.getTimesheet(month, department);
+        const companyAdvance = (ts && ts.salaryOverrides && ts.salaryOverrides[employeeId] && ts.salaryOverrides[employeeId].companyAdvance) !== undefined 
+            ? ts.salaryOverrides[employeeId].companyAdvance 
+            : 0;
+            
+        document.getElementById('settlement-modal-content').innerHTML = Views.settlementModal(employee, month, department, actualData, companyAdvance, companyCK);
+        this.openModal('settlement-modal');
+    },
+    calculateSettlementLive() {
+        const advanceInput = document.getElementById('settle-advance');
+        if (!advanceInput) return;
+        
+        const advance = Number(advanceInput.value) || 0;
+        const payment = Number(advanceInput.dataset.payment) || 0;
+        const companyCK = Number(advanceInput.dataset.companyck) || 0;
+        
+        const result = companyCK + advance - payment;
+        
+        const resultCell = document.getElementById('settle-result-cell');
+        if (resultCell) {
+            resultCell.innerText = AppData.formatCurrency(result);
+            if (result < 0) {
+                resultCell.style.color = 'var(--info)';
+            } else {
+                resultCell.style.color = 'var(--rose)';
+            }
+        }
+    },
+    saveSettlement(employeeId, month, department) {
+        const advanceInput = document.getElementById('settle-advance');
+        if (!advanceInput) return;
+        
+        const advanceValue = advanceInput.value !== '' ? Number(advanceInput.value) : 0;
+        
+        let ts = AppData.getTimesheet(month, department);
+        if (!ts) {
+            ts = { month, department, attendance: {}, voyageCount: 0 };
+        }
+        if (!ts.salaryOverrides) {
+            ts.salaryOverrides = {};
+        }
+        if (!ts.salaryOverrides[employeeId]) {
+            ts.salaryOverrides[employeeId] = {};
+        }
+        
+        ts.salaryOverrides[employeeId].companyAdvance = advanceValue;
+        AppData.saveTimesheet(ts);
+        
+        alert('Đã lưu thành công số tiền ứng công ty!');
+        this.closeModal('settlement-modal');
+        this.navigate('salary', month, department, app.salaryTab || 'thucte');
+    },
+    sendZaloSettlement(employeeId, month, department) {
+        const employee = AppData.getEmployee(employeeId);
+        if (!employee) return;
+        
+        const phone = employee.phone ? String(employee.phone).trim() : '';
+        if (!phone) {
+            alert('Thuyền viên này chưa có số điện thoại Zalo. Vui lòng cập nhật số điện thoại trong mục Quản lý nhân sự.');
+            return;
+        }
+        
+        const actualData = AppData.calculateActualSalaryForEmployee(employeeId, month, department);
+        const companyCK = AppData.calculateDocumentedSalaryForEmployee(employeeId, month);
+        
+        const advanceInput = document.getElementById('settle-advance');
+        const advance = advanceInput ? (Number(advanceInput.value) || 0) : 0;
+        
+        const payment = actualData.payment;
+        const settlement = companyCK + advance - payment;
+        
+        const [yyyy, mm] = month.split('-');
+        const monthYearStr = `${mm}/${yyyy}`;
+        
+        const vesselName = AppData.getVessels().find(v => v.id === department)?.name || department;
+        
+        const message = `BẢNG QUYẾT TOÁN LƯƠNG THÁNG ${monthYearStr}
+Thuyền viên: ${employee.name}
+Tàu: Vũ Gia ${vesselName}
+---------------------------------
+- Mức lương thực tế (1): ${AppData.formatCurrency(actualData.actual)}đ
+- Ngày công: ${actualData.workingDays}/${actualData.daysInMonth}
+- Bảo hiểm (2): ${AppData.formatCurrency(actualData.insurance)}đ
+- Lương thực lĩnh (1-2): ${AppData.formatCurrency(payment)}đ
+- Ứng công ty: ${AppData.formatCurrency(advance)}đ
+- Công ty CK: ${AppData.formatCurrency(companyCK)}đ
+---------------------------------
+=> Quyết toán: ${AppData.formatCurrency(settlement)}đ
+
+(Công ty CK: ${AppData.formatCurrency(companyCK)}đ + Ứng công ty: ${AppData.formatCurrency(advance)}đ - Lương thực lĩnh: ${AppData.formatCurrency(payment)}đ = Quyết toán: ${AppData.formatCurrency(settlement)}đ)`;
+
+        navigator.clipboard.writeText(message).then(() => {
+            alert(`Đã sao chép bảng quyết toán lương của ${employee.name} vào bộ nhớ tạm.\nHệ thống sẽ tự động chuyển hướng sang Zalo để gửi tin nhắn.`);
+            
+            let formattedPhone = phone.replace(/[^0-9+]/g, '');
+            if (formattedPhone.startsWith('+84')) {
+                formattedPhone = '0' + formattedPhone.substring(3);
+            }
+            window.open(`https://zalo.me/${formattedPhone}`, '_blank');
+        }).catch(err => {
+            console.error('Lỗi khi sao chép vào bộ nhớ tạm:', err);
+            alert('Không thể tự động sao chép bảng quyết toán. Vui lòng copy thông tin sau để gửi:\n\n' + message);
+        });
+    },
     bulkUpdateJoinDate(date) {
         if (AppData.state && AppData.state.employees) {
             AppData.state.employees.forEach(emp => {

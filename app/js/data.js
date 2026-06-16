@@ -11041,6 +11041,92 @@ if (!localStorage.getItem('allowances_extracted_v6')) {
             ...activeState // Đè các thông tin lịch sử hoạt động vào
         };
     },
+    calculateActualSalaryForEmployee(employeeId, month, department) {
+        const employee = this.getEmployee(employeeId);
+        if (!employee) return { actual: 0, insurance: 0, payment: 0, workingDays: 0, daysInMonth: 0 };
+        
+        const activeState = this.getEmployeeActiveState(employee, month);
+        const actual = Number(activeState.actualSalary) || 0;
+        
+        const [yyyy, mm] = month.split('-');
+        const daysInMonth = new Date(yyyy, mm, 0).getDate();
+        
+        let timesheet = this.getTimesheet(month, department);
+        if (!timesheet) {
+            timesheet = { month, department, attendance: {}, voyageCount: 0 };
+        }
+        
+        const ov = (timesheet.salaryOverrides && timesheet.salaryOverrides[employeeId]) || {};
+        const basic = ov.basicSalary !== undefined ? Number(ov.basicSalary) : (Number(activeState.basicSalary) || 0);
+        const insuranceBase = ov.insurance !== undefined ? Number(ov.insurance) : (activeState.insurance !== undefined && activeState.insurance !== null ? Number(activeState.insurance) : basic);
+        const insurance = Math.round(insuranceBase * 0.105);
+        
+        if (!timesheet.attendance[employeeId]) {
+            timesheet.attendance[employeeId] = Array(daysInMonth).fill(true);
+        } else {
+            while(timesheet.attendance[employeeId].length < daysInMonth) timesheet.attendance[employeeId].push(true);
+            if (timesheet.attendance[employeeId].length > daysInMonth) timesheet.attendance[employeeId] = timesheet.attendance[employeeId].slice(0, daysInMonth);
+        }
+        
+        const att = timesheet.attendance[employeeId];
+        const workingDays = att.filter(Boolean).length;
+        const payment = Math.round((actual / daysInMonth) * workingDays - insurance);
+        
+        return { actual, insurance, payment, workingDays, daysInMonth };
+    },
+    calculateDocumentedSalaryForEmployee(employeeId, month) {
+        const employee = this.getEmployee(employeeId);
+        if (!employee) return 0;
+        
+        const activeState = this.getEmployeeActiveState(employee, month);
+        const department = activeState.department;
+        
+        let timesheet = this.getTimesheet(month, department);
+        const voyageCount = (timesheet && timesheet.voyageCount) ? Number(timesheet.voyageCount) : 0;
+        const depRate = (timesheet && timesheet.dependentDeductionRate !== undefined) ? timesheet.dependentDeductionRate : 4400000;
+        
+        const ov = (timesheet && timesheet.salaryOverrides && timesheet.salaryOverrides[employeeId]) || {};
+        
+        const basic = ov.basicSalary !== undefined ? Number(ov.basicSalary) : (Number(activeState.basicSalary) || 0);
+        const meal = ov.mealAllowance !== undefined ? Number(ov.mealAllowance) : (Number(activeState.mealAllowance) || 0);
+        const phone = ov.phoneAllowance !== undefined ? Number(ov.phoneAllowance) : (Number(activeState.phoneAllowance) || 0);
+        const clothing = ov.clothingAllowance !== undefined ? Number(ov.clothingAllowance) : (Number(activeState.clothingAllowance) || 0);
+        const transport = ov.transportAllowance !== undefined ? Number(ov.transportAllowance) : (Number(activeState.transportAllowance) || 0);
+        
+        const delivery = ov.deliveryAllowance !== undefined ? Number(ov.deliveryAllowance) : (Number(activeState.deliveryAllowance) || 0) * voyageCount;
+        const bonus = ov.completionBonus !== undefined ? Number(ov.completionBonus) : (Number(activeState.completionBonus) || 0) * voyageCount;
+
+        const actualTotal = basic + meal + phone + clothing + transport + delivery + bonus;
+        const taxableIncome = Math.max(0, actualTotal - meal - phone - clothing);
+        
+        const personalDeduction = ov.personalDeduction !== undefined ? Number(ov.personalDeduction) : (Number(activeState.personalDeduction) || 15500000);
+        const dependents = ov.dependents !== undefined ? Number(ov.dependents) : (Number(activeState.dependents) || 0);
+        const dependentDeduction = dependents * depRate;
+
+        const insuranceBase = ov.insurance !== undefined ? Number(ov.insurance) : (activeState.insurance !== undefined && activeState.insurance !== null ? Number(activeState.insurance) : basic);
+
+        const nvBhxh = insuranceBase * 0.08;
+        const nvBhyt = insuranceBase * 0.015;
+        const nvBhtn = insuranceBase * 0.01;
+        const nvTotal = nvBhxh + nvBhyt + nvBhtn;
+
+        const assessableIncome = Math.max(0, taxableIncome - personalDeduction - dependentDeduction - nvTotal);
+        
+        const calcTax = (income) => {
+            if (income <= 0) return 0;
+            if (income <= 5000000) return income * 0.05;
+            if (income <= 10000000) return (5000000 * 0.05) + ((income - 5000000) * 0.1);
+            if (income <= 18000000) return (5000000 * 0.05) + (5000000 * 0.1) + ((income - 10000000) * 0.15);
+            if (income <= 32000000) return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + ((income - 18000000) * 0.2);
+            if (income <= 52000000) return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + (14000000 * 0.2) + ((income - 32000000) * 0.25);
+            if (income <= 80000000) return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + (14000000 * 0.2) + (20000000 * 0.25) + ((income - 52000000) * 0.3);
+            return (5000000 * 0.05) + (5000000 * 0.1) + (8000000 * 0.15) + (14000000 * 0.2) + (20000000 * 0.25) + (28000000 * 0.3) + ((income - 80000000) * 0.35);
+        };
+        const tax = calcTax(assessableIncome);
+        const remaining = actualTotal - nvTotal - tax;
+        
+        return Math.round(remaining);
+    },
     saveEmployee(employee) {
         if (!this.state.employees) this.state.employees = [];
         if (employee.id) {

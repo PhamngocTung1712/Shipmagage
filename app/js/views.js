@@ -3231,7 +3231,7 @@ const Views = {
                 return `
                     <tr>
                         <td style="position: sticky; left: 0; z-index: 1; background: #151824;">
-                            <span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.editEmployee('${e.id}')" title="Nhấn để xem/sửa thông tin ban đầu của nhân sự"><strong>${e.name}</strong></span><br>
+                            <span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo"><strong>${e.name}</strong></span><br>
                             <small style="color:var(--text-muted)">${e.role || ''}</small>
                         </td>
                         ${daysCells}
@@ -3449,7 +3449,7 @@ const Views = {
                 docTableHTML += `
                     <tr>
                         <td style="position: sticky; left: 0; z-index: 2; background: #151824;">${idx + 1}</td>
-                        <td style="position: sticky; left: 50px; z-index: 2; background: #151824;"><span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.editEmployee('${e.id}')" title="Nhấn để xem/sửa thông tin ban đầu của nhân sự"><strong>${e.name}</strong></span></td>
+                        <td style="position: sticky; left: 50px; z-index: 2; background: #151824;"><span style="cursor: pointer; text-decoration: underline; text-underline-offset: 3px;" onclick="app.openSettlementModal('${e.id}')" title="Nhấn để xem quyết toán lương & gửi Zalo"><strong>${e.name}</strong></span></td>
                         <td style="position: sticky; left: 200px; z-index: 2; background: #151824;">${e.role || ''}</td>
                         <td style="text-align:right; padding: 2px 4px;">
                             <input type="number" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,0.15); color: inherit; text-align: right; width: 90px; font-size: 0.8rem; font-family: inherit; outline: none; padding: 2px;" value="${basic}" onchange="app.updateSalaryOverride('${e.id}', 'basicSalary', this.value)" title="Nhấn để sửa tay. Xóa trống để khôi phục mặc định.">
@@ -3543,6 +3543,97 @@ const Views = {
 
             return headerHTML + docTableHTML;
         }
+    },
+
+    settlementModal: (e, month, department, actualData, companyAdvance, companyCK) => {
+        const [yyyy, mm] = month.split('-');
+        const vesselName = AppData.getVessels().find(v => v.id === department)?.name || department;
+        const actualTotal = actualData.actual;
+        const workingDays = actualData.workingDays;
+        const daysInMonth = actualData.daysInMonth;
+        const insurance = actualData.insurance;
+        const payment = actualData.payment;
+        const settlement = companyCK + companyAdvance - payment;
+        
+        return `
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 12px;">
+                <h3 style="margin: 0; text-transform: uppercase; font-size: 1.1rem; color: var(--info); font-weight: bold; width: 100%; text-align: center;">
+                    Bảng Quyết Toán Lương ${mm}/${yyyy}
+                </h3>
+                <button class="modal-close" onclick="app.closeModal('settlement-modal')" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding-top: 15px;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.15);">
+                    <tr>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: 600; background: rgba(255,255,255,0.03); width: 45%;">Thuyền viên</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: bold; color: #fff;">${e.name}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: 600; background: rgba(255,255,255,0.03);">Tàu</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; color: var(--text-light);">Tàu ${vesselName}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: 600; background: rgba(255,255,255,0.03);">Mức lương (1)</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: right; font-weight: 500;">${AppData.formatCurrency(actualTotal)}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: 600; background: rgba(255,255,255,0.03);">Ngày công</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: center; font-weight: bold; color: var(--info);">${workingDays}/${daysInMonth}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: 600; background: rgba(255,255,255,0.03);">Bảo hiểm (2)</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: right; color: var(--rose-light);">${AppData.formatCurrency(insurance)}</td>
+                    </tr>
+                    <tr style="background: rgba(245, 158, 11, 0.15);">
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: bold; color: #fbbf24;">Lương thực (1-2)</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: right; font-weight: bold; color: #fbbf24;">${AppData.formatCurrency(payment)}</td>
+                    </tr>
+                    <tr style="background: rgba(245, 158, 11, 0.15);">
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: bold; color: #fbbf24; vertical-align: middle;">Ứng công ty</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 4px 8px; text-align: right;">
+                            <input type="number" id="settle-advance" value="${companyAdvance || ''}" 
+                                   data-payment="${payment}" 
+                                   data-companyck="${companyCK}" 
+                                   oninput="app.calculateSettlementLive()" 
+                                   style="width: 100%; background: transparent; border: none; text-align: right; font-weight: bold; color: #fbbf24; outline: none; font-size: 0.95rem; padding: 4px 0;" 
+                                   placeholder="Nhập số tiền...">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: 600; background: rgba(255,255,255,0.03);">Công ty CK</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: right; font-weight: bold; color: var(--success);">${AppData.formatCurrency(companyCK)}</td>
+                    </tr>
+                    <tr style="background: rgba(239, 68, 68, 0.1);">
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; font-weight: bold; color: var(--rose);">Quyết toán</td>
+                        <td style="border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: right; font-weight: bold; color: ${settlement < 0 ? 'var(--info)' : 'var(--rose)'}; font-size: 1.05rem;" id="settle-result-cell">
+                            ${AppData.formatCurrency(settlement)}
+                        </td>
+                    </tr>
+                </table>
+                
+                <div style="font-size: 0.85rem; margin-bottom: 20px; text-align: center; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px;">
+                    Số điện thoại Zalo: <strong style="color: var(--primary-light);">${e.phone || 'Chưa thiết lập'}</strong>
+                    ${!e.phone ? `
+                        <div style="margin-top: 4px; color: var(--warning);">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Cần bổ sung SĐT để gửi tin nhắn Zalo.
+                        </div>
+                    ` : ''}
+                    <a href="#" onclick="event.preventDefault(); app.closeModal('settlement-modal'); app.editEmployee('${e.id}');" style="color: var(--accent); text-decoration: underline; display: block; margin-top: 6px; font-size: 0.75rem;">
+                        <i class="fa-solid fa-user-pen"></i> Chỉnh sửa hồ sơ thuyền viên (SĐT, lương mặc định...)
+                    </a>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <button class="btn btn-outline" onclick="app.closeModal('settlement-modal')" style="flex: 1; height: 38px;">Đóng</button>
+                    <button class="btn btn-primary" onclick="app.saveSettlement('${e.id}', '${month}', '${department}')" style="flex: 1.2; height: 38px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi
+                    </button>
+                    <button class="btn" onclick="app.sendZaloSettlement('${e.id}', '${month}', '${department}')" style="flex: 1.2; height: 38px; background-color: #0068ff; border-color: #0068ff; color: white; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fa-solid fa-paper-plane"></i> Gửi Zalo
+                    </button>
+                </div>
+            </div>
+        `;
     },
 
     company: () => {
