@@ -2949,7 +2949,7 @@ const Views = {
                     `).join('')}
                 </div>
 
-                <div class="filter-bar glass-card" style="margin-bottom: 1.5rem; padding: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <div class="filter-bar glass-card" style="margin-bottom: 1.5rem; padding: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; position: relative; z-index: 10;">
                     <!-- Thanh tìm kiếm -->
                     <div style="flex-grow: 1; min-width: 250px; position: relative;">
                         <input type="text" class="form-control" id="hr-search" placeholder="Tìm kiếm theo tên nhân sự..." value="${app.hrSearchQuery || ''}" oninput="app.handleHrSearch(this.value)" style="padding-left: 2.5rem; height: 38px; width: 100%;">
@@ -2957,7 +2957,7 @@ const Views = {
                     </div>
 
                     <!-- Bộ lọc chức danh -->
-                    <div style="min-width: 220px; position: relative;" id="hr-role-select-container">
+                    <div style="min-width: 220px; position: relative; z-index: 100;" id="hr-role-select-container">
                         <button type="button" class="form-control" style="text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 38px; background: var(--bg-input, #1e293b); border: 1px solid var(--border-color, #334155); color: #fff; cursor: pointer; border-radius: 6px; padding: 0.375rem 0.75rem;" onclick="app.toggleHrRoleDropdown(event)">
                             <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; display: inline-block;">
                                 ${app.selectedHrRoles && app.selectedHrRoles.length > 0 
